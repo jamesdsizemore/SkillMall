@@ -57,7 +57,7 @@ export default function RootLayout({
                 Contribute
               </Link>
               <a
-                href="https://github.com"
+                href="https://github.com/jamesdsizemore/SkillMall"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
@@ -95,7 +95,7 @@ export default function RootLayout({
                   Contribute
                 </Link>
                 <a
-                  href="https://github.com"
+                  href="https://github.com/jamesdsizemore/SkillMall"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-zinc-400"

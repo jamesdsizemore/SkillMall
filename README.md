@@ -72,9 +72,8 @@ skills/<category>/<skill-name>/
 ## Setup
 
 ```bash
-git clone https://github.com/<owner>/skill-mall
-cd skill-mall
-git init  # if not already a git repo
+git clone https://github.com/jamesdsizemore/SkillMall
+cd SkillMall
 npm install
 npm run prepare  # installs Husky pre-commit hook
 npm run dev
