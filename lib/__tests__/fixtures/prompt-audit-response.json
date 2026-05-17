@@ -1,0 +1,30 @@
+{
+  "token_efficiency": {
+    "score": 75,
+    "unnecessary_phrases": ["very", "basically"],
+    "optimized_text": "Produce a strategy canvas showing the competitive landscape."
+  },
+  "intent_completeness": {
+    "score": 78,
+    "present": ["task", "input", "output", "constraints"],
+    "missing": ["success-criteria", "examples"],
+    "suggestions": {
+      "success-criteria": "Add: The output is complete when all competing factors are scored and the proposed curve diverges.",
+      "examples": "Add a brief example showing a single scored factor."
+    }
+  },
+  "output_clarity": {
+    "score": 85,
+    "issues": [],
+    "passes": true
+  },
+  "trigger_sharpness": {
+    "score": 90,
+    "first_sentence": "Produce a strategy canvas showing the competitive landscape.",
+    "passes": true,
+    "suggestion": null
+  },
+  "optimized_prompt": "Produce a strategy canvas showing the competitive landscape.",
+  "estimated_tokens_before": 20,
+  "estimated_tokens_after": 10
+}
