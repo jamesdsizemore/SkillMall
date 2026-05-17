@@ -1334,4 +1334,91 @@ Phase 1 includes discovery only — skills in the catalog that are already publi
 
 ---
 
-*End of specification. This document covers all features, all phases, and all design decisions in the approved scope. Any feature not listed here is not in scope for the current roadmap.*
+---
+
+## 10. UI/UX Design System
+
+### Directive
+
+This section documents visual direction and UX patterns. It is directional, not prescriptive. The implementing agent should honor the intent and the pattern — if a technical constraint requires a layout adjustment, adjust the layout. Never force code to fit this documentation.
+
+### Visual Language — Nothing Design System
+
+SkillMall uses the Nothing design system. Implementation should install the skill from `github.com/dominikmartn/nothing-design-skill` and reference it throughout UI work.
+
+**Font stack (required — load from Google Fonts):**
+
+| Role | Font | Usage |
+|------|------|-------|
+| Display / hero numbers | Doto (variable, DOTO axis = 1) | Large stats, quality scores, counters |
+| Body / UI | Space Grotesk | All body text, headings, descriptions |
+| Labels / data | Space Mono | ALL CAPS labels, monospace data, bracket notation |
+
+**Color tokens (light mode default, dark mode must be equally designed):**
+
+| Token | Light | Dark | Role |
+|-------|-------|------|------|
+| `--bg` | `#F5F5F5` | `#000000` | Page background |
+| `--surface` | `#FFFFFF` | `#111111` | Card / panel surfaces |
+| `--border-visible` | `#CCCCCC` | `#333333` | Intentional borders |
+| `--text-display` | `#000000` | `#FFFFFF` | Hero numbers, headlines |
+| `--text-primary` | `#1A1A1A` | `#E8E8E8` | Body text |
+| `--text-secondary` | `#666666` | `#999999` | Labels, captions |
+| `--text-disabled` | `#999999` | `#666666` | Tertiary content |
+| `--accent` | `#D71921` | `#D71921` | One interrupt per screen only |
+| `--blue` | `#007AFF` | `#5B9BF6` | Positive states, interactive, confirmed |
+
+**No green. No purple. Blues and greys with red accent only.**
+
+### Craft Rules (summary — full rules in the Nothing design skill)
+
+**Three-layer hierarchy per screen:**
+- Primary: Doto or large Space Grotesk, `--text-display`, max one per screen
+- Secondary: Space Grotesk body, `--text-primary`, supporting content
+- Tertiary: Space Mono ALL CAPS, `--text-secondary`, pushed to edges
+
+**The one surprise element rule:** Each screen has exactly one element that breaks the visual grid — an oversized Doto number, a high-contrast data panel, a red accent indicator. One. Not two. Not zero.
+
+**No:** gradients, shadows, border-radius above 16px on cards, toast popups (use `[SAVED]` inline status), skeleton loaders (use `[LOADING...]` text), green, purple, zebra-striped tables.
+
+**Yes:** segmented progress bars as the data visualization language throughout, bracket notation for statuses and labels (`[ CONFIRMED ]`, `[ NON-SKIPPABLE ]`, `[ 147 SKILLS ]`), dot-grid backgrounds as subtle texture (not dominant), underline-style inputs (bottom border only), mechanical toggle for the mode switch.
+
+**Dot-grid background:**
+```css
+background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px);
+background-size: 16px 16px;
+```
+Use as texture on specific data-heavy sections. Never as the hero background.
+
+**Alignment rule:** When displaying a list of items with a type label (e.g., tool type, prompt type), use a CSS grid with a fixed-width first column so the item name always starts at the same horizontal position. Never use inline-flex where variable-width labels would shift name alignment.
+
+### Homepage
+
+**Hero section stays light** (`--bg` background, `--text-display` headline). The dramatic moment on the homepage is the Doto stat counter row below the headline and CTAs — `147 SKILLS`, `8 CATEGORIES`, `54 AGENTS`, each a large Doto number with a Space Mono ALL CAPS label and a segmented bar beneath it. This is the instrument-panel moment for the homepage. The hero background is not inverted.
+
+**Navigation:** one topbar only. No secondary navigation bar below it.
+
+### Skill Creation Wizard (Step 1)
+
+- Form inputs use underline style (bottom border only, no box)
+- Labels in Space Mono ALL CAPS with bracket notation: `[ SKILL TOPIC ]`
+- The "what happens next" panel uses Doto numbers (01, 02, 03, 04) as the visual anchor for each step
+- Never pre-populate form inputs via HTML `value` attributes inside animated containers — initialize via React state after mount to prevent the value appearing before the container animation completes
+
+### Research Review (Step 2) — Add Model
+
+The dominant visual moment is the tools-found count as a large Doto number in a high-contrast panel (dark background with dot-grid texture) on the left, with the explanation text on the right in a two-column layout.
+
+**Add model, not remove model.** The screen starts with 5 recommended tools. Additional tools are behind a collapsed `[ ADD MORE TOOLS ]` section. Users add, never remove. This is the universal UI pattern users expect.
+
+### Skill Detail Page
+
+Quality score displayed as an inverted (dark background) panel with the Doto number as the hero — this is the one high-contrast element on this screen. All other content remains on light surfaces. The deploy section, tabs, and content areas are light.
+
+### Prompts
+
+Prompts are grouped by use case in plain English ("Step by step", "Full analysis in one pass", "For a specific situation") — not by technical PE framework name. Framework names are accessible in a secondary details expansion but never the primary label. Complexity is indicated by a color-coded dot (blue = quick, grey = thorough, red = exhaustive) aligned in a fixed column so all prompt names start at the same horizontal position.
+
+---
+
+*End of specification. This document covers all features, all phases, design decisions, and UI/UX direction in the approved scope.*
