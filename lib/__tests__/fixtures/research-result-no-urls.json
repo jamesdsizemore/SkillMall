@@ -1,0 +1,25 @@
+{
+  "topic": "OKR Framework",
+  "sources": [],
+  "researchUnverified": true,
+  "summary": "Apply the OKR Framework to set ambitious, measurable goals that align teams around outcomes. Provide source URLs for authoritative, verified results.",
+  "tools": [
+    {
+      "name": "OKR Template",
+      "category": "Goal Setting",
+      "description": "Captures Objectives and Key Results in a structured format.",
+      "artifactType": "list",
+      "artifactStructure": "## Objective\n[Qualitative, ambitious goal]\n\n## Key Results\n1. [Measurable outcome 1] — Target: \n2. [Measurable outcome 2] — Target: \n3. [Measurable outcome 3] — Target: ",
+      "inputs": ["strategic priorities", "measurable metrics"],
+      "outputs": ["completed OKR set"],
+      "howUsed": "1. Define the objective. 2. Write 2-5 key results. 3. Assign owners. 4. Track weekly."
+    }
+  ],
+  "principles": [
+    "Objectives are qualitative and inspirational",
+    "Key results are quantitative and time-bound",
+    "OKRs should be ambitious — 70% attainment is considered success"
+  ],
+  "suggestedCategory": "productivity",
+  "suggestedTags": ["okr", "goals", "productivity", "planning"]
+}
