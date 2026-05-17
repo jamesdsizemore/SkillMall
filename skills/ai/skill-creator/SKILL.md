@@ -48,7 +48,7 @@ Based on the user's request and the found skills, determine:
 | `metadata.category` | development, design, writing, research, productivity, infrastructure, ai, business | Choose best fit |
 | `metadata.tags` | 2–6 lowercase, comma-separated | Derive from scope |
 
-**Note on description length**: descriptions over 150 chars are silently truncated by Claude Code's `skillListingBudgetFraction` (1% of context window). The AgentSkills spec allows up to 1024 chars — other agents handle this without truncation.
+**Description length**: the AgentSkills spec allows up to 1024 chars, but keep descriptions under 150 chars. All coding agents implement skill listing budgets and silently truncate descriptions that exceed the budget when context fills with many skills. Put the key trigger phrase in the first 80 chars.
 
 ## Step 4 — Scaffold the skill
 

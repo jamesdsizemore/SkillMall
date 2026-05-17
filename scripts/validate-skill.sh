@@ -29,11 +29,13 @@ NC='\033[0m'
 
 # Character limits
 # AgentSkills spec: name ≤ 64, description ≤ 1024
-# Claude Code best practice: description ≤ 150 (skillListingBudgetFraction truncation)
+# Universal best practice: keep description ≤ 150 chars.
+# All coding agents implement skill listing budgets and silently truncate
+# descriptions that exceed the budget when context fills with many skills.
 NAME_MAX=64          # AgentSkills spec hard limit
 DESC_MAX=1024        # AgentSkills spec hard limit
-DESC_WARN=150        # Claude Code efficiency threshold — warn if exceeded
-WHEN_MAX=150         # Claude Code when_to_use limit (CC-only field)
+DESC_WARN=150        # Universal efficiency threshold — warn if exceeded
+WHEN_MAX=150         # Claude Code when_to_use (CC-only field, same budget logic)
 
 get_field() {
   local file="$1" key="$2"

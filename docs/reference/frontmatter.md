@@ -88,9 +88,7 @@ argument-hint: "[PR number or branch name]"
 
 | Agent | Description limit | Behavior when exceeded |
 |-------|------------------|------------------------|
-| AgentSkills spec | 1,024 chars | Spec violation — reject |
-| Claude Code | ~150 chars effective | Silent truncation via `skillListingBudgetFraction` (1% of context) |
-| Cursor | ~1,024 chars | Follows spec |
-| GitHub Copilot | ~1,024 chars | Follows spec |
+| AgentSkills spec | 1,024 chars | Technical maximum — above this is a spec violation |
+| All agents (effective) | ~150 chars | All agents implement skill listing budgets. Descriptions over ~150 chars risk silent truncation when the agent's context fills with many skills. |
 
-**Recommendation**: Keep `description` under 150 chars and put the primary trigger phrase in the first 80 characters. This ensures the skill works at full strength across all agents, including Claude Code under heavy skill load.
+**Recommendation**: Keep `description` under 150 chars and put the primary trigger phrase in the first 80 characters. This is a universal best practice — every coding agent implements some form of skill listing budget, and all are affected by descriptions that exceed it.

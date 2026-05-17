@@ -2,16 +2,24 @@
 
 SkillMall skills follow the [AgentSkills open standard](https://agentskills.io). Every skill in the catalog works with any compatible agent by default. This page documents agent-specific behavior and known differences.
 
+For detailed, per-agent skill creation guidance, see [docs/agents/](../agents/README.md).
+
 ## Supported agents
 
-| Agent | Skills path (global) | Skills path (project) | Auto-discovery | Notes |
-|-------|---------------------|----------------------|----------------|-------|
-| Claude Code | `~/.claude/skills/` | `.claude/skills/` | Yes | Extends the standard with additional frontmatter fields |
-| Cursor | `~/.cursor/skills/` | `.cursor/skills/` | Yes | Follows the AgentSkills spec |
-| GitHub Copilot | `~/.agents/skills/` | `.agents/skills/` | Yes | Uses the universal path |
-| OpenAI Codex | `~/.agents/skills/` | `.agents/skills/` | Yes | Uses the universal path |
-| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/` | Partial | Check current Gemini CLI docs |
-| Aider | `~/.agents/skills/` | `.agents/skills/` | Varies | Depends on version |
+| Agent | Skills path (global) | Skills path (project) |
+|-------|---------------------|----------------------|
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Cursor | `~/.cursor/skills/` | `.agents/skills/` |
+| GitHub Copilot | `~/.copilot/skills/` | `.agents/skills/` |
+| OpenAI Codex | `~/.codex/skills/` | `.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/` | `.agents/skills/` |
+| Continue | `~/.continue/skills/` | `.continue/skills/` |
+| Goose | `~/.config/goose/skills/` | `.goose/skills/` |
+| Cline | `~/.agents/skills/` | `.agents/skills/` |
+| Amp | `~/.config/agents/skills/` | `.agents/skills/` |
+| Windsurf | `~/.codeium/skills/` | `.codeium/skills/` |
+
+The `npx skills` CLI from [vercel-labs/skills](https://github.com/vercel-labs/skills) supports 50+ agents and handles path detection automatically.
 
 ## Feature compatibility
 

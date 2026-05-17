@@ -6,7 +6,8 @@
 name: skill-name
 
 # max 1024 chars per spec. Use imperative: "Use when..." — put the trigger phrase FIRST.
-# Claude Code best practice: keep under 150 chars to avoid skill-listing budget truncation.
+# Universal best practice: keep under 150 chars. All agents implement skill listing budgets
+# and silently truncate descriptions that exceed the budget when context fills with many skills.
 description: "Use when [trigger]. Produces [output]."
 
 # OPTIONAL spec fields
