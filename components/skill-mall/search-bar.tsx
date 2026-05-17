@@ -2,16 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type Props = {
   className?: string;
-  placeholder?: string;
 };
 
-export function SearchBar({ className, placeholder = "Search skills, tags, categories..." }: Props) {
+export function SearchBar({ className }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(searchParams.get("q") ?? "");
@@ -32,21 +29,34 @@ export function SearchBar({ className, placeholder = "Search skills, tags, categ
 
   return (
     <div className={cn("relative", className)}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-      <Input
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        placeholder={placeholder}
-        className="border-zinc-700 bg-zinc-800/80 pl-10 pr-10 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-zinc-500 focus-visible:ring-zinc-500/20"
-      />
-      {value && (
-        <button
-          onClick={() => handleChange("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
+      <label
+        className="mb-1.5 block text-[9px] tracking-widest text-sm-secondary"
+        style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+      >
+        [ SEARCH SKILLS ]
+      </label>
+      <div className="relative border-b border-sm-border focus-within:border-sm-display transition-colors">
+        <input
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder="skill name, tag, or category..."
+          className="w-full bg-transparent py-2 pr-8 text-sm text-sm-primary outline-none placeholder:text-sm-disabled"
+        />
+        {value && (
+          <button
+            onClick={() => handleChange("")}
+            className="absolute right-0 top-1/2 -translate-y-1/2 text-sm-disabled hover:text-sm-primary transition-colors"
+            aria-label="Clear search"
+          >
+            <span
+              className="text-[10px]"
+              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+            >
+              [ X ]
+            </span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
