@@ -1,26 +1,51 @@
 # Agent Reference Docs
 
-Per-agent reference material for creating SkillMall-compatible skills. Use these docs when creating a skill that targets a specific agent, or when you need to know an agent's exact paths, supported fields, and native extensions.
+Two distinct sets of documentation, kept separate by audience and purpose.
 
-## Agent index
+---
 
-| Agent | Doc | Project path | Global path | Native extensions |
-|-------|-----|-------------|-------------|-------------------|
-| Claude Code | [claude-code.md](claude-code.md) | `.claude/skills/` | `~/.claude/skills/` | Yes — extensive |
-| Cursor | [cursor.md](cursor.md) | `.agents/skills/` | `~/.cursor/skills/` | No |
-| OpenAI Codex | [codex.md](codex.md) | `.agents/skills/` | `~/.codex/skills/` | No |
-| GitHub Copilot | [github-copilot.md](github-copilot.md) | `.agents/skills/` | `~/.copilot/skills/` | No |
-| Gemini CLI | [gemini-cli.md](gemini-cli.md) | `.agents/skills/` | `~/.gemini/skills/` | No |
-| Continue | [continue.md](continue.md) | `.continue/skills/` | `~/.continue/skills/` | No |
+## `human/` — Setup and deployment guides
 
-## Writing for multiple agents
+For developers installing and using SkillMall skills in their agent. Covers install paths, invocation syntax, verification, and troubleshooting.
 
-If your skill must work on all agents, start with [universal.md](universal.md). It defines the safe subset of frontmatter, lists what to avoid, and explains when to write a universal skill versus an agent-specific one.
+| Agent | Guide | Project path | Global path |
+|-------|-------|-------------|-------------|
+| Claude Code | [human/claude-code.md](human/claude-code.md) | `.claude/skills/` | `~/.claude/skills/` |
+| Cursor | [human/cursor.md](human/cursor.md) | `.agents/skills/` | `~/.cursor/skills/` |
+| GitHub Copilot | [human/github-copilot.md](human/github-copilot.md) | `.agents/skills/` | `~/.copilot/skills/` |
+| OpenAI Codex | [human/codex.md](human/codex.md) | `.agents/skills/` | `~/.codex/skills/` |
+| Gemini CLI | [human/gemini-cli.md](human/gemini-cli.md) | `.agents/skills/` | `~/.gemini/skills/` |
+| Continue | [human/continue.md](human/continue.md) | `.continue/skills/` | `~/.continue/skills/` |
 
-If your skill targets a single agent and you want to use its native features, go directly to that agent's doc.
+---
 
-## Relationship to other docs
+## `skill-creation/` — Skill authoring reference for AI agents
 
-- Frontmatter field definitions: [../reference/frontmatter.md](../reference/frontmatter.md)
-- Cross-agent feature matrix: [../reference/agent-compatibility.md](../reference/agent-compatibility.md)
-- General skill creation workflow: [../user/creating-skills.md](../user/creating-skills.md)
+For coding agents asked to create a skill targeting a specific agent. Load the relevant document to know that agent's exact frontmatter fields, native extensions, character limits, and authoring rules.
+
+| Document | When to load it |
+|----------|----------------|
+| [skill-creation/universal.md](skill-creation/universal.md) | Creating a skill that works across all agents |
+| [skill-creation/claude-code.md](skill-creation/claude-code.md) | Creating a Claude Code-native skill |
+| [skill-creation/cursor.md](skill-creation/cursor.md) | Creating a skill targeting Cursor |
+| [skill-creation/github-copilot.md](skill-creation/github-copilot.md) | Creating a skill targeting GitHub Copilot |
+| [skill-creation/codex.md](skill-creation/codex.md) | Creating a skill targeting OpenAI Codex |
+| [skill-creation/gemini-cli.md](skill-creation/gemini-cli.md) | Creating a skill targeting Gemini CLI |
+| [skill-creation/continue.md](skill-creation/continue.md) | Creating a skill targeting Continue |
+
+---
+
+## Which document to load
+
+**Human developer** setting up SkillMall with a specific agent → `human/<agent>.md`
+
+**Coding agent** asked to create a skill:
+- Universal skill (works everywhere) → load `skill-creation/universal.md`
+- Agent-specific skill → load `skill-creation/<target-agent>.md`
+- Default to universal unless agent-specific features are explicitly required
+
+---
+
+## More agents
+
+[vercel-labs/skills](https://github.com/vercel-labs/skills) supports 50+ agents. For any agent not listed here, use the universal skill format. Full path reference: [../reference/agent-compatibility.md](../reference/agent-compatibility.md)
