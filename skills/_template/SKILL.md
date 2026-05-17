@@ -1,42 +1,42 @@
 ---
-# REQUIRED — max 64 chars, lowercase letters, numbers, hyphens only
+# REQUIRED — AgentSkills open standard (agentskills.io)
+# Works with Claude Code, Cursor, GitHub Copilot, Codex, Gemini CLI, and any compatible agent.
+
+# max 64 chars · lowercase letters, numbers, hyphens · no leading/trailing/consecutive hyphens
 name: skill-name
 
-# REQUIRED — max 150 chars. Put the key use case FIRST (truncation starts here).
-description: One-line key use case. Under 150 chars. Front-load the trigger phrase.
+# max 1024 chars per spec. Use imperative: "Use when..." — put the trigger phrase FIRST.
+# Claude Code best practice: keep under 150 chars to avoid skill-listing budget truncation.
+description: "Use when [trigger]. Produces [output]."
 
-# OPTIONAL — max 150 chars. Appended to description in skill listing. Same char budget.
-when_to_use: "Trigger phrases: 'do X', 'help me with Y', 'run Z'"
-
-# SkillMall metadata (not read by Claude Code — used by catalog only)
-version: 1.0.0
-category: development
-tags:
-  - tag-one
-  - tag-two
-author: your-github-username
+# OPTIONAL spec fields
 license: MIT
-linked_skills:
-  - related-skill-name
+# compatibility: "Requires Python 3.11+, internet access." (omit if no special requirements)
 
-# OPTIONAL Claude Code behavior flags
-disable-model-invocation: false
-user-invocable: true
-# allowed-tools: Read Bash(git *)
+# SkillMall catalog metadata — read by the catalog UI, not by agents
+metadata:
+  version: "1.0.0"
+  author: your-github-username
+  category: development
+  tags: "tag-one, tag-two"
+  linked-skills: "related-skill-name"
+
+# OPTIONAL — Claude Code extensions (safe to leave in; other agents ignore unknown fields)
+# when_to_use: "Additional trigger phrases for Claude Code's skill listing."
+# allowed-tools: "Read Bash(git *)"
+# disable-model-invocation: false
 # argument-hint: "[optional-arg]"
-# context: fork
-# agent: Explore
 ---
 
 # Skill Name
 
-One to two sentence overview. State what this skill does and what it produces.
+One to two sentence overview. What this skill does and what it produces.
 
 ## When to Use
 
-- Specific trigger: user asks "..."
-- Specific trigger: user wants to ...
-- Anti-pattern: do NOT use when ...
+- Trigger: user asks "..."
+- Trigger: user wants to ...
+- Do NOT use when: ...
 
 ## What This Produces
 
@@ -47,23 +47,24 @@ One to two sentence overview. State what this skill does and what it produces.
 
 ### Step 1 — Gather context
 
-What Claude should read or check first.
+What the agent should read or check first.
 
 ### Step 2 — Core work
 
 The main directives. Be specific. Use imperative voice.
+Include both shell (bash) and PowerShell variants for any terminal commands.
 
 ### Step 3 — Verify and return
 
-How Claude confirms the output is correct before responding.
+How the agent confirms the output is correct before responding.
 
 ## Supporting Files
 
-Reference any supporting files here so Claude knows to load them:
+Reference supporting files so the agent knows to load them:
 
-- For the output template, see [resources/templates/output-template.md](resources/templates/output-template.md)
-- For a completed example, see [resources/samples/sample-output.md](resources/samples/sample-output.md)
-- To run automation, execute [scripts/run.sh](scripts/run.sh)
+- Template: [resources/templates/output-template.md](resources/templates/output-template.md)
+- Sample: [resources/samples/sample-output.md](resources/samples/sample-output.md)
+- Script: [scripts/run.sh](scripts/run.sh)
 
 ## Linked Skills
 

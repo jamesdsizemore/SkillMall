@@ -27,10 +27,13 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Character limits (based on Claude Code docs + SkillMall best practices)
-NAME_MAX=64          # Official Claude Code maximum
-DESC_MAX=150         # Best practice (well within 1,536-char combined budget)
-WHEN_MAX=150         # Same as description — both count toward the 1,536 cap
+# Character limits
+# AgentSkills spec: name ≤ 64, description ≤ 1024
+# Claude Code best practice: description ≤ 150 (skillListingBudgetFraction truncation)
+NAME_MAX=64          # AgentSkills spec hard limit
+DESC_MAX=1024        # AgentSkills spec hard limit
+DESC_WARN=150        # Claude Code efficiency threshold — warn if exceeded
+WHEN_MAX=150         # Claude Code when_to_use limit (CC-only field)
 
 get_field() {
   local file="$1" key="$2"
@@ -73,16 +76,16 @@ validate_file() {
   fi
 
   if [[ -z "$description" ]]; then
-    echo -e "${YELLOW}WARN${NC}  $rel: missing recommended field 'description'"
+    echo -e "${YELLOW}WARN${NC}  $rel: missing required field 'description' (AgentSkills spec)"
     ((WARNINGS++)); ((file_warnings++))
   else
     local desc_len=${#description}
     if [[ $desc_len -gt $DESC_MAX ]]; then
-      echo -e "${RED}ERROR${NC} $rel: 'description' is $desc_len chars (max $DESC_MAX)"
+      echo -e "${RED}ERROR${NC} $rel: 'description' is $desc_len chars (spec max $DESC_MAX)"
       echo -e "       \"${description:0:80}...\""
       ((ERRORS++)); ((file_errors++))
-    elif [[ $desc_len -gt 120 ]]; then
-      echo -e "${YELLOW}WARN${NC}  $rel: 'description' is $desc_len chars (approaching $DESC_MAX limit)"
+    elif [[ $desc_len -gt $DESC_WARN ]]; then
+      echo -e "${YELLOW}WARN${NC}  $rel: 'description' is $desc_len chars — Claude Code may truncate above $DESC_WARN"
       ((WARNINGS++)); ((file_warnings++))
     fi
   fi

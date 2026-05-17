@@ -1,0 +1,27 @@
+{
+  "name": "skill-mall",
+  "version": "0.1.0",
+  "description": "The SkillMall CLI — browse, deploy, and create Claude Code skills",
+  "type": "module",
+  "bin": {
+    "skill-mall": "./dist/index.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsx src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "gray-matter": "^4.0.3",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsup": "^8",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "engines": { "node": ">=18" }
+}

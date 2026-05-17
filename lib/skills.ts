@@ -12,6 +12,8 @@ export type Skill = {
   version: string;
   tags: string[];
   author: string;
+  license: string;
+  compatibility: string;
   linked_skills: string[];
   content: string;
   path: string;
@@ -25,15 +27,46 @@ export type Category = {
   skills: Skill[];
 };
 
+// Parse tags from either a comma-separated string ("tag-one, tag-two")
+// or a YAML array — both are valid per the SkillMall template.
+function parseTags(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  if (typeof raw === "string") {
+    return raw
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+// Parse linked-skills from either a comma-separated string or array.
+function parseLinkedSkills(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  if (typeof raw === "string") {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 function parseSkill(filePath: string): Skill | null {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
     const { data, content } = matter(raw);
     const rel = path.relative(SKILLS_DIR, filePath);
     const parts = rel.split(path.sep);
-    const category = parts[0];
+    const dirCategory = parts[0];
     const slug = parts[1];
     const dir = path.dirname(filePath);
+
+    // AgentSkills spec: name, description, license, compatibility, metadata (key-value map)
+    // SkillMall catalog fields live inside metadata: (version, author, category, tags, linked-skills)
+    // For backward compat, also check top-level fields from the old format.
+    const meta =
+      data.metadata && typeof data.metadata === "object" ? data.metadata : {};
 
     const hasScripts =
       fs.existsSync(path.join(dir, "scripts")) &&
@@ -53,13 +86,18 @@ function parseSkill(filePath: string): Skill | null {
 
     return {
       slug,
-      category,
-      name: data.name ?? slug,
-      description: data.description ?? "",
-      version: data.version ?? "1.0.0",
-      tags: Array.isArray(data.tags) ? data.tags : [],
-      author: data.author ?? "",
-      linked_skills: Array.isArray(data.linked_skills) ? data.linked_skills : [],
+      // Use metadata.category if present, fall back to directory name
+      category: String(meta.category ?? data.category ?? dirCategory),
+      name: String(data.name ?? slug),
+      description: String(data.description ?? ""),
+      version: String(meta.version ?? data.version ?? "1.0.0"),
+      tags: parseTags(meta.tags ?? data.tags),
+      author: String(meta.author ?? data.author ?? ""),
+      license: String(data.license ?? ""),
+      compatibility: String(data.compatibility ?? ""),
+      linked_skills: parseLinkedSkills(
+        meta["linked-skills"] ?? data.linked_skills
+      ),
       content,
       path: rel,
       hasScripts,
@@ -79,9 +117,7 @@ export function getAllSkills(): Skill[] {
   const categories = fs
     .readdirSync(SKILLS_DIR)
     .filter((d) => d !== "_template" && !d.startsWith("."))
-    .filter((d) =>
-      fs.statSync(path.join(SKILLS_DIR, d)).isDirectory()
-    );
+    .filter((d) => fs.statSync(path.join(SKILLS_DIR, d)).isDirectory());
 
   for (const cat of categories) {
     const catDir = path.join(SKILLS_DIR, cat);

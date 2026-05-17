@@ -1,17 +1,16 @@
 ---
 name: skill-creator
-description: Create a new SkillMall skill by searching skills.sh for related examples first.
-when_to_use: "Trigger: 'create a skill for X', 'I need a skill that does Y', 'build me a skill'"
-version: 1.0.0
-category: ai
-tags:
-  - skill-creation
-  - discovery
-  - scaffolding
-author: jamesdsizemore
+description: "Use when asked to create a new skill. Searches skills.sh, then scaffolds a SkillMall-format skill."
 license: MIT
-disable-model-invocation: false
-user-invocable: true
+compatibility: "Dynamic context injection (Step 1) requires Claude Code. Other agents: skip Step 1 and proceed from Step 2."
+metadata:
+  version: "1.0.0"
+  author: jamesdsizemore
+  category: ai
+  tags: "skill-creation, discovery, scaffolding"
+
+# Claude Code extensions
+when_to_use: "'create a skill for X', 'I need a skill that does Y', 'build me a skill'"
 argument-hint: "[skill description or topic]"
 ---
 
@@ -40,13 +39,16 @@ Based on the user's request and the found skills, determine:
 
 | Field | Constraint | Action |
 |-------|-----------|--------|
-| `name` | ≤ 64 chars, kebab-case | Derive from user's description |
-| `description` | ≤ 150 chars, trigger phrase FIRST | Write a precise, front-loaded description |
-| `when_to_use` | ≤ 150 chars | List 2–3 specific trigger phrases |
-| `category` | One of: development, design, writing, research, productivity, infrastructure, ai, business | Choose the best fit |
-| `tags` | 2–6 lowercase tags | Derive from the skill's scope |
+| Field | Constraint | Action |
+|-------|-----------|--------|
+| `name` | ≤ 64 chars, kebab-case, no consecutive hyphens | Derive from user's description |
+| `description` | ≤ 1024 chars (spec); ≤ 150 for Claude Code efficiency | Imperative: "Use when..." — trigger phrase FIRST |
+| `license` | Short license name | Default: MIT |
+| `compatibility` | Note agent-specific requirements only if needed | Omit if universally compatible |
+| `metadata.category` | development, design, writing, research, productivity, infrastructure, ai, business | Choose best fit |
+| `metadata.tags` | 2–6 lowercase, comma-separated | Derive from scope |
 
-**Critical**: descriptions that exceed 150 characters are silently truncated in Claude Code's skill listing budget (`skillListingBudgetFraction`). Put the most important trigger keyword in the first 80 characters.
+**Note on description length**: descriptions over 150 chars are silently truncated by Claude Code's `skillListingBudgetFraction` (1% of context window). The AgentSkills spec allows up to 1024 chars — other agents handle this without truncation.
 
 ## Step 4 — Scaffold the skill
 
@@ -78,6 +80,8 @@ bash scripts/validate-skill.sh skills/<category>/<skill-name>
 
 Report to the user:
 - The skill directory path
-- The deploy command: `cp -r skills/<cat>/<name> ~/.claude/skills/`
+- Universal deploy: `cp -r skills/<cat>/<name> ~/.agents/skills/`
+- Claude Code deploy: `cp -r skills/<cat>/<name> ~/.claude/skills/`
+- Cursor deploy: `cp -r skills/<cat>/<name> ~/.cursor/skills/`
 - Any validation warnings
 - Linked skills that would compound the output
