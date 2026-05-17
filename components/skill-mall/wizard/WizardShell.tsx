@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useWizard } from "./useWizard";
 import { Step1Topic } from "./Step1Topic";
 import { Step2Research } from "./Step2Research";
@@ -13,6 +15,14 @@ const STEP_LABELS = ["TOPIC", "RESEARCH", "METADATA", "PREVIEW", "PROMPTS", "CON
 
 export function WizardShell() {
   const wizard = useWizard();
+  const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/providers")
+      .then((r) => r.json())
+      .then((d: { configured: boolean }) => setProviderConfigured(d.configured))
+      .catch(() => setProviderConfigured(true)); // If check fails, proceed optimistically
+  }, []);
 
   // Step 1 → 2: call /api/research
   const handleStep1Next = async () => {
@@ -111,6 +121,32 @@ export function WizardShell() {
           .map((t) => t.category)
       ).size
     : 0;
+
+  // Provider not configured — show setup prompt
+  if (providerConfigured === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-sm-bg px-4">
+        <div className="max-w-sm text-center">
+          <p
+            className="mb-4 text-[9px] tracking-widest text-sm-accent"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            [ NO LLM PROVIDER CONFIGURED ]
+          </p>
+          <p className="mb-8 text-sm text-sm-secondary">
+            Configure a provider before creating skills.
+          </p>
+          <Link
+            href="/settings/providers"
+            className="inline-block bg-sm-display px-6 py-3 text-[10px] tracking-widest text-sm-bg hover:opacity-80 transition-opacity"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            [ CONFIGURE PROVIDER → ]
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-sm-bg min-h-screen">
