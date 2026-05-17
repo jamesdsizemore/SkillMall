@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Space_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const spaceMono = Space_Mono({
   subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-space-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -32,27 +35,42 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${spaceMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-zinc-950 text-zinc-100">
-        <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
+      <head>
+        {/* Doto variable font — dot-matrix display style for stats and counters */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Doto:ROND,wght@0,100..900;1,100..900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body
+        className="flex min-h-full flex-col bg-sm-bg text-sm-primary"
+        style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}
+      >
+        <header className="sticky top-0 z-50 border-b border-sm-border bg-sm-surface/90 backdrop-blur-md">
           <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-100 font-mono text-xs font-black text-zinc-950">
+              <span className="flex h-7 w-7 items-center justify-center bg-sm-display font-label text-xs font-black text-sm-bg">
                 SM
               </span>
-              <span className="font-semibold tracking-tight text-zinc-100">
+              <span className="font-semibold tracking-tight text-sm-display">
                 SkillMall
               </span>
-              <span className="hidden rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 sm:block">
-                beta
+              <span
+                className="hidden border border-sm-border bg-sm-surface px-1.5 py-0.5 text-[10px] font-medium text-sm-secondary sm:block"
+                style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+              >
+                [ BETA ]
               </span>
             </Link>
 
             <nav className="flex items-center gap-4">
               <Link
                 href="/contributing"
-                className="text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+                className="text-sm text-sm-secondary transition-colors hover:text-sm-primary"
               >
                 Contribute
               </Link>
@@ -60,7 +78,7 @@ export default function RootLayout({
                 href="https://github.com/jamesdsizemore/SkillMall"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+                className="flex items-center gap-1.5 text-sm text-sm-secondary transition-colors hover:text-sm-primary"
               >
                 <svg
                   className="h-4 w-4"
@@ -82,23 +100,26 @@ export default function RootLayout({
 
         <main className="flex-1">{children}</main>
 
-        <footer className="border-t border-zinc-800 py-8">
+        <footer className="border-t border-sm-border py-8">
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
-            <div className="flex flex-col items-center justify-between gap-4 text-xs text-zinc-600 sm:flex-row">
+            <div
+              className="flex flex-col items-center justify-between gap-4 text-xs text-sm-disabled sm:flex-row"
+              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+            >
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-zinc-500">SkillMall</span>
+                <span className="font-bold text-sm-secondary">SkillMall</span>
                 <span>—</span>
-                <span>Open-source Claude Code skill catalog</span>
+                <span>Open-source agent skill catalog</span>
               </div>
               <div className="flex gap-4">
-                <Link href="/contributing" className="hover:text-zinc-400">
+                <Link href="/contributing" className="hover:text-sm-secondary">
                   Contribute
                 </Link>
                 <a
                   href="https://github.com/jamesdsizemore/SkillMall"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-zinc-400"
+                  className="hover:text-sm-secondary"
                 >
                   GitHub
                 </a>

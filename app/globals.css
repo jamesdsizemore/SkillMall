@@ -2,7 +2,26 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *), &:is([data-theme="dark"] *));
+
+/* ─── Nothing Design System — font families ─────────────────────────────── */
+@theme {
+  --font-display: "Doto", monospace;
+  --font-body: "Space Grotesk", sans-serif;
+  --font-label: "Space Mono", monospace;
+
+  /* sm-* color aliases map to Nothing design tokens */
+  --color-sm-bg: var(--bg);
+  --color-sm-surface: var(--surface);
+  --color-sm-border: var(--border-visible);
+  --color-sm-border-subtle: var(--border-subtle);
+  --color-sm-display: var(--text-display);
+  --color-sm-primary: var(--text-primary);
+  --color-sm-secondary: var(--text-secondary);
+  --color-sm-disabled: var(--text-disabled);
+  --color-sm-accent: var(--accent);
+  --color-sm-blue: var(--blue);
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -48,6 +67,65 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ─── Nothing Design System — tokens ───────────────────────────────────── */
+:root {
+  /* Light mode */
+  --bg: #F5F5F5;
+  --surface: #FFFFFF;
+  --border-visible: #CCCCCC;
+  --border-subtle: #E8E8E8;
+  --text-display: #000000;
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-disabled: #999999;
+  --accent: #D71921;
+  --blue: #007AFF;
+  --dot-grid-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #111111;
+  --border-visible: #333333;
+  --border-subtle: #222222;
+  --text-display: #FFFFFF;
+  --text-primary: #E8E8E8;
+  --text-secondary: #999999;
+  --text-disabled: #666666;
+  --accent: #D71921;
+  --blue: #5B9BF6;
+  --dot-grid-color: rgba(255, 255, 255, 0.04);
+}
+
+/* ─── Nothing Design System — animations ───────────────────────────────── */
+@keyframes scanReveal {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { clip-path: inset(0 0% 0 0); opacity: 1; }
+}
+
+@keyframes dotoCount {
+  0%   { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes segmentFill {
+  0%   { width: 0%; }
+  100% { width: var(--fill-percent, 100%); }
+}
+
+@keyframes charReveal {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Dot-grid texture — apply via .dot-grid-texture class */
+.dot-grid-texture {
+  background-image: radial-gradient(circle, var(--dot-grid-color) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* ─── shadcn/base tokens ────────────────────────────────────────────────── */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
