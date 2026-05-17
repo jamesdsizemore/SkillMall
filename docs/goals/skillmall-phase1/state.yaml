@@ -3,35 +3,39 @@
 version: 2
 
 goal:
-  title: "SkillMall Phase 1"
+  title: "SkillMall Phase 1 — Core System"
   slug: skillmall-phase1
   kind: existing_plan
-  tranche: "Build SkillMall Phase 1: UI foundation first, then Research Engine → Skill Builder → Prompt Engine pipeline, CLI, and quality tooling. Complete successive verified slices until all Phase 1 features are shipped and passing."
+  tranche: "Build SkillMall Phase 1: provider abstraction + Nothing design UI (T001–T006) → research pipeline + API routes (T007–T012) → CLI + quality tooling + docs (T013–T017) → completion audit (T018). UI approval gate (T006) blocks all pipeline work. Continuous execution until T018 passes."
   status: active
   intake:
-    original_request: "Build SkillMall Phase 1 — UI ships first, then pipeline and tooling"
-    interpreted_outcome: "A working SkillMall Next.js application with Nothing design UI, research-first skill creation pipeline, prompt generation, CLI, and quality tooling — all Phase 1 features passing tests, building clean, and running in the browser"
+    original_request: "Build SkillMall Phase 1 — comprehensive pipeline, UI, CLI, quality tooling, and docs"
+    interpreted_outcome: "A working SkillMall Next.js application where users can configure a multi-provider LLM, create skills via the 6-step wizard or CLI, browse the catalog with quality scores, optimize prompts, and browse the prompt library — all Phase 1 features passing tests, building clean, UI approved by James"
     input_shape: existing_plan
     audience: "James Sizemore — project owner"
     authority: approved
     proof_type: demo
-    completion_proof: "npm run build passes, all tests pass, app runs at localhost:3000 with homepage + wizard + skill detail working, user approves the UI"
-    likely_misfire: "Implementing Phase 2 features, treating UI approval as optional, or building pipeline before UI is reviewed"
+    completion_proof: "npm run build passes, npm test passes, npx tsc --noEmit clean, wizard completes all 6 steps with real LLM, CLI create + confirm-research produces a valid skill, James explicitly approves UI at T006, all T017 docs exist at >= 500 words each"
+    likely_misfire: "Building pipeline before T006 UI approval. Implementing Phase 2 features. Making implementation decisions not in the Phase 1 plan. Treating spec descriptions as implementation guidance instead of reading the plan."
     blind_spots_considered:
-      - "UI approval gate — if Phase 1a UI is rejected, all subsequent phases waste effort"
-      - "Nothing design skill must be loaded per task to ensure design consistency"
-      - "TypeScript contract (ResearchResult / ResearchTool types) must be established before parallel dispatch"
-      - "CLI and web catalog share lib/ — changes in lib/ affect both; parallel workers need disjoint scopes"
+      - "claude --print flag must be verified against installed claude CLI version before assuming it works"
+      - "Provider configuration must be tested with 2+ different providers before Phase 1 ships"
+      - "60 LLM calls for a 20-tool domain — loading UX must exist throughout wizard"
+      - "UI approval gate (T006) is a hard block — no pipeline task activates until T006 passes"
     existing_plan_facts:
-      - "UI ships first — homepage, wizard Steps 1-2, skill detail — reviewed by James before pipeline work begins"
-      - "Nothing design: Space Grotesk / Space Mono / Doto, light default, dark toggle, blues/greys/red only, dot-matrix animations required"
-      - "Development loop: spec read → dep map → parallel dispatch → tests → tsc → lint → build → code review × 2 → smoke test → security check → docs → git"
-      - "Subagent orchestration explicit: establish shared types first, dispatch parallel agents, integration checkpoint after each batch"
-      - "Git commit + push after every phase"
-      - "Spec at docs/superpowers/specs/2026-05-17-skillmall-feature-expansion-design.md"
-      - "Feature roadmap at docs/FEATURE_ROADMAP.md"
-      - "Nothing design skill reference: github.com/dominikmartn/nothing-design-skill"
-      - "Prompt ELO Tester is out of scope — Future Development only"
+      - "Full plan at docs/superpowers/plans/PHASE-1-PLAN.md — 104KB, fully self-contained, all TypeScript types, LLM prompts, and algorithms embedded"
+      - "Provider abstraction: OpenAI, Claude Code CLI (subprocess, NO Anthropic SDK), Gemini, Groq, Ollama — user supplies own keys"
+      - "Claude Code uses execFile('claude', ['--print', '--model', model, prompt]) — verify --print flag against installed version"
+      - "Nothing design: Space Grotesk / Space Mono / Doto, light default, dark toggle, --bg #F5F5F5, --accent #D71921, --blue #007AFF only, no green, no purple"
+      - "Development workflow: 16 steps per task — Steps 6 (tsc), 7 (lint), 8 (build), 9 (first review), 11 (second review) are NEVER skipped"
+      - "All types embedded in plan: ResearchResult, ResearchTool, InMemoryFile, WizardState, PromptAudit, QualityScore, PipelineInput"
+      - "All Zod schemas embedded in plan: ResearchResultSchema, FrameworkSelectionSchema, PromptAuditSchema, PipelineInputSchema"
+      - "All LLM prompt templates embedded in plan — use them word-for-word"
+      - "Framework pre-filter data (FRAMEWORK_CANDIDATES, DOMAIN_MODIFIER_RULES) embedded in plan"
+      - "Quality score rubric embedded in plan — exact point values for all 5 dimensions"
+      - "Atomic write: temp dir + fs.rename — never write directly to output path"
+      - "Stages 3 and 4 (Skill Builder + Prompt Engine) run in parallel with Promise.all"
+      - "No Phase 2 features: no Supabase, no ratings, no collections, no MCP server, no skills.sh publishing"
 
 rules:
   pm_owns_state: true
@@ -59,8 +63,8 @@ agents:
 visual_board:
   selected: local
   local:
-    status: starting
-    url: null
+    status: running
+    url: "http://goalbuddy.localhost:41737/skillmall-phase1/"
     command: "npx goalbuddy board /Users/jamesdsizemore/Developer/skill-mall/docs/goals/skillmall-phase1"
   github_projects:
     status: not_requested
@@ -72,31 +76,37 @@ active_task: T001
 
 tasks:
 
-  # ─── PHASE 1a — UI FOUNDATION ─────────────────────────────────────────────
-  # UI ships first. James reviews before any pipeline work begins.
-  # Nothing design system applied throughout. Parallel subagents for components.
+  # ─── FOUNDATION — parallel, no dependencies ────────────────────────────────
 
   - id: T001
-    type: judge
-    assignee: Judge
+    type: worker
+    assignee: Worker
     status: active
-    reasoning_hint: high
-    objective: "Validate the Phase 1a plan: confirm UI-first ordering, map task dependencies, identify parallel dispatch opportunities, and produce the exact Worker task sequence for the UI foundation."
-    inputs:
-      - "docs/superpowers/specs/2026-05-17-skillmall-feature-expansion-design.md Section 10 (UI/UX Design System)"
-      - "docs/superpowers/specs/2026-05-17-skillmall-feature-expansion-design.md Section 3 (Skill Creation Tools)"
-      - "Existing app/ components/ lib/ directories"
-      - "github.com/dominikmartn/nothing-design-skill (design reference)"
-    constraints:
-      - "Do not implement. Decide only."
-      - "UI must be approved by James before T005 (pipeline) begins."
-      - "Establish TypeScript design tokens and component contracts before parallel dispatch."
-      - "Flag any existing code that conflicts with Nothing design tokens."
-    expected_output:
-      - "Confirmed task sequence for T002–T004"
-      - "Parallel dispatch map: which components can be built simultaneously"
-      - "Shared contract definitions needed before parallel dispatch"
-      - "Risk flags on existing code"
+    reasoning_hint: default
+    objective: "Implement the complete multi-provider LLM abstraction layer: OpenAI, Claude Code CLI (subprocess via execFile — no Anthropic SDK), Gemini, Groq, and Ollama. Config reads from env vars first, then ~/.skill-mall/config.json. createLLMClient(resolveProviderConfig()) must work for all 5 providers."
+    allowed_files:
+      - lib/providers/types.ts
+      - lib/providers/defaults.ts
+      - lib/providers/openai.ts
+      - lib/providers/claude-code.ts
+      - lib/providers/gemini.ts
+      - lib/providers/groq.ts
+      - lib/providers/ollama.ts
+      - lib/providers/index.ts
+      - lib/providers/__tests__/providers.test.ts
+      - lib/providers/__tests__/config-resolution.test.ts
+    verify:
+      - "npx tsc --noEmit"
+      - "npm run build"
+      - "npm test lib/providers"
+      - "grep -n 'import.*anthropic' lib/providers/claude-code.ts gives 0 matches"
+      - "grep -n 'api.anthropic.com' lib/providers/claude-code.ts gives 0 matches"
+      - "resolveProviderConfig() throws ConfigError when no config exists (test)"
+      - "createLLMClient({ provider: 'openai', apiKey: 'test', model: 'gpt-4o' }) returns OpenAIClient instance (test)"
+    stop_if:
+      - "claude --print is not a valid flag — verify with claude --help, report the correct flag before continuing"
+      - "openai npm package version conflicts with existing package.json — report before resolving"
+      - "Need files outside allowed_files"
     receipt: null
 
   - id: T002
@@ -104,7 +114,7 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Establish the Nothing design token system in the Next.js app: CSS custom properties, Tailwind config, font loading (Space Grotesk, Space Mono, Doto), color tokens, and the dot-matrix animation keyframes. This is the shared contract all UI components depend on."
+    objective: "Establish Nothing design system tokens: CSS custom properties (all 9 light + 9 dark), Tailwind config extension (sm-* color aliases + font families), Google Fonts loading (Space Grotesk, Space Mono, Doto variable font), dark mode data-theme toggle, and all 4 animation keyframes (scanReveal, dotoCount, segmentFill, charReveal)."
     allowed_files:
       - app/globals.css
       - tailwind.config.ts
@@ -113,24 +123,33 @@ tasks:
     verify:
       - "npx tsc --noEmit"
       - "npm run build"
-      - "Font families present in rendered HTML (Space Grotesk, Space Mono, Doto)"
-      - "CSS custom properties --bg, --surface, --text-display, --accent present"
-      - "Dark mode toggle switches data-theme attribute"
+      - "grep 'var(--bg)' app/globals.css"
+      - "grep 'scanReveal' app/globals.css"
+      - "grep 'dotoCount' app/globals.css"
+      - "grep 'segmentFill' app/globals.css"
+      - "grep 'charReveal' app/globals.css"
+      - "grep 'Doto' app/layout.tsx"
+      - "grep -rn '#00.*green\\|green-\\|purple-\\|#8B5CF6' app/globals.css gives 0 matches"
     stop_if:
-      - "Doto variable font fails to load from Google Fonts"
-      - "Tailwind config conflicts with existing shadcn setup"
+      - "Doto font URL returns 404 from Google Fonts — find correct URL from fonts.google.com and use it"
+      - "Tailwind extension breaks existing shadcn component styles — isolate conflict before continuing"
       - "Need files outside allowed_files"
     receipt: null
+
+  # ─── UI FOUNDATION — T002 required; T003 and T004 parallel; T005 after T004 ─
 
   - id: T003
     type: worker
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Build the SkillMall homepage using Nothing design: light hero with Doto stat counters (dot-matrix animations), 'What is a skill?' three-column grid, catalog preview with search. All Nothing design rules applied. Dot-matrix scan reveal on load."
+    objective: "Build the homepage: light hero (--bg background, never dark), Doto stat counter row (skills/categories/agents counts with dot-matrix animations), 'What is a skill?' three-column grid, catalog preview with search and skill cards. Reference .superpowers/brainstorm/45530-1779038737/content/ui-v4.html for visual direction. All Nothing design rules: no green, no purple, no gradients, no shadows, one topbar only."
     allowed_files:
       - app/page.tsx
-      - components/skill-mall/homepage/
+      - components/skill-mall/homepage/HeroSection.tsx
+      - components/skill-mall/homepage/StatCounters.tsx
+      - components/skill-mall/homepage/WhatIsASkill.tsx
+      - components/skill-mall/homepage/CatalogPreview.tsx
       - components/skill-mall/stats-banner.tsx
       - components/skill-mall/skill-card.tsx
       - components/skill-mall/category-nav.tsx
@@ -138,14 +157,14 @@ tasks:
     verify:
       - "npx tsc --noEmit"
       - "npm run build"
-      - "Doto counter animation visible on localhost:3000"
-      - "Dot-matrix scan reveal fires on page load"
-      - "Light mode renders correctly; dark mode toggle works"
-      - "Staggered segmented bar fill visible on skill cards"
+      - "grep -rn 'bg-green\\|text-green\\|bg-purple\\|text-purple\\|gradient\\|shadow-' components/skill-mall/homepage/ gives 0 matches"
+      - "grep -rn 'toast\\|Toast\\|skeleton\\|Skeleton' components/skill-mall/homepage/ gives 0 matches"
+      - "Doto counter animation fires on page load at localhost:3000 (smoke test)"
+      - "Dot-matrix scan reveal animation visible on load (smoke test)"
+      - "Dark mode toggle switches all token values (smoke test)"
     stop_if:
-      - "Animation causes layout shift"
+      - "Animation causes CLS detectable in Lighthouse — diagnose before continuing"
       - "Need files outside allowed_files"
-      - "TypeScript errors in design token usage"
     receipt: null
 
   - id: T004
@@ -153,107 +172,105 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Build the Skill Creation Wizard (Steps 1 and 2) and the Skill Detail page using Nothing design. Step 1: description field (22px primary), optional name, optional source URLs (add on demand, no blank field on load). Step 2: add-not-remove model, light background with dot-grid texture, Doto number as visual hero, disabled CTA until one tool is reviewed. Detail: back nav, fixed-width dark quality panel (solid contrast text), readable deploy section, bracket-notation tabs."
+    objective: "Build wizard Steps 1-2 UI shell (no API calls yet) and Skill Detail page. Step 1: zero URL inputs on load, underline-style fields, bracket-notation labels. Step 2: Doto tool count on dark panel (left), tool cards on light surface (right), add-not-remove model, Continue disabled until one DETAILS expanded. Detail: dark quality score panel as one high-contrast element, light surfaces everywhere else, bracket-notation tabs."
     allowed_files:
-      - app/skills/create/
+      - app/skills/create/page.tsx
       - app/skills/[category]/[slug]/page.tsx
-      - components/skill-mall/wizard/
+      - components/skill-mall/wizard/Step1Topic.tsx
+      - components/skill-mall/wizard/Step2Research.tsx
+      - components/skill-mall/wizard/Step3Metadata.tsx
+      - components/skill-mall/wizard/Step4Preview.tsx
+      - components/skill-mall/wizard/Step5PromptOptions.tsx
+      - components/skill-mall/wizard/Step6Confirm.tsx
       - components/skill-mall/deploy-button.tsx
       - components/skill-mall/category-badge.tsx
     verify:
       - "npx tsc --noEmit"
       - "npm run build"
-      - "Step 1 description field renders at 22px"
-      - "URL container starts empty — no blank input on load"
-      - "Step 2 continue button disabled until DETAILS expanded on at least one tool"
-      - "Step 2 rr-block has no dark background"
-      - "Quality panel contrast: all text minimum 4.5:1 on dark background"
-      - "Character-by-character reveal on skill title"
+      - "grep -rn 'value=.*url\\|defaultValue=.*url' components/skill-mall/wizard/Step1Topic.tsx gives 0 matches"
+      - "Step 1: zero URL inputs on load (smoke test)"
+      - "Step 2: Continue button disabled on initial render (smoke test)"
+      - "Step 2: no dark background on research result block — only tool count panel (smoke test)"
+      - "Detail: quality score panel dark background with >= 4.5:1 text contrast (smoke test)"
     stop_if:
-      - "Disabled CTA pattern conflicts with React state management"
       - "Need files outside allowed_files"
     receipt: null
 
-  - id: T004b
-    type: judge
-    assignee: Judge
-    status: queued
-    reasoning_hint: high
-    objective: "UI APPROVAL GATE — audit the Phase 1a UI against Nothing design spec and James's stated requirements before any pipeline work begins. This gate must pass before T005 activates."
-    inputs:
-      - "T002, T003, T004 receipts"
-      - "Running app at localhost:3000"
-      - "docs/superpowers/specs/2026-05-17-skillmall-feature-expansion-design.md Section 10"
-    constraints:
-      - "Do not approve if any of the following are present: dark hero on homepage, green or purple anywhere, rgba() opacity text on dark backgrounds failing contrast, missing dot-matrix animations, hint text blurring between form sections, blank URL field on Step 1 load, Continue button active before any tool is reviewed"
-      - "Do not approve if npm run build fails"
-      - "James must explicitly approve before marking this done"
-    expected_output:
-      - "approved | rejected"
-      - "If rejected: specific list of failing items with file:line references"
-      - "If approved: confirmation that T005 may proceed"
-    receipt: null
-
-  # ─── PHASE 1b — RESEARCH ENGINE ──────────────────────────────────────────
-  # Only begins after T004b (UI approval gate) is approved.
-
   - id: T005
-    type: judge
-    assignee: Judge
-    status: queued
-    reasoning_hint: high
-    objective: "Plan the Research Engine implementation: validate ResearchResult and ResearchTool TypeScript schemas, map parallel dispatch opportunities for Research Engine vs Skill Builder, define integration contracts, and produce the exact Worker task sequence."
-    inputs:
-      - "docs/superpowers/specs/2026-05-17-skillmall-feature-expansion-design.md Section 1 (Core Pipeline)"
-      - "lib/skills.ts (existing)"
-      - "T004b receipt (UI approved)"
-    constraints:
-      - "Do not begin until T004b is approved."
-      - "ResearchResult and ResearchTool types must be finalized before any pipeline Workers dispatch."
-      - "Research Engine and Skill Builder may be built in parallel only if TypeScript contracts are established first."
-    expected_output:
-      - "Finalized ResearchResult / ResearchTool TypeScript types"
-      - "Parallel dispatch map for T006–T008"
-      - "Integration checkpoint definition"
-    receipt: null
-
-  - id: T006
     type: worker
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement the ResearchResult and ResearchTool TypeScript types in lib/research.ts, plus the Research Engine: fetches URLs, extracts tools/frameworks, classifies artifact types, normalizes into ResearchResult schema. Fallback to training knowledge with unverified flag when no URLs provided."
+    objective: "Implement WizardContext (useReducer + React Context), sessionStorage persistence, and step transition logic. WizardState, WizardAction, and INITIAL_WIZARD_STATE types are defined exactly in the plan — use them. On mount: hydrate from sessionStorage, reset to INITIAL_WIZARD_STATE on parse failure. Step transitions call API stubs for now (real routes wired in T012)."
     allowed_files:
-      - lib/research.ts
-      - lib/research-engine.ts
-      - lib/research-engine.test.ts
+      - components/skill-mall/wizard/WizardContext.tsx
+      - components/skill-mall/wizard/useWizard.ts
+      - components/skill-mall/wizard/__tests__/wizard-state.test.ts
+      - app/skills/create/page.tsx
     verify:
       - "npx tsc --noEmit"
-      - "npm test -- lib/research-engine.test.ts"
-      - "ResearchResult schema validates against Blue Ocean Strategy URL"
-      - "Unverified flag set when no URLs provided"
+      - "npm run build"
+      - "npm test components/skill-mall/wizard"
+      - "NEXT_STEP from step 1 -> state.step = 2 (test)"
+      - "SET_RESEARCH_RESULT sets selectedToolNames to all tool names from result (test)"
+      - "State persists to sessionStorage on every dispatch (test)"
+      - "Invalid sessionStorage JSON on mount -> reset to INITIAL_WIZARD_STATE, no throw (test)"
     stop_if:
-      - "External URL fetch fails in test environment"
       - "Need files outside allowed_files"
     receipt: null
+
+  - id: T006
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "UI Approval Gate: audit homepage, wizard Steps 1-2, and skill detail against Nothing design rules and ui-v4.html reference. Block all pipeline tasks (T007+) until this gate passes AND James explicitly approves."
+    inputs:
+      - "T003, T004, T005 receipts"
+      - "Running app at localhost:3000"
+      - ".superpowers/brainstorm/45530-1779038737/content/ui-v4.html"
+      - "Nothing design rules in Phase 1 plan Design Rules section"
+    constraints:
+      - "Do not approve if hero background is dark or inverted"
+      - "Do not approve if green or purple appears anywhere"
+      - "Do not approve if dot-matrix counter animations missing from homepage"
+      - "Do not approve if URL inputs pre-populated on Step 1 load"
+      - "Do not approve if Continue button not disabled on Step 2 initial render"
+      - "Do not approve if Step 2 research block has dark background (only tool count panel should be dark)"
+      - "Do not approve if quality score panel contrast fails 4.5:1"
+      - "Do not approve if npm run build is not passing"
+      - "James must explicitly approve before marking done"
+    expected_output:
+      - "approved | rejected"
+      - "If rejected: specific failing items with file and line number"
+      - "If approved: written confirmation that T007 may activate"
+    receipt: null
+
+  # ─── PIPELINE — T001 + T006 required before any pipeline task ──────────────
 
   - id: T007
     type: worker
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement the Skill Builder: receives ResearchResult, generates SKILL.md, one template per tool, one sample per tool, scripts, and README.md. Does not write to disk — returns in-memory skill directory representation."
+    objective: "Implement the Research Engine: URL fetching with cheerio text extraction (8k chars/URL, 20k combined cap), LLM extraction call using the exact prompt templates in the plan, Zod validation with retry (ResearchResultSchema), multi-URL parallel handling with Promise.allSettled, no-URL fallback with researchUnverified flag. All 9 required test cases must pass."
     allowed_files:
-      - lib/skill-builder.ts
-      - lib/skill-builder.test.ts
+      - lib/research-engine.ts
+      - lib/validators.ts
+      - lib/__tests__/research-engine.test.ts
+      - lib/__tests__/fixtures/research-result-blue-ocean.json
+      - lib/__tests__/fixtures/research-result-no-urls.json
+      - lib/__tests__/mocks/mock-llm-client.ts
+      - lib/__tests__/mocks/mock-fetch.ts
     verify:
       - "npx tsc --noEmit"
-      - "npm test -- lib/skill-builder.test.ts"
-      - "Given Blue Ocean Strategy ResearchResult, generates 21 template files"
-      - "SKILL.md description field is under 150 chars"
+      - "npm run build"
+      - "npm test lib/__tests__/research-engine"
+      - "All 9 test cases from plan Required Test Cases — Research Engine Tests pass"
+      - "grep -n 'import.*anthropic' lib/research-engine.ts gives 0 matches"
     stop_if:
+      - "cheerio installation conflicts with existing package.json — report version info before resolving"
       - "Need files outside allowed_files"
-      - "ResearchTool type mismatch with Research Engine output"
     receipt: null
 
   - id: T008
@@ -261,21 +278,21 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement the Prompt Engine: evaluates all 40+ PE frameworks against each ResearchTool, selects the framework that maximizes output quality for that specific tool and domain (no hardcoded defaults), generates tool-specific + category + meta-use-case prompts, passes each through the Prompt Optimizer before returning. All prompts are fully self-contained."
+    objective: "Implement Skill Builder: SKILL.md generation (deterministic, no LLM), template generation (deterministic), sample generation (1 LLM call per tool via generateSample, run in parallel with Promise.all), README generation, script generation, InMemorySkillDirectory assembly. All 5 required test cases must pass. SKILL.md description must be <= 150 chars."
     allowed_files:
-      - lib/prompt-engine.ts
-      - lib/prompt-engine.test.ts
-      - lib/prompt-optimizer.ts
-      - lib/pe-frameworks.ts
+      - lib/skill-builder.ts
+      - lib/__tests__/skill-builder.test.ts
+      - lib/__tests__/fixtures/research-result-blue-ocean.json
+      - lib/__tests__/fixtures/skill-directory-blue-ocean.json
     verify:
       - "npx tsc --noEmit"
-      - "npm test -- lib/prompt-engine.test.ts"
-      - "Blue Ocean 21 tools produces 29 prompts (21 tool + 3 category + 5 meta)"
-      - "No prompt references external template files"
-      - "Each prompt passes optimizer: 9-dimension intent check"
+      - "npm run build"
+      - "npm test lib/__tests__/skill-builder"
+      - "All 5 test cases from plan Required Test Cases — Skill Builder Tests pass"
+      - "grep -n 'import.*research-engine' lib/skill-builder.ts gives 0 matches"
     stop_if:
+      - "ResearchTool type from T007 differs from the ResearchTool interface in the plan — report mismatch before resolving"
       - "Need files outside allowed_files"
-      - "Framework selection produces identical framework for all artifact types (would indicate hardcoded defaults)"
     receipt: null
 
   - id: T009
@@ -283,44 +300,41 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Wire the 5-stage pipeline: Input Layer → Research Engine → Skill Builder → Prompt Engine → Stage 5 write-to-disk. Implement Stage 5 validation (AgentSkills spec check) and atomic write. Connect the Wizard API route to the pipeline. Research confirmation (Stage 2) is non-skippable — no files written until user confirms."
+    objective: "Implement Prompt Engine: framework pre-filter (FRAMEWORK_CANDIDATES + DOMAIN_MODIFIER_RULES + complexity modifier — exact data in plan), LLM framework selection from candidates using exact selection prompt from plan, LLM prompt body generation using exact generation prompt from plan, category prompts (1 per category), meta prompts (5 standard + optional 6th for 3+ categories). Prompt count: Blue Ocean 21 tools 3 categories = 29. All 8 required test cases must pass."
     allowed_files:
-      - lib/pipeline.ts
-      - lib/pipeline.test.ts
-      - app/api/research/route.ts
-      - app/api/create-skill/route.ts
+      - lib/prompt-engine.ts
+      - lib/pe-frameworks.ts
+      - lib/__tests__/prompt-engine.test.ts
+      - lib/__tests__/fixtures/framework-selection-response.json
+      - lib/__tests__/fixtures/prompt-body-response.txt
     verify:
       - "npx tsc --noEmit"
       - "npm run build"
-      - "npm test -- lib/pipeline.test.ts"
-      - "POST /api/research with Blue Ocean URL returns ResearchResult in < 5s"
-      - "POST /api/create-skill writes skill directory to skills/"
-      - "Validation blocks write if name > 64 chars or description > 1024 chars"
+      - "npm test lib/__tests__/prompt-engine"
+      - "All 8 test cases from plan Required Test Cases — Prompt Engine Tests pass"
+      - "grep -rn 'resources/' lib/prompt-engine.ts gives 0 matches (no external file references in prompt bodies)"
     stop_if:
+      - "Framework selection returns same framework for all 6 artifact types — diagnose pre-filter before continuing"
       - "Need files outside allowed_files"
-      - "Circular dependency between pipeline stages"
     receipt: null
-
-  # ─── PHASE 1c — CLI + QUALITY TOOLING ─────────────────────────────────────
 
   - id: T010
     type: worker
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Update the CLI (cli/src/) to use the new pipeline: wire cli create command to Research Engine + Skill Builder + Prompt Engine. Add confirm-research command for CLI path (writes research-result.json, waits for npx skill-mall confirm-research before pipeline continues). Update validate command with new schema."
+    objective: "Implement Prompt Optimizer: 4-dimension LLM audit using exact audit prompt from plan, Zod validation of PromptAuditSchema with 1 retry on failure, token count estimation (word_count * 1.35 rounded to int), failure fallback returns unoptimized prompt with optimizationFailed: true without throwing. 3 required test cases must pass."
     allowed_files:
-      - cli/src/commands/create.ts
-      - cli/src/commands/validate.ts
-      - cli/src/commands/new.ts
-      - cli/src/utils.ts
+      - lib/prompt-optimizer.ts
+      - lib/__tests__/prompt-optimizer.test.ts
+      - lib/__tests__/fixtures/prompt-audit-response.json
     verify:
-      - "cd cli && npm run type-check"
-      - "cd cli && npm run build"
-      - "npx skill-mall validate skills/_template shows 0 errors"
+      - "npx tsc --noEmit"
+      - "npm run build"
+      - "npm test lib/__tests__/prompt-optimizer"
+      - "LLM failure on both calls -> returns { optimizedPrompt: originalPrompt, optimizationFailed: true } without throwing (test)"
     stop_if:
       - "Need files outside allowed_files"
-      - "CLI create command produces different SKILL.md format than web wizard"
     receipt: null
 
   - id: T011
@@ -328,19 +342,28 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement the Skill Quality Score: automated rubric (0-100) computed from SKILL.md frontmatter and directory contents. Five dimensions: description quality (25), completeness (25), frontmatter health (20), resource richness (20), link health (10). Display on skill cards and detail page. Specific actionable feedback per deduction."
+    objective: "Wire the 5-stage pipeline (runPipeline with confirmation gate, Stages 3+4 parallel, atomic write via temp+rename), implement AgentSkills spec validation (validateSkillDirectory), and build all 6 API routes: GET /api/providers, POST /api/providers/configure, POST /api/research, POST /api/confirm-research, POST /api/create-skill, POST /api/optimize-prompt. All 7 pipeline test cases + 3 API test cases must pass."
     allowed_files:
-      - lib/quality-score.ts
-      - lib/quality-score.test.ts
-      - components/skill-mall/quality-badge.tsx
-      - app/skills/[category]/[slug]/page.tsx
+      - lib/pipeline.ts
+      - lib/__tests__/pipeline.test.ts
+      - app/api/providers/route.ts
+      - app/api/providers/configure/route.ts
+      - app/api/research/route.ts
+      - app/api/confirm-research/route.ts
+      - app/api/create-skill/route.ts
+      - app/api/optimize-prompt/route.ts
+      - app/api/__tests__/
     verify:
       - "npx tsc --noEmit"
       - "npm run build"
-      - "npm test -- lib/quality-score.test.ts"
-      - "blue-ocean-strategy skill scores > 80"
-      - "_template skill scores < 40 (incomplete placeholders)"
+      - "npm test lib/__tests__/pipeline"
+      - "npm test app/api/__tests__"
+      - "All 7 pipeline + 3 API test cases from plan pass"
+      - "POST /api/research with SKILL_MALL_PROVIDER unset -> 503 with provider_not_configured"
+      - "POST /api/create-skill success -> skill directory exists on disk"
     stop_if:
+      - "Circular import dependency between pipeline stages — restructure shared types before continuing"
+      - "fs.rename atomicity issue in test environment — document the behavior before resolving"
       - "Need files outside allowed_files"
     receipt: null
 
@@ -349,64 +372,181 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement the Prompt Optimizer as a standalone tool at /optimize: accepts any prompt text, runs 4-dimension audit (token efficiency, 9-dimension intent completeness, output spec clarity, trigger sharpness), returns scored audit + leaner rewrite + word-level diff. Also add the /prompt-library page: browsable framework pattern library seeded from NirDiamant's 22 PE techniques."
+    objective: "Replace API stubs in WizardContext with real calls: Step 1->2 calls POST /api/research, Step 5->6 calls POST /api/confirm-research, Step 6 confirm calls POST /api/create-skill then navigates to /skills/:category/:slug. Add provider check on mount: if GET /api/providers returns configured: false, show setup prompt linking to /settings/providers."
     allowed_files:
-      - app/optimize/page.tsx
-      - app/prompt-library/page.tsx
-      - lib/prompt-optimizer.ts
-      - components/skill-mall/optimizer/
-      - lib/prompt-templates/
+      - components/skill-mall/wizard/WizardContext.tsx
+      - components/skill-mall/wizard/useWizard.ts
+      - app/skills/create/page.tsx
+      - app/settings/providers/page.tsx
     verify:
       - "npx tsc --noEmit"
       - "npm run build"
-      - "localhost:3000/optimize renders and accepts input"
-      - "localhost:3000/prompt-library shows at least 10 framework entries"
+      - "End-to-end smoke test: complete all 6 wizard steps with real LLM provider, skill written to skills/"
+      - "Network error on Step 1->2 -> error shown inline on Step 1, user stays on Step 1 (smoke test)"
+      - "Provider not configured -> setup prompt shown, not Step 1 (smoke test)"
     stop_if:
       - "Need files outside allowed_files"
     receipt: null
+
+  # ─── CLI + QUALITY TOOLING — T011 required ────────────────────────────────
 
   - id: T013
     type: worker
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement the CI/CD Validation Action (skill-mall/validate-action@v1): GitHub Action wrapper around validate-skill.sh. Triggers on PRs touching skills/. Posts structured validation report as PR comment. Blocks merge on errors. Generates status badge. Update package.json validate script."
+    objective: "Implement CLI: npx skill-mall configure (interactive + non-interactive for all 5 providers), npx skill-mall create (runs research, writes research-result.json to ./skill-builder-output/<slug>/, exits with confirm instruction), npx skill-mall confirm-research <slug> (reads research-result.json, runs full pipeline, atomic write to skills/, prints summary). Update validate with new schema. Exit codes: 0 success, 1 no provider, 2 all URLs failed, 3 extraction failure."
+    allowed_files:
+      - cli/src/commands/create.ts
+      - cli/src/commands/configure.ts
+      - cli/src/commands/confirm-research.ts
+      - cli/src/commands/validate.ts
+      - cli/src/commands/new.ts
+      - cli/src/utils.ts
+      - cli/src/index.ts
+    verify:
+      - "cd cli && npm run type-check"
+      - "cd cli && npm run build"
+      - "npx skill-mall configure --provider claude-code --model claude-sonnet-4-6 writes correct ~/.skill-mall/config.json"
+      - "npx skill-mall validate skills/_template exits 0 with 0 errors"
+      - "npx skill-mall create 'test' with no provider -> exits 1 with helpful setup message"
+      - "confirm-research SKILL.md matches format produced by web wizard (same generateSkillMd function)"
+    stop_if:
+      - "confirm-research and web wizard produce different SKILL.md formats — they must call the same lib/skill-builder.ts generateSkillMd function"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T014
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Skill Quality Score: 5-dimension rubric (description quality 25pts, completeness 25pts, frontmatter health 20pts, resource richness 20pts, link health 10pts) with exact point values from plan. Feedback messages in format 'specific issue (-N)'. Display Doto number on skill cards and full breakdown on detail page. All 5 required test cases must pass."
+    allowed_files:
+      - lib/quality-score.ts
+      - lib/__tests__/quality-score.test.ts
+      - components/skill-mall/quality-badge.tsx
+      - app/skills/[category]/[slug]/page.tsx
+    verify:
+      - "npx tsc --noEmit"
+      - "npm run build"
+      - "npm test lib/__tests__/quality-score"
+      - "All 5 test cases from plan Required Test Cases — Quality Score Tests pass"
+      - "Blue Ocean fixture scores > 80 (test)"
+      - "_template fixture scores < 40 (test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T015
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Build /optimize page (text area input, POST /api/optimize-prompt, 4 dimension scores as segmented bars, missing intent dimensions listed, word-level diff with --accent for deletions and --blue for changes) and /prompt-library page (one card per framework from FRAMEWORK_DESCRIPTIONS in pe-frameworks.ts, filterable by category using bracket-notation filter chips)."
+    allowed_files:
+      - app/optimize/page.tsx
+      - app/prompt-library/page.tsx
+      - lib/prompt-templates/
+      - components/skill-mall/optimizer/PromptInput.tsx
+      - components/skill-mall/optimizer/AuditResults.tsx
+      - components/skill-mall/optimizer/WordDiff.tsx
+    verify:
+      - "npx tsc --noEmit"
+      - "npm run build"
+      - "/optimize accepts prompt text and shows audit results (smoke test)"
+      - "/prompt-library shows all 40+ framework entries in [ X FRAMEWORKS ] bracket label (smoke test)"
+      - "/prompt-library filter by 'reasoning' shows only reasoning-category frameworks (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T016
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement skill-mall/validate-action@v1 GitHub Action: triggers on PRs touching skills/, discovers changed skill directories from PR diff, runs validate-skill.sh --strict per skill, posts structured markdown table as PR comment (Skill | Status | Issues), blocks merge on any error. Update package.json validate script."
     allowed_files:
       - .github/workflows/validate-skills.yml
       - .github/actions/skill-mall-validate/action.yml
       - scripts/validate-skill.sh
       - package.json
     verify:
-      - "bash scripts/validate-skill.sh --strict passes on skills/ai/skill-creator"
-      - "GitHub Action YAML is valid (act --dry-run or yamllint)"
+      - "python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))\" exits 0"
+      - "bash scripts/validate-skill.sh --strict skills/ai/skill-creator exits 0"
+      - "package.json validate script runs validate-skill.sh"
     stop_if:
       - "Need files outside allowed_files"
     receipt: null
 
-  # ─── PHASE 1 AUDIT ────────────────────────────────────────────────────────
+  # ─── DOCUMENTATION — parallel with T013-T016 ──────────────────────────────
 
-  - id: T999
+  - id: T017
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write all Phase 1 documentation: 9 new doc files (each >= 500 words, production quality), JSDoc on all public lib/ functions, updated README.md with pipeline overview and provider quick-start, updated CONTRIBUTING.md with generated skill guidelines. Every code example must work. Docs must match actual implementation — any discrepancy must be fixed (in code or doc, not left inconsistent)."
+    allowed_files:
+      - docs/user/configuring-providers.md
+      - docs/user/using-the-wizard.md
+      - docs/user/using-the-cli.md
+      - docs/reference/pipeline-architecture.md
+      - docs/reference/provider-catalog.md
+      - docs/reference/research-result-schema.md
+      - docs/reference/prompt-file-format.md
+      - docs/reference/quality-score-rubric.md
+      - docs/reference/api-routes.md
+      - README.md
+      - CONTRIBUTING.md
+      - lib/providers/index.ts
+      - lib/research-engine.ts
+      - lib/skill-builder.ts
+      - lib/prompt-engine.ts
+      - lib/prompt-optimizer.ts
+      - lib/pipeline.ts
+      - lib/quality-score.ts
+    verify:
+      - "wc -w docs/user/configuring-providers.md shows >= 500"
+      - "wc -w docs/reference/api-routes.md shows >= 500"
+      - "All 9 new doc files exist"
+      - "docs/user/configuring-providers.md has setup instructions for all 5 providers"
+      - "docs/reference/api-routes.md documents all 6 routes with request/response schemas"
+    stop_if:
+      - "A doc describes an interface that does not match implementation — fix the discrepancy before closing task"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── COMPLETION AUDIT ────────────────────────────────────────────────────────
+
+  - id: T018
     type: judge
     assignee: Judge
     status: queued
     reasoning_hint: high
-    objective: "Audit whether Phase 1 is complete: all features shipped, all tests passing, build clean, UI approved by James, nothing from Phase 1 spec section left unimplemented."
+    objective: "Audit whether Phase 1 is complete: all 17 Worker tasks done, build and tests passing, TypeScript clean, UI approved at T006, all T017 documentation exists and is production quality, no Phase 2 features present."
     inputs:
-      - "All T001–T013 receipts"
+      - "All T001–T017 receipts"
       - "npm run build output"
       - "npm test output"
       - "npx tsc --noEmit output"
-      - "James's UI approval from T004b"
+      - "T006 receipt (must show approved)"
+      - "Word counts on all T017 doc files"
+      - "bash scripts/validate-skill.sh --strict output on catalog skills"
     constraints:
-      - "Do not mark complete if any Phase 1 Worker task is queued or active."
-      - "Do not mark complete if npm run build fails."
-      - "Do not mark complete if James has not explicitly approved the UI."
-      - "Do not include Phase 2 features as evidence of completion."
+      - "Do not mark complete if any Worker task T001–T017 is queued or active"
+      - "Do not mark complete if npm run build exits nonzero"
+      - "Do not mark complete if npm test exits nonzero"
+      - "Do not mark complete if npx tsc --noEmit exits nonzero"
+      - "Do not mark complete if T006 receipt does not show approved"
+      - "Do not mark complete if any T017 doc file is missing or < 500 words"
+      - "Do not mark complete if any Phase 2 feature is present in the codebase"
     expected_output:
       - "complete | not_complete"
       - "full_outcome_complete: true | false"
-      - "Missing items if not_complete"
-      - "Next recommended action"
+      - "If not_complete: exact list of what is missing or failing"
+      - "If complete: confirmation that Phase 2 may begin after James approves"
     receipt: null
 
 checks:

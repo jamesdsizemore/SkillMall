@@ -47,3 +47,6 @@ cli/*.tsbuildinfo
 
 # skill-mall settings (local only)
 .claude/settings.local.json
+
+# visual brainstorming sessions
+.superpowers/
