@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Auto-regenerate AGENTS.md if any skill files changed in this commit.
+
+if git diff --cached --name-only | grep -q "^skills/"; then
+  bash scripts/sync-agents.sh
+  git add AGENTS.md
+fi
