@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/skills";
 
-const TABS = ["OVERVIEW", "SKILL.MD"] as const;
+const TABS = ["OVERVIEW", "SKILL.MD", "HISTORY"] as const;
 type Tab = typeof TABS[number];
 
 type Props = {
@@ -74,7 +74,60 @@ export function SkillTabs({ skill, readme }: Props) {
             </pre>
           </div>
         )}
+
+        {active === "HISTORY" && (
+          <HistoryPanel skillPath={skill.path} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function HistoryPanel({ skillPath }: { skillPath: string }) {
+  const [entries, setEntries] = React.useState<import("@/lib/version-history").VersionEntry[] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    setLoading(true);
+    fetch(`/api/version-history?path=${encodeURIComponent(skillPath)}`)
+      .then(r => r.json())
+      .then(d => setEntries(d.entries ?? []))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+  }, [skillPath]);
+
+  if (loading) {
+    return (
+      <p className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+        [ LOADING... ]
+      </p>
+    );
+  }
+
+  if (!entries || entries.length === 0) {
+    return (
+      <p className="text-sm text-sm-secondary">No version history found for this skill.</p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(entry => (
+        <div key={entry.hash} className="border border-sm-border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] tracking-widest text-sm-secondary" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+              [ {entry.hash} ] {entry.date}
+            </span>
+            <span className="text-[9px] text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+              {entry.author}
+            </span>
+          </div>
+          <p className="text-sm text-sm-primary mb-1">{entry.message}</p>
+          <p className="text-[9px] text-sm-secondary" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+            {entry.semanticDiff}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
