@@ -4,6 +4,7 @@ import { resolveProviderConfig, createLLMClient, ConfigError } from "@/lib/provi
 import { buildSkillDirectory } from "@/lib/skill-builder";
 import { generatePrompts } from "@/lib/prompt-engine";
 import { validateSkillDirectory, atomicWrite } from "@/lib/pipeline";
+import { logInstallEvent } from "@/lib/analytics";
 import path from "path";
 
 export async function POST(req: NextRequest) {
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
 
     const outputPath = path.join("skills", metadata.category, metadata.slug);
     const writeResult = await atomicWrite(completeDirectory, outputPath);
+
+    // Log install event (aggregate analytics, no PII)
+    logInstallEvent(metadata.slug, "claude-code");
 
     return NextResponse.json({
       slug: metadata.slug,
