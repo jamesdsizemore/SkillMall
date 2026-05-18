@@ -11,6 +11,7 @@ import { confirmResearchCommand } from "./commands/confirm-research.js";
 import { deployPackCommand } from "./commands/deploy-pack.js";
 import { forkCommand } from "./commands/fork.js";
 import { revertCommand } from "./commands/revert.js";
+import { publishCommand } from "./commands/publish.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -93,6 +94,10 @@ async function main(): Promise<void> {
 
     case "revert":
       revertCommand(rest);
+      break;
+
+    case "publish":
+      await publishCommand(rest);
       break;
 
     case "--help":
