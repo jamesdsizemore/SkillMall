@@ -10,6 +10,8 @@ import { getAvailableLocales } from "@/lib/i18n";
 import nodePath from "node:path";
 import { SkillsShBadge } from "@/components/skill-mall/skill-detail/SkillsShBadge";
 import { FeedbackForm } from "@/components/skill-mall/improvements/FeedbackForm";
+import { TierBadge } from "@/components/skill-mall/marketplace/TierBadge";
+import { getSkillTier } from "@/lib/marketplace/gate";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
 import { ForkButton } from "@/components/skill-mall/fork-button";
 import { ReviewForm } from "@/components/skill-mall/reviews/ReviewForm";
@@ -34,6 +36,7 @@ export default async function SkillPage({ params }: Props) {
   const skillDir = nodePath.join(process.cwd(), nodePath.dirname(skill.path));
   const availableLocales = getAvailableLocales(skillDir);
   const forkCount = getForkCount(skill.slug);
+  const skillTier = getSkillTier(skill.slug);
   const allSkills = getAllSkills();
   const allSlugs = new Set(allSkills.map((s) => s.slug));
   const score = computeQualityScore(skill, allSlugs).total;
@@ -69,9 +72,14 @@ export default async function SkillPage({ params }: Props) {
             {/* Title with character-by-character reveal */}
             <CharRevealTitle title={skill.name} />
 
-            <p className="mt-3 mb-6 text-sm leading-relaxed text-sm-secondary">
+            <p className="mt-3 mb-4 text-sm leading-relaxed text-sm-secondary">
               {skill.description}
             </p>
+            {skillTier.tier !== "free" && (
+              <div className="mb-6">
+                <TierBadge tier={skillTier.tier} priceCents={skillTier.price_cents} />
+              </div>
+            )}
 
             {/* Bracket-notation tags */}
             {skill.tags.length > 0 && (

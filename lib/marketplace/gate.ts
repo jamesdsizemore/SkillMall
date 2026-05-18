@@ -1,6 +1,8 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { getDb } from '../db/client'
-import { getReviewCount } from '../reviews'
 import { getAllSkills } from '../skills'
+import type { SkillTier } from '../db/types'
 
 export interface MarketplaceConditions {
   catalogSize: number
@@ -32,13 +34,13 @@ export function checkMarketplaceReady(): MarketplaceReadiness {
 
   // Condition 2: community >= 500 members (unique reviewers as proxy)
   const communityRow = db
-    .prepare("SELECT COUNT(DISTINCT reviewer_github_id) as count FROM reviews")
+    .prepare('SELECT COUNT(DISTINCT reviewer_github_id) as count FROM reviews')
     .get() as { count: number } | undefined
   const communitySize = communityRow?.count ?? 0
 
   // Condition 3: ratings >= 3 months active (first review >= 90 days ago)
   const firstReviewRow = db
-    .prepare("SELECT MIN(created_at) as first FROM reviews")
+    .prepare('SELECT MIN(created_at) as first FROM reviews')
     .get() as { first: string | null } | undefined
   const firstReview = firstReviewRow?.first
   const ratingsMonthsActive = firstReview
@@ -46,8 +48,6 @@ export function checkMarketplaceReady(): MarketplaceReadiness {
     : 0
 
   // Condition 4: >= 50 skills with test coverage (tests/<slug>/*.json files)
-  const fs = require('node:fs')
-  const path = require('node:path')
   const testsDir = path.join(process.cwd(), 'tests')
   let skillsWithTests = 0
   if (fs.existsSync(testsDir)) {
@@ -55,7 +55,7 @@ export function checkMarketplaceReady(): MarketplaceReadiness {
       const dir = path.join(testsDir, slug)
       if (
         fs.statSync(dir).isDirectory() &&
-        fs.readdirSync(dir).some((f: string) => f.endsWith('.json'))
+        fs.readdirSync(dir).some((f) => f.endsWith('.json'))
       ) {
         skillsWithTests++
       }
@@ -80,4 +80,21 @@ export function checkMarketplaceReady(): MarketplaceReadiness {
     skillsWithTests >= 50
 
   return { ready, conditions }
+}
+
+export function getSkillTier(skillSlug: string): SkillTier {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT * FROM skill_tiers WHERE skill_slug = ?')
+    .get(skillSlug) as SkillTier | undefined
+  return row ?? { skill_slug: skillSlug, tier: 'free', price_cents: 0, set_at: new Date().toISOString() }
+}
+
+export function setSkillTier(skillSlug: string, tier: 'free' | 'sponsored' | 'premium', priceCents = 0): void {
+  const db = getDb()
+  db.prepare(
+    `INSERT INTO skill_tiers (skill_slug, tier, price_cents, set_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(skill_slug) DO UPDATE SET tier = excluded.tier, price_cents = excluded.price_cents, set_at = excluded.set_at`
+  ).run(skillSlug, tier, priceCents)
 }

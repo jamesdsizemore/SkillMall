@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T206
+active_task: T207
 
 tasks:
 
@@ -1065,7 +1065,7 @@ tasks:
   - id: T206
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement marketplace gate and tier system: lib/marketplace/gate.ts (checkMarketplaceReady — 4 conditions, returns ready:false with current counts until all met), skill_tiers table queries, GET /api/marketplace/status route, marketplace UI visible ONLY when checkMarketplaceReady() returns ready:true, TierBadge component, PremiumTeaser page for locked premium skills."
     allowed_files:
@@ -1087,12 +1087,30 @@ tasks:
       - "Marketplace UI does not render when ready: false (smoke test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/marketplace/gate.ts
+        - lib/marketplace/entitlement.ts
+        - lib/__tests__/marketplace.test.ts
+        - app/api/marketplace/status/route.ts
+        - app/api/marketplace/entitlement/route.ts
+        - components/skill-mall/marketplace/TierBadge.tsx
+        - components/skill-mall/marketplace/PremiumTeaser.tsx
+        - app/skills/[category]/[slug]/page.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/marketplace"
+          status: pass
+      summary: "lib/marketplace/gate.ts: fixed require→import, added getSkillTier() and setSkillTier(). lib/marketplace/entitlement.ts: getEntitlement() checks purchases table. GET /api/marketplace/status returns checkMarketplaceReady() with all 4 conditions. GET /api/marketplace/entitlement checks user purchase. TierBadge.tsx: shows SPONSORED/PREMIUM badge (free = null). PremiumTeaser.tsx: shows purchase CTA when marketplace ready, 'coming soon' when not. page.tsx: TierBadge shown below description for non-free skills. 4 tests passing."
 
   - id: T207
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement Stripe payment integration: lib/marketplace/payments.ts (createCheckoutSession, handleWebhook with signature verification), POST /api/marketplace/checkout, POST /api/webhooks/stripe (bodyParser: false, MUST verify Stripe-Signature header), GET /api/marketplace/entitlement. Stripe test mode only — live mode gated on marketplace launch conditions."
     allowed_files:
