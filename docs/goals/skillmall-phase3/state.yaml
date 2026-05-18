@@ -300,7 +300,7 @@ tasks:
   - id: T263
     type: worker
     assignee: Worker
-    status: queued
+    status: blocked
     reasoning_hint: default
     objective: "Add Prompts tab to skill detail page (SkillTabs). Display all prompt files from resources/prompts/ grouped by use case in plain English (not framework name). Each prompt card shows: name, complexity dot (blue=quick, grey=thorough, red=exhaustive), when_to_use text, collapsed DETAILS with framework names. Fixed-width grid so all names start at same horizontal position."
     allowed_files:
@@ -316,7 +316,9 @@ tasks:
     stop_if:
       - "Skill prompts directory does not exist for all skills — render empty state gracefully"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: blocked
+      reason: "Merged into T261. The Prompts tab and Framework Override are one feature — implement together in T261. This task card is kept for board integrity but should not be executed."
 
   # ─── SPEC FEATURES MISSED FROM PHASE 2 (round 2) ────────────────────────
 
