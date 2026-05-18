@@ -40,16 +40,32 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
+/** Detect agents for a given scope ('user' = home dir, 'project' = cwd). */
+export function detectAgentsForScope(scope: 'user' | 'project' = 'user'): DetectedAgent[] {
+  const base = scope === 'project' ? process.cwd() : os.homedir();
+  return AGENT_REGISTRY.map((agent) => {
+    const dir = agent.skillsDir(base);
+    return {
+      id: agent.id,
+      name: agent.name,
+      skillsDir: dir,
+      // For project scope: directory may not exist yet — create it on deploy
+      detected: scope === 'user' ? fs.existsSync(dir) : true,
+    };
+  });
+}
+
 /**
  * Deploy a skill directory to all detected agents (or a filtered subset).
- * Logs an install event for each successful deployment.
+ * scope: 'user' deploys to ~/.<agent>/skills, 'project' deploys to ./<agent>/skills in cwd.
  */
 export function deployToAgents(
   skillPath: string,
-  agentIds?: string[]
+  agentIds?: string[],
+  scope: 'user' | 'project' = 'user'
 ): DeployAgentResult[] {
-  const candidates = detectAgents().filter((a) => {
-    if (!a.detected) return false;
+  const candidates = detectAgentsForScope(scope).filter((a) => {
+    if (scope === 'user' && !a.detected) return false;
     if (agentIds && agentIds.length > 0) return agentIds.includes(a.id);
     return true;
   });

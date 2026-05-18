@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 import { getSkill, getAllSkills } from "./skills";
-import { logForkEvent } from "./analytics";
 
 export interface ForkResult {
   sourceSlug: string;
@@ -90,8 +89,8 @@ export function forkSkill(
 
   fs.writeFileSync(skillMdPath, content, "utf-8");
 
-  // Track fork event for Community Favorites analytics
-  logForkEvent(sourceSlug, newSlug);
+  // Track fork event via dynamic import to avoid bundling SQLite into CLI
+  import("./analytics").then(({ logForkEvent }) => logForkEvent(sourceSlug, newSlug)).catch(() => {});
 
   return {
     sourceSlug,

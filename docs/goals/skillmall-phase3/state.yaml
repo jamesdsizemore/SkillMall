@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T267
+active_task: T268
 
 tasks:
 
@@ -582,7 +582,7 @@ tasks:
   - id: T267
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Add --scope project flag to deploy and deploy-pack CLI commands. --scope project deploys to .claude/skills/ (or equivalent) in the current working directory instead of ~/.claude/skills/. Update lib/agents/detector.ts to accept scope parameter. Update deploy-button.tsx to show project scope option."
     allowed_files:
@@ -597,12 +597,26 @@ tasks:
       - "npx skill-mall deploy-pack full-stack-developer-kit --scope project deploys all skills to project-local dirs"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - cli/src/commands/deploy.ts
+        - cli/src/commands/deploy-pack.ts
+        - lib/agents/detector.ts
+        - components/skill-mall/deploy-button.tsx
+      commands:
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "node cli/dist/index.js deploy ai/skill-creator --scope project"
+          status: pass
+      summary: "lib/agents/detector.ts: detectAgentsForScope(scope) uses cwd instead of homedir for project scope. deployToAgents() accepts scope parameter (user|project, default user). deploy.ts: parses --scope flag, passes scope to deployToAgents and uses .claude/skills/ in cwd for project scope single-agent path. deploy-pack.ts: getAgentSkillsDir() accepts scope, uses cwd as base for project scope. deploy-button.tsx: adds CLI commands with --scope project as top options. Bug fix: forking.ts uses dynamic import() for analytics to prevent bundling better-sqlite3 (CJS) into the ESM CLI."
 
   - id: T268
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Wire trigger evaluator accuracy into CI validation action. Add trigger_accuracy_threshold (default 80%) and budget_warn_at_installed (default 25) as configurable options in .github/workflows/validate-skills.yml and .github/actions/skill-mall-validate/action.yml. When a PR touches a skill that has a trigger_accuracy flag set, run eval-triggers and warn (or block) based on threshold."
     allowed_files:

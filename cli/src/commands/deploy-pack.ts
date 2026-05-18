@@ -28,13 +28,13 @@ function findCollection(slug: string): Collection | null {
   }
 }
 
-function getAgentSkillsDir(agentId: string): string | null {
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+function getAgentSkillsDir(agentId: string, scope: 'user' | 'project' = 'user'): string | null {
+  const base = scope === 'project' ? process.cwd() : (process.env.HOME ?? process.env.USERPROFILE ?? "");
   const dirs: Record<string, string> = {
-    "claude-code": path.join(home, ".claude", "skills"),
-    cursor: path.join(home, ".cursor", "skills"),
-    codex: path.join(home, ".codex", "skills"),
-    agents: path.join(home, ".agents", "skills"),
+    "claude-code": path.join(base, ".claude", "skills"),
+    cursor: path.join(base, ".cursor", "skills"),
+    codex: path.join(base, ".codex", "skills"),
+    agents: path.join(base, ".agents", "skills"),
   };
   return dirs[agentId] ?? null;
 }
@@ -68,16 +68,20 @@ function resolveSkillPath(skillSlug: string): string | null {
 export async function deployPackCommand(args: string[]): Promise<void> {
   const [slug, ...rest] = args;
   let agentId = "claude-code";
+  let scope: 'user' | 'project' = 'user';
 
   for (let i = 0; i < rest.length; i++) {
     if ((rest[i] === "--agent" || rest[i] === "-a") && rest[i + 1]) {
       agentId = rest[++i];
+    } else if (rest[i] === "--scope" && rest[i + 1]) {
+      const s = rest[++i];
+      if (s === "project" || s === "user") scope = s;
     }
   }
 
   if (!slug) {
     process.stderr.write(
-      pc.red("Usage: skill-mall deploy-pack <collection-slug> [--agent <agent>]\n") +
+      pc.red("Usage: skill-mall deploy-pack <collection-slug> [--agent <agent>] [--scope project|user]\n") +
         pc.dim("  Example: skill-mall deploy-pack full-stack-developer-kit --agent claude-code\n")
     );
     process.exit(1);
@@ -89,7 +93,7 @@ export async function deployPackCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const agentDir = getAgentSkillsDir(agentId);
+  const agentDir = getAgentSkillsDir(agentId, scope);
   if (!agentDir) {
     process.stderr.write(pc.red(`Unknown agent: ${agentId}\n`));
     process.exit(1);
@@ -97,7 +101,7 @@ export async function deployPackCommand(args: string[]): Promise<void> {
 
   console.log();
   p.intro(pc.bold(`  skill-mall deploy-pack: ${collection.name}`));
-  console.log(`  Target: ${agentId} → ${agentDir}`);
+  console.log(`  Target: ${agentId} [${scope}] → ${agentDir}`);
   console.log();
 
   const sorted = [...collection.skills].sort((a, b) => a.order - b.order);

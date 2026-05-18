@@ -9,13 +9,18 @@ type Agent = {
   command: (slug: string) => string;
 };
 
+// Convert skills/ai/skill-creator/SKILL.md → ai/skill-creator
+function toCliSlug(skillPath: string): string {
+  return skillPath.replace(/^skills\//, "").replace(/\/SKILL\.md$/, "");
+}
+
 const AGENTS: Agent[] = [
-  { id: "claude-global",   label: "Claude Code — global",  command: (p) => `cp -r ${p} ~/.claude/skills/` },
-  { id: "claude-project",  label: "Claude Code — project", command: (p) => `cp -r ${p} .claude/skills/` },
-  { id: "cursor-global",   label: "Cursor — global",       command: (p) => `cp -r ${p} ~/.cursor/skills/` },
-  { id: "cursor-project",  label: "Cursor — project",      command: (p) => `cp -r ${p} .cursor/skills/` },
-  { id: "agents-global",   label: ".agents — global",      command: (p) => `cp -r ${p} ~/.agents/skills/` },
-  { id: "agents-project",  label: ".agents — project",     command: (p) => `cp -r ${p} .agents/skills/` },
+  { id: "cli-global",      label: "CLI — global (all agents)",  command: (p) => `npx skill-mall deploy ${toCliSlug(p)}` },
+  { id: "cli-project",     label: "CLI — project scope",        command: (p) => `npx skill-mall deploy ${toCliSlug(p)} --scope project` },
+  { id: "claude-global",   label: "Claude Code — global",       command: (p) => `cp -r ${p.replace(/\/SKILL\.md$/, "")} ~/.claude/skills/` },
+  { id: "claude-project",  label: "Claude Code — project",      command: (p) => `cp -r ${p.replace(/\/SKILL\.md$/, "")} .claude/skills/` },
+  { id: "cursor-global",   label: "Cursor — global",            command: (p) => `cp -r ${p.replace(/\/SKILL\.md$/, "")} ~/.cursor/skills/` },
+  { id: "cursor-project",  label: "Cursor — project",           command: (p) => `cp -r ${p.replace(/\/SKILL\.md$/, "")} .cursor/skills/` },
 ];
 
 type Props = {

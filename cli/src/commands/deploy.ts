@@ -30,6 +30,7 @@ export function deployCommand(args: string[]): void {
   let allAgents = false;
   let agentList: string[] = [];
   let lang: string | null = null;
+  let scope: 'user' | 'project' = 'user';
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--all-agents") {
@@ -38,6 +39,9 @@ export function deployCommand(args: string[]): void {
       agentList = args[++i].split(",").map((s) => s.trim());
     } else if (args[i] === "--lang" && args[i + 1]) {
       lang = args[++i];
+    } else if (args[i] === "--scope" && args[i + 1]) {
+      const s = args[++i];
+      if (s === "project" || s === "user") scope = s;
     } else if (!args[i].startsWith("--")) {
       positional.push(args[i]);
     }
@@ -47,7 +51,7 @@ export function deployCommand(args: string[]): void {
 
   if (!target) {
     process.stderr.write(
-      pc.red("Usage: skill-mall deploy <category/skill-name> [--lang <locale>] [--all-agents] [--agents <id,id>]\n")
+      pc.red("Usage: skill-mall deploy <category/skill-name> [--scope project|user] [--lang <locale>] [--all-agents] [--agents <id,id>]\n")
     );
     process.exit(1);
   }
@@ -115,7 +119,7 @@ export function deployCommand(args: string[]): void {
     console.log(pc.dim(`Deploying ${skillName}...`));
     console.log();
 
-    const results = deployToAgents(srcDir, agentList.length > 0 ? agentList : undefined);
+    const results = deployToAgents(srcDir, agentList.length > 0 ? agentList : undefined, scope);
     const all = detectAgents();
 
     for (const agent of all) {
@@ -137,17 +141,21 @@ export function deployCommand(args: string[]): void {
   }
 
   // Single-agent deploy (Claude Code default)
+  const destBase = scope === 'project'
+    ? path.join(process.cwd(), ".claude", "skills")
+    : CLAUDE_SKILLS_DIR;
+
   console.log();
   console.log(
     pc.dim("Deploying ") +
       pc.bold(pc.green(skillName)) +
-      pc.dim(" to ") +
-      pc.cyan(CLAUDE_SKILLS_DIR)
+      pc.dim(scope === 'project' ? " [project] to " : " to ") +
+      pc.cyan(destBase)
   );
 
   let destDir: string;
   try {
-    destDir = deploySkill(srcDir, CLAUDE_SKILLS_DIR);
+    destDir = deploySkill(srcDir, destBase);
   } catch (err) {
     process.stderr.write(
       pc.red(`Deploy failed: ${err instanceof Error ? err.message : String(err)}\n`)
