@@ -12,6 +12,7 @@ import { deployPackCommand } from "./commands/deploy-pack.js";
 import { forkCommand } from "./commands/fork.js";
 import { revertCommand } from "./commands/revert.js";
 import { publishCommand } from "./commands/publish.js";
+import { budgetCheckCommand } from "./commands/budget-check.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -29,6 +30,7 @@ ${pc.bold("Commands:")}
   ${pc.cyan("deploy")} <category/name>           Copy a skill to ~/.claude/skills/
   ${pc.cyan("new")} <category> <name>            Scaffold a new skill from template
   ${pc.cyan("new")} --from-template <slug> <name> Scaffold from a domain starter in skills/_starters/
+  ${pc.cyan("budget-check")} <cat/slug>          Simulate description visibility at N chars (--chars-available)
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
@@ -99,6 +101,10 @@ async function main(): Promise<void> {
 
     case "publish":
       await publishCommand(rest);
+      break;
+
+    case "budget-check":
+      budgetCheckCommand(rest);
       break;
 
     case "--help":

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/skills";
 
-const TABS = ["OVERVIEW", "SKILL.MD", "HISTORY", "TRIGGER ANALYSIS"] as const;
+const TABS = ["OVERVIEW", "SKILL.MD", "HISTORY", "TRIGGER ANALYSIS", "BUDGET ANALYSIS"] as const;
 type Tab = typeof TABS[number];
 
 type Props = {
@@ -81,6 +81,10 @@ export function SkillTabs({ skill, readme }: Props) {
 
         {active === "TRIGGER ANALYSIS" && (
           <TriggerPanel category={skill.category} slug={skill.slug} />
+        )}
+
+        {active === "BUDGET ANALYSIS" && (
+          <BudgetPanel category={skill.category} slug={skill.slug} />
         )}
       </div>
     </div>
@@ -164,6 +168,156 @@ function TriggerPanel({ category, slug }: { category: string; slug: string }) {
               <p className="text-xs text-sm-secondary">{q.suggestion}</p>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BudgetPanel({ category, slug }: { category: string; slug: string }) {
+  const [charsAvailable, setCharsAvailable] = React.useState(200);
+  const [result, setResult] = React.useState<import('@/lib/budget-analyzer').BudgetCheckResult | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const run = async (chars: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/budget-check?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}&charsAvailable=${chars}`
+      );
+      if (res.ok) setResult(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseInt(e.target.value, 10);
+    setCharsAvailable(v);
+    run(v);
+  };
+
+  React.useEffect(() => { run(charsAvailable); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-sm-secondary">
+        Simulate how much of this skill&apos;s description an agent sees at different context budgets.
+        Set <span className="font-mono">--chars-available</span> to match your agent&apos;s actual skill listing budget.
+      </p>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label
+            className="text-[9px] tracking-widest text-sm-secondary"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            [ CHARS AVAILABLE ]
+          </label>
+          <span
+            className="text-sm font-black text-sm-display"
+            style={{ fontFamily: '"Doto", monospace' }}
+          >
+            {charsAvailable}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={50}
+          max={500}
+          step={10}
+          value={charsAvailable}
+          onChange={handleSliderChange}
+          className="w-full accent-sm-display"
+        />
+        <div className="flex justify-between text-[9px] text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+          <span>50</span>
+          <span>500</span>
+        </div>
+      </div>
+
+      {loading && (
+        <p className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+          [ ANALYZING... ]
+        </p>
+      )}
+
+      {result && !loading && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {[
+              ['VISIBLE', result.visible ? 'YES' : 'NO'],
+              ['DESC LENGTH', String(result.descriptionLength)],
+              ['TRIGGER', result.triggerPreserved ? 'PRESERVED' : 'LOST'],
+            ].map(([label, value]) => (
+              <div key={label} className="border border-sm-border p-3">
+                <p
+                  className="text-[9px] tracking-widest text-sm-disabled mb-1"
+                  style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                >
+                  {label}
+                </p>
+                <p
+                  className={`text-xl font-black ${value === 'YES' || value === 'PRESERVED' ? 'text-green-500' : value === 'NO' || value === 'LOST' ? 'text-sm-accent' : 'text-sm-display'}`}
+                  style={{ fontFamily: '"Doto", monospace' }}
+                >
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="border border-sm-border">
+            <div
+              className="border-b border-sm-border px-4 py-2 text-[9px] tracking-widest text-sm-secondary"
+              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+            >
+              [ VISIBLE TEXT ]
+            </div>
+            <pre className="p-4 text-xs leading-relaxed text-sm-primary whitespace-pre-wrap">
+              {result.visibleText}
+            </pre>
+          </div>
+
+          {result.truncatedText && (
+            <div className="border border-sm-accent">
+              <div
+                className="border-b border-sm-accent px-4 py-2 text-[9px] tracking-widest text-sm-accent"
+                style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+              >
+                [ TRUNCATED ]
+              </div>
+              <pre className="p-4 text-xs leading-relaxed text-sm-secondary whitespace-pre-wrap opacity-60">
+                {result.truncatedText}
+              </pre>
+            </div>
+          )}
+
+          {result.triggerPhrase && (
+            <div className="border border-sm-border p-3">
+              <p className="text-[9px] tracking-widest text-sm-disabled mb-1" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                [ TRIGGER PHRASE ]
+              </p>
+              <p className="text-sm text-sm-primary">&ldquo;{result.triggerPhrase}&rdquo;</p>
+            </div>
+          )}
+
+          {result.rewriteSuggestions.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[9px] tracking-widest text-sm-secondary" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                [ SUGGESTIONS ]
+              </p>
+              {result.rewriteSuggestions.map((s, i) => (
+                <div key={i} className="border border-sm-border p-3 text-sm text-sm-secondary">
+                  {s}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {result.rewriteSuggestions.length === 0 && (
+            <p className="text-sm text-green-500">Description fits within {charsAvailable} chars. No rewrite needed.</p>
+          )}
         </div>
       )}
     </div>

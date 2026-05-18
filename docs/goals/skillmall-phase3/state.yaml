@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T252
+active_task: T253
 
 tasks:
 
@@ -133,7 +133,7 @@ tasks:
   - id: T252
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement Agent Budget Analyzer: lib/budget-analyzer.ts (per-agent budget simulation — at 10/20/30/50 installed skills, show what the agent reads, whether trigger phrase is preserved, and specific rewrite suggestions that fit all load levels). CLI: npx skill-mall budget-check <slug> --agent claude-code --installed 25. UI: Budget Analysis tab on skill detail page."
     allowed_files:
@@ -154,12 +154,32 @@ tasks:
       - "Budget simulation uses invented/hardcoded per-agent token budgets without documentation — STOP and implement as a configurable simulation instead: let the user supply --chars-available <N> rather than assuming per-agent values. Document this decision in the task receipt."
       - "Per-agent budget values are hardcoded without a cited source — the safest implementation is agent-agnostic: show what fits in N characters, let user specify N. Do not invent agent-specific numbers."
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/budget-analyzer.ts
+        - lib/__tests__/budget-analyzer.test.ts
+        - components/skill-mall/skill-detail/SkillTabs.tsx
+        - app/api/budget-check/route.ts
+        - cli/src/commands/budget-check.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/budget-analyzer"
+          status: pass
+        - cmd: "node cli/dist/index.js budget-check ai/skill-creator --chars-available 200"
+          status: pass
+        - cmd: "node cli/dist/index.js budget-check ai/skill-creator --agent claude-code --chars-available 100"
+          status: pass
+      summary: "Implemented user-configurable budget analyzer (no hardcoded per-agent values). analyzeDescription() and analyzeSkill() in lib/budget-analyzer.ts. --chars-available N flag on CLI (--agent accepted but only for display). BUDGET ANALYSIS tab added to SkillTabs with slider 50-500, live API calls to GET /api/budget-check. 14 tests all passing."
 
   - id: T253
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement Codebase-to-Skill Extractor: CLI npx skill-mall extract <dir> --output <slug> [--category <cat>] [--focus 'error handling,naming']. Reads .md, .ts, .js, .py files in the directory. Passes content to Research Engine variant (same LLM extraction, same pipeline). Writes research-result.json, then user runs confirm-research as usual."
     allowed_files:
