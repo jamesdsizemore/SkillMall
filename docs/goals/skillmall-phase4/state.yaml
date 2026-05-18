@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T402
+active_task: T403
 
 tasks:
 
@@ -112,7 +112,7 @@ tasks:
   - id: T402
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/architecture.md (4000+ words) covering: system overview with ASCII diagram, provider abstraction with full TypeScript interface, all 5 pipeline stages in detail (what flows in, what flows out, how LLM calls work, how Zod validation works), state management (WizardContext), database design (all tables + WHY SQLite), GitHub OAuth flow step-by-step, Nothing design system with token values, performance characteristics (60+ LLM calls for 20-tool domain), security model (Zod, parameterized SQL, path traversal, author verification)."
     allowed_files:
@@ -125,12 +125,19 @@ tasks:
     stop_if:
       - "Any TypeScript type shown doesn't match actual codebase type — grep before writing"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/architecture.md
+      commands:
+        - cmd: "wc -w docs/developer/architecture.md"
+          status: pass
+      summary: "4516 words. ASCII diagram, LLMClient interface (verified against lib/providers/types.ts), SQL schemas (verified against 001_initial.sql), all 5 pipeline stages, RAG pure-JS decision rationale, Nothing design system tokens, 60+ LLM call performance analysis, Zod/parameterized SQL/path traversal/author verification security model. Additional sections: quality score 5-dimension breakdown, file-system-as-database rationale, AGENTS.md auto-generation, CLI dynamic import requirement (critical — static import crashes CLI)."
 
   - id: T403
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/developer/api-reference.md (5000+ words) covering ALL 23 API routes: auth routes (login/callback/logout), provider routes, pipeline routes (research/confirm-research/create-skill), tool routes (optimize-prompt/regen-prompt/eval-triggers/budget-check/fork-skill/version-history), community routes (reviews/feedback/improvements), MCP route, analytics route, marketplace routes (Phase 3), Stripe webhook. Each route: method, path, auth requirement, complete request/response schema tables, all error codes with exact error string values, working curl example."
     allowed_files:
