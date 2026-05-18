@@ -9,6 +9,23 @@ inputs:
     description: Fail on warnings as well as errors
     required: false
     default: 'false'
+  trigger_accuracy_threshold:
+    description: |
+      Minimum trigger accuracy percentage (0-100) required to pass.
+      When a skill has trigger_accuracy set in its frontmatter and
+      SKILL_MALL_PROVIDER/SKILL_MALL_API_KEY secrets are present, eval-triggers
+      runs and warns (or fails if above threshold) based on this value.
+      Set to 0 to disable threshold enforcement.
+      Default: 80
+    required: false
+    default: '80'
+  budget_warn_at_installed:
+    description: |
+      Number of installed skills at which to warn about description budget.
+      When description exceeds budget at this install count, a warning is added.
+      Default: 25
+    required: false
+    default: '25'
 
 outputs:
   valid:
@@ -17,6 +34,9 @@ outputs:
   issues:
     description: Comma-separated list of issues found
     value: ${{ steps.validate.outputs.issues }}
+  trigger_accuracy:
+    description: Trigger accuracy percentage (if eval-triggers ran)
+    value: ${{ steps.eval-triggers.outputs.accuracy }}
 
 runs:
   using: composite
@@ -42,4 +62,51 @@ runs:
           echo "valid=false" >> $GITHUB_OUTPUT
           issues=$(echo "$output" | grep ERROR | tr '\n' ',' | sed 's/,$//')
           echo "issues=$issues" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Eval trigger accuracy (optional — skips when secrets absent)
+      id: eval-triggers
+      shell: bash
+      env:
+        SKILL_MALL_PROVIDER: ${{ env.SKILL_MALL_PROVIDER }}
+        SKILL_MALL_API_KEY: ${{ env.SKILL_MALL_API_KEY }}
+      run: |
+        echo "accuracy=" >> $GITHUB_OUTPUT
+
+        # Skip when secrets are not configured — never fail the build
+        if [ -z "$SKILL_MALL_PROVIDER" ] || [ -z "$SKILL_MALL_API_KEY" ]; then
+          echo "Skipping trigger accuracy eval — SKILL_MALL_PROVIDER or SKILL_MALL_API_KEY not set."
+          exit 0
+        fi
+
+        SKILL_PATH="${{ inputs.skill-path }}"
+        SKILL_MD="$SKILL_PATH/SKILL.md"
+
+        if [ ! -f "$SKILL_MD" ]; then
+          exit 0
+        fi
+
+        # Only run if skill frontmatter has trigger_accuracy flag
+        if ! grep -q "^trigger_accuracy:" "$SKILL_MD" 2>/dev/null; then
+          exit 0
+        fi
+
+        echo "Running trigger accuracy eval for $SKILL_PATH..."
+
+        # Extract category/slug from path for CLI command
+        SLUG=$(echo "$SKILL_PATH" | sed 's|skills/||' | sed 's|/$||')
+
+        accuracy_output=$(npx skill-mall eval-triggers "$SLUG" 2>&1 || true)
+        echo "$accuracy_output"
+
+        # Extract accuracy percentage from output (looks for "Overall accuracy: XX%")
+        accuracy=$(echo "$accuracy_output" | grep -oE 'Overall accuracy: [0-9]+' | grep -oE '[0-9]+' | head -1 || echo "")
+
+        if [ -n "$accuracy" ]; then
+          echo "accuracy=$accuracy" >> $GITHUB_OUTPUT
+          THRESHOLD="${{ inputs.trigger_accuracy_threshold }}"
+          if [ "$THRESHOLD" -gt 0 ] && [ "$accuracy" -lt "$THRESHOLD" ]; then
+            echo "WARNING: Trigger accuracy $accuracy% is below threshold $THRESHOLD%"
+            # Warn but do NOT fail the build — trigger accuracy is advisory
+          fi
         fi

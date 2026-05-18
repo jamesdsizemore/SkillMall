@@ -5,6 +5,12 @@ on:
     paths:
       - 'skills/**'
 
+# Workflow-level configuration for quality gates.
+# Override these in .github/workflows/ or at the job level as needed.
+env:
+  TRIGGER_ACCURACY_THRESHOLD: '80'   # Minimum trigger accuracy % (0 = disabled)
+  BUDGET_WARN_AT_INSTALLED: '25'     # Warn when description overflows at N installed skills
+
 jobs:
   validate:
     name: Validate changed skills
@@ -96,6 +102,44 @@ jobs:
               repo: context.repo.repo,
               body: report,
             });
+
+      - name: Eval trigger accuracy (optional — skips when secrets absent, never blocks build)
+        if: steps.validate.outputs.result != 'no_skills_changed'
+        env:
+          SKILL_MALL_PROVIDER: ${{ secrets.SKILL_MALL_PROVIDER }}
+          SKILL_MALL_API_KEY: ${{ secrets.SKILL_MALL_API_KEY }}
+        run: |
+          if [ -z "$SKILL_MALL_PROVIDER" ] || [ -z "$SKILL_MALL_API_KEY" ]; then
+            echo "Skipping trigger accuracy eval — SKILL_MALL_PROVIDER or SKILL_MALL_API_KEY not set."
+            exit 0
+          fi
+
+          THRESHOLD="${TRIGGER_ACCURACY_THRESHOLD:-80}"
+          DIRS="${{ steps.changed.outputs.dirs }}"
+
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            SKILL_MD="$dir/SKILL.md"
+
+            # Only eval skills that have trigger_accuracy flag in frontmatter
+            if [ ! -f "$SKILL_MD" ] || ! grep -q "^trigger_accuracy:" "$SKILL_MD" 2>/dev/null; then
+              continue
+            fi
+
+            SLUG=$(echo "$dir" | sed 's|skills/||' | sed 's|/$||')
+            echo "Evaluating trigger accuracy for: $SLUG (threshold: $THRESHOLD%)"
+
+            accuracy_output=$(npx skill-mall eval-triggers "$SLUG" 2>&1 || true)
+            accuracy=$(echo "$accuracy_output" | grep -oE 'Overall accuracy: [0-9]+' | grep -oE '[0-9]+' | head -1 || echo "")
+
+            if [ -n "$accuracy" ]; then
+              echo "  $SLUG trigger accuracy: $accuracy%"
+              if [ "$THRESHOLD" -gt 0 ] && [ "$accuracy" -lt "$THRESHOLD" ]; then
+                echo "  WARNING: $SLUG trigger accuracy $accuracy% is below threshold $THRESHOLD%"
+                echo "  To suppress: lower TRIGGER_ACCURACY_THRESHOLD in validate-skills.yml"
+              fi
+            fi
+          done <<< "$DIRS"
 
       - name: Run skill test suites (optional — skips when LLM secrets absent)
         if: steps.validate.outputs.result != 'no_skills_changed'

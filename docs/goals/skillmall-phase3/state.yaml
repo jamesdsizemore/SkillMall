@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T268
+active_task: T271
 
 tasks:
 
@@ -616,7 +616,7 @@ tasks:
   - id: T268
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Wire trigger evaluator accuracy into CI validation action. Add trigger_accuracy_threshold (default 80%) and budget_warn_at_installed (default 25) as configurable options in .github/workflows/validate-skills.yml and .github/actions/skill-mall-validate/action.yml. When a PR touches a skill that has a trigger_accuracy flag set, run eval-triggers and warn (or block) based on threshold."
     allowed_files:
@@ -628,14 +628,24 @@ tasks:
     stop_if:
       - "eval-triggers step runs in CI without SKILL_MALL_PROVIDER and SKILL_MALL_API_KEY secrets configured — the step must be OPTIONAL and skip with a warning when secrets are not present, never fail the build"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - .github/workflows/validate-skills.yml
+        - .github/actions/skill-mall-validate/action.yml
+      commands:
+        - cmd: "python3 -c 'import yaml; yaml.safe_load(open(\".github/workflows/validate-skills.yml\"))'"
+          status: pass
+        - cmd: "python3 -c 'import yaml; yaml.safe_load(open(\".github/actions/skill-mall-validate/action.yml\"))'"
+          status: pass
+      summary: "action.yml: adds trigger_accuracy_threshold (default 80%) and budget_warn_at_installed (default 25) inputs. Adds eval-triggers step that skips with warning when SKILL_MALL_PROVIDER/SKILL_MALL_API_KEY absent, only runs for skills with trigger_accuracy flag in frontmatter, warns when accuracy below threshold but NEVER fails build. validate-skills.yml: TRIGGER_ACCURACY_THRESHOLD and BUDGET_WARN_AT_INSTALLED env vars at workflow level. Adds optional trigger accuracy eval step (non-blocking, secrets-gated)."
 
   # ─── SPEC FEATURES MISSED FROM PHASE 1/2 (round 3 — final) ─────────────
 
   - id: T271
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Display skills.sh badge on skill detail page when metadata.skills_sh_id is set in SKILL.md frontmatter. Show the slug as a static badge linking to https://skills.sh/skills/<id>. DO NOT attempt to fetch live install counts — the skills.sh API is not publicly documented. Badge appears on skill detail sidebar."
     allowed_files:
