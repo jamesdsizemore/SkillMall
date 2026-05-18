@@ -17,6 +17,7 @@ import { extractCommand } from "./commands/extract.js";
 import { testSkillCommand } from "./commands/test-skill.js";
 import { regenPromptCommand } from "./commands/regen-prompt.js";
 import { optimizePromptCommand } from "./commands/optimize-prompt.js";
+import { mcpServerCommand } from "./commands/mcp-server.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -39,6 +40,7 @@ ${pc.bold("Commands:")}
   ${pc.cyan("test")} <category/slug>             Run test suite for a skill (tests/<slug>/*.json)
   ${pc.cyan("regen-prompt")} <cat/slug> <file>  Regenerate a prompt file with a new reasoning framework
   ${pc.cyan("optimize-prompt")} [file|--stdin]  Audit and optimize a prompt (4-dimension quality score)
+  ${pc.cyan("mcp-server")} [--port <n>]        Start standalone MCP server on port 3001 (no Next.js needed)
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
@@ -129,6 +131,10 @@ async function main(): Promise<void> {
 
     case "optimize-prompt":
       await optimizePromptCommand(rest);
+      break;
+
+    case "mcp-server":
+      mcpServerCommand(rest);
       break;
 
     case "--help":

@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T273
+active_task: T274
 
 tasks:
 
@@ -701,7 +701,7 @@ tasks:
   - id: T273
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement npx skill-mall mcp-server CLI command that starts the MCP server on port 3001 for local development. The server serves the same /api/mcp logic but as a standalone HTTP server (not Next.js). Users add it to their MCP config as http://localhost:3001."
     allowed_files:
@@ -715,14 +715,24 @@ tasks:
     stop_if:
       - "Server imports from @/lib/skills which in turn imports Next.js modules — rewrite catalog reading as a pure Node.js file reader without Next.js dependencies"
       - "Need files outside allowed_files"
-    stop_if:
-      - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - cli/src/commands/mcp-server.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: "cd cli && npm run type-check"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "node cli/dist/index.js mcp-server --help"
+          status: pass
+      summary: "mcp-server.ts: standalone HTTP server (no Next.js). readAllSkills() reads SKILL.md files directly using fs + gray-matter — does NOT import from lib/skills.ts. Handles GET (tools list) and POST (JSON-RPC: tools/list, tools/call). Implements search_skills, get_skill, list_categories tools. Skills refreshed on each tools/call. --port flag configurable. EADDRINUSE detected with helpful error. --help prints MCP config snippet."
 
   - id: T274
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Add review score trend (30-day moving average) to contributor dashboard. lib/analytics.ts: add getEffectivenessTrend(skillSlug) that returns 30 data points (daily average over past 30 days). Render as a mini segmented bar chart on the dashboard skill card alongside install counts."
     allowed_files:
