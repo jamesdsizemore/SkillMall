@@ -6,7 +6,7 @@ goal:
   title: "SkillMall Phase 3 — Advanced Capabilities"
   slug: skillmall-phase3
   kind: existing_plan
-  tranche: "Build chains (React Flow canvas), RAG (SQLite-VSS), self-improvement loop (feedback + LLM suggestions + approval gate), marketplace (Stripe + code-gated launch conditions). T201-T205 start immediately. T206/T207 marketplace visible only when checkMarketplaceReady() passes."
+  tranche: "Build 6 missed Phase 1/2 features (T251-T256: domain starters, budget analyzer, codebase extractor, dependency graph, skill testing framework, multilingual) + Phase 3 features (chains, RAG, self-improvement, marketplace). T251-T256 run before Phase 3 chains/RAG."
   status: active
   intake:
     original_request: "Build SkillMall Phase 3 from docs/superpowers/plans/PHASE-3-PLAN.md"
@@ -35,6 +35,10 @@ goal:
       - "Stripe: STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET in .env.local. Webhook MUST use arrayBuffer + Buffer.from for raw body. MUST add export const config = {api: {bodyParser: false}}"
       - "Phase 3 SQLite migration: db/migrations/002_phase3.sql — skill_feedback, improvement_suggestions, knowledge_bases, knowledge_chunks, purchases, skill_tiers tables"
       - "Development workflow: 16 steps per task. Security check mandatory for every Phase 3 task."
+      - "MISSED FROM PHASE 1 spec: Agent Budget Analyzer, Domain Starter Templates"
+      - "MISSED FROM PHASE 2 spec: Codebase-to-Skill Extractor, Skill Dependency Graph, Skill Testing Framework, Multilingual Support"
+      - "T251-T256 are these missed features — they run before Phase 3 chains/RAG/marketplace"
+      - "Skill Testing Framework (T255) is required for Phase 3 marketplace gate (>=50 skills with test coverage)"
 
 rules:
   pm_owns_state: true
@@ -74,6 +78,148 @@ visual_board:
 active_task: T201
 
 tasks:
+
+  # ─── MISSED PHASE 1/2 FEATURES — build before Phase 3 features ──────────
+  # These were in the original feature spec but omitted from Phase 1 and Phase 2 plans.
+  # T255 (Skill Testing Framework) is also required for the Phase 3 marketplace gate.
+
+  - id: T251
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Create 20 Domain Starter Templates in skills/_starters/<domain>/. Each is 80% complete with real content and [fill-in] markers for domain-specific content. Implement CLI: npx skill-mall new --from-template <slug> <new-name> (copies to skills/<category>/<new-name>/). Add starter-config.json with domain, category, fill-in field descriptions."
+    allowed_files:
+      - skills/_starters/
+      - cli/src/commands/new.ts
+      - cli/src/index.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "cd cli && npm run build exits 0"
+      - "All 20 starter directories exist under skills/_starters/"
+      - "Each starter has SKILL.md, README.md, resources/templates/, starter-config.json"
+      - "npx skill-mall new --from-template code-review my-code-review creates skills/<category>/my-code-review/ with SKILL.md pre-populated"
+      - "bash scripts/validate-skill.sh skills/_starters/code-review exits 0 (starters must be valid)"
+    stop_if:
+      - "A starter SKILL.md description is a placeholder or generic — every starter must have real, domain-specific content with only the user-specific fields marked [fill-in]"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T252
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Agent Budget Analyzer: lib/budget-analyzer.ts (per-agent budget simulation — at 10/20/30/50 installed skills, show what the agent reads, whether trigger phrase is preserved, and specific rewrite suggestions that fit all load levels). CLI: npx skill-mall budget-check <slug> --agent claude-code --installed 25. UI: Budget Analysis tab on skill detail page."
+    allowed_files:
+      - lib/budget-analyzer.ts
+      - lib/__tests__/budget-analyzer.test.ts
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - app/api/budget-check/route.ts
+      - cli/src/commands/budget-check.ts
+      - cli/src/index.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/budget-analyzer all pass"
+      - "Budget analysis at 50 installed skills correctly truncates long descriptions (test)"
+      - "Trigger phrase preservation check works: 'Apply Blue Ocean' in first 80 chars -> preserved at all levels (test)"
+      - "npx skill-mall budget-check ai/skill-creator --agent claude-code --installed 25 prints budget analysis"
+    stop_if:
+      - "Budget simulation uses invented/hardcoded per-agent token budgets without documentation of how values were derived — derive from actual agent behavior or document the assumption clearly"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T253
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Codebase-to-Skill Extractor: CLI npx skill-mall extract <dir> --output <slug> [--category <cat>] [--focus 'error handling,naming']. Reads .md, .ts, .js, .py files in the directory. Passes content to Research Engine variant (same LLM extraction, same pipeline). Writes research-result.json, then user runs confirm-research as usual."
+    allowed_files:
+      - cli/src/commands/extract.ts
+      - cli/src/index.ts
+      - lib/codebase-extractor.ts
+      - lib/__tests__/codebase-extractor.test.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "cd cli && npm run build exits 0"
+      - "npm test lib/__tests__/codebase-extractor all pass"
+      - "npx skill-mall extract ./lib --output our-lib-conventions writes skill-builder-output/our-lib-conventions/research-result.json"
+      - "Extracted ResearchResult has researchUnverified: true (no URLs provided)"
+    stop_if:
+      - "Extractor reads files outside the specified directory (path traversal) — validate all paths stay within the target directory"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T254
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Skill Dependency Graph at /graph: force-directed graph visualization using React (no external graph library — use SVG with D3-style force simulation or simple canvas). Nodes are skills, edges are linked-skills connections. Node color maps to category. Hub skills (many connections) highlighted. Orphan skills (zero connections) shown with distinct border. Click node navigates to skill detail."
+    allowed_files:
+      - app/graph/page.tsx
+      - components/skill-mall/graph/DependencyGraph.tsx
+      - components/skill-mall/graph/GraphNode.tsx
+      - lib/graph.ts
+      - lib/__tests__/graph.test.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/graph all pass"
+      - "/graph renders without error (smoke test)"
+      - "computeGraph returns nodes and edges arrays from skill linked-skills data (test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T255
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: high
+    objective: "Implement Skill Testing Framework: test case format at tests/<slug>/*.json (id, description, input, required[], forbidden[]), npx skill-mall test <slug> command that runs each test case by calling the skill's prompts via the configured LLM, evaluates required/forbidden assertions via LLM evaluator, reports pass/fail per assertion. CI integration: validate-action@v1 runs tests on PRs touching skills/ that have tests/. Required: target 50+ skills with test suites for Phase 3 marketplace gate."
+    allowed_files:
+      - lib/skill-tester.ts
+      - lib/__tests__/skill-tester.test.ts
+      - cli/src/commands/test-skill.ts
+      - cli/src/index.ts
+      - .github/workflows/validate-skills.yml
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "cd cli && npm run build exits 0"
+      - "npm test lib/__tests__/skill-tester all pass (mocked LLM)"
+      - "npx skill-mall test ai/skill-creator runs test suite and reports results (requires tests/skill-creator/ to exist)"
+      - "npm run db:migrate exits 0 (test framework uses same SQLite)"
+    stop_if:
+      - "Test framework calls LLM with skill content that could contain prompt injection from the test input field — sanitize test input before passing to evaluator"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T256
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Multilingual Skill Support: SKILL.<locale>.md convention (es, fr, de, pt-BR), CLI deploy with --lang flag (copies locale-specific file), CI validation that translation structure matches canonical SKILL.md sections, catalog UI shows available locales on skill detail page. Canonical SKILL.md is always English and always the source of truth."
+    allowed_files:
+      - lib/i18n.ts
+      - lib/__tests__/i18n.test.ts
+      - cli/src/commands/deploy.ts
+      - scripts/validate-skill.sh
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - app/skills/[category]/[slug]/page.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/i18n all pass"
+      - "npx skill-mall deploy ai/skill-creator --lang es copies SKILL.es.md if it exists, falls back to SKILL.md if not"
+      - "validate-skill.sh --strict fails if translation SKILL.es.md has different section structure than canonical SKILL.md (test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
 
   # ─── FOUNDATION — SQLite Phase 3 migration ────────────────────────────────
 
