@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T254
+active_task: T255
 
 tasks:
 
@@ -218,15 +218,17 @@ tasks:
   - id: T254
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement Skill Dependency Graph at /graph: force-directed graph visualization. Use reactflow (already installed for T202) as the graph library — do NOT implement a physics simulation from scratch. Nodes are skills, edges are linked-skills connections. Nodes are skills, edges are linked-skills connections. Node color maps to category. Hub skills (many connections) highlighted. Orphan skills (zero connections) shown with distinct border. Click node navigates to skill detail."
     allowed_files:
       - app/graph/page.tsx
+      - app/graph/GraphClient.tsx
       - components/skill-mall/graph/DependencyGraph.tsx
       - components/skill-mall/graph/GraphNode.tsx
       - lib/graph.ts
       - lib/__tests__/graph.test.ts
+      - package.json
     verify:
       - "npx tsc --noEmit exits 0"
       - "npm run build exits 0"
@@ -235,12 +237,29 @@ tasks:
       - "computeGraph returns nodes and edges arrays from skill linked-skills data (test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - app/graph/page.tsx
+        - app/graph/GraphClient.tsx
+        - components/skill-mall/graph/DependencyGraph.tsx
+        - components/skill-mall/graph/GraphNode.tsx
+        - lib/graph.ts
+        - lib/__tests__/graph.test.ts
+        - package.json
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/graph"
+          status: pass
+      summary: "computeGraph() in lib/graph.ts builds SkillGraph from Skill.linked_skills — nodes get isHub (>3 connections), isOrphan (0 connections). ReactFlow canvas in DependencyGraph.tsx (SSR-avoided via GraphClient.tsx dynamic import). GraphNode renders with category color, hub glow, orphan dashed border. Click navigates to skill detail. /graph route builds and renders. 9 tests pass. Installed reactflow (required for T202 also)."
 
   - id: T255
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: high
     objective: "Implement Skill Testing Framework: test case format at tests/<slug>/*.json (id, description, input, required[], forbidden[]), npx skill-mall test <slug> command that runs each test case by calling the skill's prompts via the configured LLM, evaluates required/forbidden assertions via LLM evaluator, reports pass/fail per assertion. CI integration: validate-action@v1 runs tests on PRs touching skills/ that have tests/. Required: target 50+ skills with test suites for Phase 3 marketplace gate."
     allowed_files:
