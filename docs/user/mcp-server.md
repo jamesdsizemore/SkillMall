@@ -151,3 +151,52 @@ For a deployed SkillMall instance, change the MCP server URL to your production 
 ```
 
 Note: the MCP server reads skills from the local filesystem at runtime. In a serverless deployment, the skills are baked in at build time via Next.js static generation — the MCP server serves the same skill data as the catalog UI.
+
+## Limitations
+
+The MCP server reads skills from the local filesystem. Skills must be present in the `skills/` directory of the running SkillMall instance. Remote skills or skills installed only to agent skill directories are not available through the MCP server.
+
+The `deploy_skill` tool is not yet implemented — the server exposes read-only catalog access in Phase 2. Write operations (deploying, creating, forking) require the CLI or web UI.
+
+## Verifying the Server
+
+Test that the server is running correctly:
+
+```bash
+# Check tool list
+curl http://localhost:3000/api/mcp
+
+# Search for a skill
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_categories","arguments":{}}}'
+```
+
+A successful response returns a JSON-RPC 2.0 result with skill data in the `content[0].text` field (JSON-encoded).
+
+## JSON-RPC 2.0 Format
+
+All requests are JSON-RPC 2.0:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "<tool_name>",
+    "arguments": { ... }
+  }
+}
+```
+
+Error responses use the standard JSON-RPC error format:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": { "code": -32601, "message": "Method not found: unknown_method" }
+}
+```
+
