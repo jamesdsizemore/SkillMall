@@ -6,17 +6,11 @@ import type { Skill } from "@/lib/skills";
 type Props = {
   skill: Skill;
   index?: number;
+  qualityScore?: number;
 };
 
-export function SkillCard({ skill, index = 0 }: Props) {
-  // Quality proxy: tags + resources as a 0–100 fill
-  const resourceScore =
-    (skill.hasScripts ? 20 : 0) +
-    (skill.hasTemplates ? 30 : 0) +
-    (skill.hasSamples ? 30 : 0) +
-    Math.min(skill.tags.length * 4, 20);
-
-  const fillPercent = resourceScore;
+export function SkillCard({ skill, index = 0, qualityScore }: Props) {
+  const fillPercent = qualityScore ?? 0;
 
   return (
     <Link

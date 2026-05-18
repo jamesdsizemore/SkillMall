@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getSkillsByCategory, getAllSkills } from "@/lib/skills";
+import { computeQualityScore } from "@/lib/quality-score";
 import { SkillCard } from "@/components/skill-mall/skill-card";
 import { SearchBar } from "@/components/skill-mall/search-bar";
 import { CategoryNav } from "@/components/skill-mall/category-nav";
@@ -18,6 +19,10 @@ export default async function HomePage({ searchParams }: Props) {
 
   const skillCount = allSkills.length;
   const categoryCount = categories.filter((c) => c.skills.length > 0).length;
+  const allSlugs = new Set(allSkills.map((s) => s.slug));
+  const qualityScores = new Map(
+    allSkills.map((s) => [s.slug, computeQualityScore(s, allSlugs).total])
+  );
 
   const filtered = allSkills.filter((skill) => {
     const matchesCat = !cat || skill.category === cat;
@@ -68,7 +73,7 @@ export default async function HomePage({ searchParams }: Props) {
               </p>
               <div className="grid grid-cols-1 gap-px border border-sm-border bg-sm-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filtered.map((skill, i) => (
-                  <SkillCard key={`${skill.category}/${skill.slug}`} skill={skill} index={i} />
+                  <SkillCard key={`${skill.category}/${skill.slug}`} skill={skill} index={i} qualityScore={qualityScores.get(skill.slug)} />
                 ))}
               </div>
             </>

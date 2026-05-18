@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSkill, getSkillReadme, getAllSkills } from "@/lib/skills";
+import { computeQualityScore } from "@/lib/quality-score";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
 
 type Props = {
@@ -12,23 +13,15 @@ export async function generateStaticParams() {
   return skills.map((s) => ({ category: s.category, slug: s.slug }));
 }
 
-function qualityScore(skill: ReturnType<typeof getSkill>) {
-  if (!skill) return 0;
-  return (
-    (skill.hasScripts ? 20 : 0) +
-    (skill.hasTemplates ? 30 : 0) +
-    (skill.hasSamples ? 30 : 0) +
-    Math.min(skill.tags.length * 4, 20)
-  );
-}
-
 export default async function SkillPage({ params }: Props) {
   const { category, slug } = await params;
   const skill = getSkill(category, slug);
   if (!skill) notFound();
 
   const readme = getSkillReadme(category, slug);
-  const score = qualityScore(skill);
+  const allSkills = getAllSkills();
+  const allSlugs = new Set(allSkills.map((s) => s.slug));
+  const score = computeQualityScore(skill, allSlugs).total;
 
   return (
     <div className="bg-sm-bg">
