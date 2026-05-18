@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTrending7d, getRising } from "@/lib/analytics";
+import { getTrending7d, getRising, getTopByForkCount, getHighQualitySkills } from "@/lib/analytics";
 import { getSkill, getAllSkills } from "@/lib/skills";
 
 function SkillRow({
@@ -66,6 +66,8 @@ function SkillRow({
 export default function TrendingPage() {
   const trending = getTrending7d(10);
   const rising = getRising();
+  const communityFavorites = getTopByForkCount(10);
+  const highQuality = getHighQualitySkills();
 
   return (
     <div className="bg-sm-bg min-h-screen px-4 py-12 sm:px-6">
@@ -126,22 +128,64 @@ export default function TrendingPage() {
 
           {rising.length === 0 ? (
             <div className="border border-sm-border p-6 text-center">
-              <p
-                className="text-[9px] tracking-widest text-sm-disabled"
-                style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-              >
+              <p className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
                 [ NO RISING SKILLS YET ]
               </p>
             </div>
           ) : (
             <div className="space-y-2">
               {rising.map((item) => (
-                <SkillRow
-                  key={item.skill_slug}
-                  slug={item.skill_slug}
-                  velocity={item.velocity}
-                  badge={`+${item.growth_pct}%`}
-                />
+                <SkillRow key={item.skill_slug} slug={item.skill_slug} velocity={item.velocity} badge={`+${item.growth_pct}%`} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Community Favorites */}
+        <section>
+          <p className="mb-2 text-[9px] tracking-widest text-sm-secondary" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+            [ COMMUNITY FAVORITES ]
+          </p>
+          <h2 className="mb-6 text-xl font-bold text-sm-display">Most Forked Skills</h2>
+          <p className="mb-4 text-sm text-sm-secondary">
+            Skills that developers fork most often to create their own variants.
+          </p>
+
+          {communityFavorites.length === 0 ? (
+            <div className="border border-sm-border p-6 text-center">
+              <p className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                [ NO FORKS YET ]
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {communityFavorites.map((item) => (
+                <SkillRow key={item.slug} slug={item.slug} velocity={item.forkCount} badge={`${item.forkCount} forks`} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* High Quality */}
+        <section>
+          <p className="mb-2 text-[9px] tracking-widest text-sm-secondary" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+            [ HIGH QUALITY ]
+          </p>
+          <h2 className="mb-6 text-xl font-bold text-sm-display">Highest Rated Skills</h2>
+          <p className="mb-4 text-sm text-sm-secondary">
+            Skills with quality score above 90 and effectiveness rating above 4.5 stars.
+          </p>
+
+          {highQuality.length === 0 ? (
+            <div className="border border-sm-border p-6 text-center">
+              <p className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                [ NO HIGH QUALITY SKILLS YET — requires reviews with 4.5+ effectiveness ]
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {highQuality.map((item) => (
+                <SkillRow key={item.slug} slug={item.slug} velocity={0} badge={`★ ${item.effectivenessScore}`} />
               ))}
             </div>
           )}

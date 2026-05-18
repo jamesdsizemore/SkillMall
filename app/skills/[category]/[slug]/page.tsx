@@ -5,7 +5,7 @@ import { getSkill, getSkillReadme, getAllSkills } from "@/lib/skills";
 import { computeQualityScore } from "@/lib/quality-score";
 import { getSession } from "@/lib/auth/github";
 import { getReviews, getEffectivenessScore, getReviewCount } from "@/lib/reviews";
-import { getInstallCount } from "@/lib/analytics";
+import { getInstallCount, getForkCount } from "@/lib/analytics";
 import { getAvailableLocales } from "@/lib/i18n";
 import nodePath from "node:path";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
@@ -31,6 +31,7 @@ export default async function SkillPage({ params }: Props) {
   const readme = getSkillReadme(category, slug);
   const skillDir = nodePath.join(process.cwd(), nodePath.dirname(skill.path));
   const availableLocales = getAvailableLocales(skillDir);
+  const forkCount = getForkCount(skill.slug);
   const allSkills = getAllSkills();
   const allSlugs = new Set(allSkills.map((s) => s.slug));
   const score = computeQualityScore(skill, allSlugs).total;
@@ -153,6 +154,23 @@ export default async function SkillPage({ params }: Props) {
                     {skill.hasTemplates && <span>[ TEMPLATES ]</span>}
                     {skill.hasSamples && <span>[ SAMPLES ]</span>}
                   </div>
+                </div>
+              )}
+
+              {forkCount > 0 && (
+                <div className="mt-3 border-t border-sm-border pt-3">
+                  <p
+                    className="mb-1 text-[9px] tracking-widest text-sm-disabled"
+                    style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                  >
+                    [ COMMUNITY ]
+                  </p>
+                  <p
+                    className="text-xs text-sm-secondary"
+                    style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                  >
+                    Forked {forkCount} time{forkCount !== 1 ? "s" : ""}
+                  </p>
                 </div>
               )}
 

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getSkill, getAllSkills } from "./skills";
+import { logForkEvent } from "./analytics";
 
 export interface ForkResult {
   sourceSlug: string;
@@ -88,6 +89,9 @@ export function forkSkill(
   }
 
   fs.writeFileSync(skillMdPath, content, "utf-8");
+
+  // Track fork event for Community Favorites analytics
+  logForkEvent(sourceSlug, newSlug);
 
   return {
     sourceSlug,
