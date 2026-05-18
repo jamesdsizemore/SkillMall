@@ -1,0 +1,45 @@
+name: SkillMall Validate
+description: Validate SkillMall skill directories against the AgentSkills spec
+
+inputs:
+  skill-path:
+    description: Path to the skill directory to validate
+    required: true
+  strict:
+    description: Fail on warnings as well as errors
+    required: false
+    default: 'false'
+
+outputs:
+  valid:
+    description: Whether the skill passed validation
+    value: ${{ steps.validate.outputs.valid }}
+  issues:
+    description: Comma-separated list of issues found
+    value: ${{ steps.validate.outputs.issues }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate skill
+      id: validate
+      shell: bash
+      run: |
+        FLAGS=""
+        if [ "${{ inputs.strict }}" = "true" ]; then
+          FLAGS="--strict"
+        fi
+
+        output=$(bash ${{ github.action_path }}/../../../scripts/validate-skill.sh $FLAGS "${{ inputs.skill-path }}" 2>&1)
+        exit_code=$?
+
+        echo "$output"
+
+        if [ $exit_code -eq 0 ]; then
+          echo "valid=true" >> $GITHUB_OUTPUT
+          echo "issues=" >> $GITHUB_OUTPUT
+        else
+          echo "valid=false" >> $GITHUB_OUTPUT
+          issues=$(echo "$output" | grep ERROR | tr '\n' ',' | sed 's/,$//')
+          echo "issues=$issues" >> $GITHUB_OUTPUT
+        fi

@@ -1,0 +1,104 @@
+name: Validate Skills
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+
+jobs:
+  validate:
+    name: Validate changed skills
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Find changed skill directories
+        id: changed
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'skills/**' \
+            | grep -E '^skills/[^_][^/]+/[^/]+/' \
+            | sed 's|/[^/]*$||' \
+            | sort -u \
+            | grep -v '^skills/_template' \
+            || true)
+          echo "dirs<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Found changed skill directories:"
+          echo "$CHANGED"
+
+      - name: Validate each changed skill
+        id: validate
+        run: |
+          DIRS="${{ steps.changed.outputs.dirs }}"
+          if [ -z "$DIRS" ]; then
+            echo "No skill directories changed."
+            echo "result=no_skills_changed" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          REPORT="## SkillMall Validation Report\n\n| Skill | Status | Issues |\n|-------|--------|--------|\n"
+          ERRORS=0
+
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            skill_name=$(basename "$dir")
+
+            output=$(bash scripts/validate-skill.sh "$dir" 2>&1)
+            exit_code=$?
+
+            if [ $exit_code -eq 0 ]; then
+              REPORT="${REPORT}| \`$skill_name\` | PASS | — |\n"
+            else
+              issues=$(echo "$output" | grep -E '(ERROR|WARN)' | sed 's/.*ERROR[[:space:]]*//' | sed 's/.*WARN[[:space:]]*/WARN: /' | tr '\n' ' ')
+              REPORT="${REPORT}| \`$skill_name\` | FAIL | $issues |\n"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done <<< "$DIRS"
+
+          TOTAL=$(echo "$DIRS" | grep -c '.' || true)
+          PASSED=$((TOTAL - ERRORS))
+          REPORT="${REPORT}\n${PASSED} skill(s) passed, ${ERRORS} failed."
+
+          if [ $ERRORS -gt 0 ]; then
+            REPORT="${REPORT} **Merge blocked.**"
+          fi
+
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          printf "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+
+      - name: Post validation report as PR comment
+        if: steps.validate.outputs.result != 'no_skills_changed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = `${{ steps.validate.outputs.report }}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report,
+            });
+
+      - name: Fail if any skill has errors
+        if: steps.validate.outputs.errors != '0' && steps.validate.outputs.result != 'no_skills_changed'
+        run: |
+          echo "Validation failed: ${{ steps.validate.outputs.errors }} skill(s) have errors."
+          exit 1
