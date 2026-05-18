@@ -777,7 +777,17 @@ tasks:
       - "Skills using framework count is shown per card (smoke test — may be 0)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - app/prompt-library/page.tsx
+        - lib/skills.ts
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+      summary: "lib/skills.ts: getFrameworkSkillCounts() scans resources/prompts/ frontmatter for framework fields, returns Record<string, number>. page.tsx: each framework card shows [COPY] button (data-copy attribute) + skill count (linked to catalog filter or '0 skills'). Inline event-delegation script handles clipboard.writeText() without React state. Server Component — no 'use client' needed."
 
   # ─── MISSED FEATURES COMPLETION AUDIT — gates all Phase 3 features ────────
   # T280 must pass before T201 (SQLite migration) and all Phase 3 features activate.

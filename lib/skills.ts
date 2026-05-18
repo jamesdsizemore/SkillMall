@@ -166,3 +166,44 @@ export function getSkillReadme(category: string, slug: string): string | null {
   if (!fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, "utf-8");
 }
+
+/**
+ * Count how many skills in the catalog reference each framework.
+ * Scans resources/prompts/ frontmatter for 'framework' field matches.
+ * Returns a map of framework name → skill count.
+ */
+export function getFrameworkSkillCounts(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const skills = getAllSkills();
+
+  for (const skill of skills) {
+    const promptsDir = path.join(
+      SKILLS_DIR, skill.category, skill.slug, "resources", "prompts"
+    );
+    if (!fs.existsSync(promptsDir)) continue;
+
+    const seenFrameworks = new Set<string>();
+    for (const file of fs.readdirSync(promptsDir)) {
+      if (!file.endsWith(".md")) continue;
+      try {
+        const { data } = matter(
+          fs.readFileSync(path.join(promptsDir, file), "utf-8")
+        );
+        const fw = String(data.framework ?? "")
+        if (!fw) continue;
+        // A framework field may be comma-separated (e.g. "Chain of Thought, ERRC")
+        for (const name of fw.split(",").map((s) => s.trim()).filter(Boolean)) {
+          seenFrameworks.add(name);
+        }
+      } catch {
+        // Skip malformed prompt files
+      }
+    }
+
+    for (const fw of seenFrameworks) {
+      counts[fw] = (counts[fw] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}

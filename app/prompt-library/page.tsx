@@ -1,4 +1,5 @@
 import { FRAMEWORK_DESCRIPTIONS } from "@/lib/pe-frameworks";
+import { getFrameworkSkillCounts } from "@/lib/skills";
 
 const FRAMEWORK_CATEGORIES: Record<string, string[]> = {
   reasoning: [
@@ -38,6 +39,7 @@ const allFrameworks = Object.values(FRAMEWORK_CATEGORIES).flat();
 
 export default function PromptLibraryPage() {
   const totalCount = allFrameworks.length;
+  const frameworkCounts = getFrameworkSkillCounts();
 
   return (
     <div className="bg-sm-bg min-h-screen px-4 py-12 sm:px-6">
@@ -70,20 +72,69 @@ export default function PromptLibraryPage() {
             </p>
 
             <div className="grid grid-cols-1 gap-px border border-sm-border bg-sm-border sm:grid-cols-2 lg:grid-cols-3">
-              {frameworks.map((name) => (
-                <div key={name} className="bg-sm-surface p-4">
-                  <h3 className="mb-2 text-sm font-semibold text-sm-display leading-snug">
-                    {name}
-                  </h3>
-                  <p className="text-xs leading-relaxed text-sm-secondary">
-                    {FRAMEWORK_DESCRIPTIONS[name] ?? "A prompt engineering framework pattern."}
-                  </p>
-                </div>
-              ))}
+              {frameworks.map((name) => {
+                const skillCount = frameworkCounts[name] ?? 0;
+                const filterUrl = `/?q=${encodeURIComponent(name)}`;
+                return (
+                  <div key={name} className="bg-sm-surface p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="text-sm font-semibold text-sm-display leading-snug flex-1">
+                        {name}
+                      </h3>
+                      {/* Copy button — handled by inline event-delegation script below */}
+                      <button
+                        data-copy={name}
+                        className="shrink-0 border border-sm-border px-2 py-0.5 text-[8px] tracking-widest text-sm-disabled hover:border-sm-display hover:text-sm-display transition-colors"
+                        style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                      >
+                        [ COPY ]
+                      </button>
+                    </div>
+                    <p className="text-xs leading-relaxed text-sm-secondary mb-2">
+                      {FRAMEWORK_DESCRIPTIONS[name] ?? "A prompt engineering framework pattern."}
+                    </p>
+                    {/* Skills using this framework */}
+                    <div className="flex items-center gap-2">
+                      {skillCount > 0 ? (
+                        <a
+                          href={filterUrl}
+                          className="text-[8px] tracking-widest text-sm-secondary hover:text-sm-display transition-colors"
+                          style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                        >
+                          {skillCount} skill{skillCount !== 1 ? "s" : ""} →
+                        </a>
+                      ) : (
+                        <span
+                          className="text-[8px] tracking-widest text-sm-disabled"
+                          style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                        >
+                          0 skills
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Copy button handler — event delegation, no React state needed */}
+      {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.addEventListener('click', function(e) {
+          var btn = e.target && e.target.closest('[data-copy]');
+          if (!btn) return;
+          var text = btn.getAttribute('data-copy');
+          if (!text) return;
+          navigator.clipboard && navigator.clipboard.writeText(text).then(function() {
+            var orig = btn.textContent;
+            btn.textContent = '[ COPIED ]';
+            setTimeout(function() { btn.textContent = orig; }, 1500);
+          }).catch(function() {});
+        });
+      `}} />
     </div>
   );
 }
