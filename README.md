@@ -1,5 +1,7 @@
 # SkillMall
 
+[![Validate Skills](https://github.com/jamesdsizemore/SkillMall/actions/workflows/validate-skills.yml/badge.svg)](https://github.com/jamesdsizemore/SkillMall/actions/workflows/validate-skills.yml)
+
 An open-source catalog and generation platform for AI agent skills. Create production-quality skills from any URL or description using a research-first pipeline. Works with Claude Code, Cursor, Codex, Gemini CLI, and any AgentSkills-compatible agent.
 
 ## Pipeline Overview

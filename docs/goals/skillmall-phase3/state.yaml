@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T272
+active_task: T273
 
 tasks:
 
@@ -676,7 +676,7 @@ tasks:
   - id: T272
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Add CI README status badge to the GitHub Actions workflow. After validate-skills.yml runs, write a badge showing validation status of the most recently merged skill change. Use shields.io endpoint or GitHub Actions badge format. Update README.md to show the badge."
     allowed_files:
@@ -687,12 +687,21 @@ tasks:
       - "README.md contains a badge link pointing to the workflow status"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - README.md
+      commands:
+        - cmd: "python3 -c 'import yaml; yaml.safe_load(open(\".github/workflows/validate-skills.yml\"))'"
+          status: pass
+        - cmd: "grep 'badge.svg' README.md"
+          status: pass
+      summary: "README.md: GitHub Actions badge added linking to validate-skills.yml workflow. Badge shows live CI status. No changes to validate-skills.yml required — GitHub Actions generates badges from existing workflows automatically."
 
   - id: T273
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement npx skill-mall mcp-server CLI command that starts the MCP server on port 3001 for local development. The server serves the same /api/mcp logic but as a standalone HTTP server (not Next.js). Users add it to their MCP config as http://localhost:3001."
     allowed_files:
