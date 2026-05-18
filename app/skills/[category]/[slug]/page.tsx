@@ -9,6 +9,7 @@ import { getInstallCount, getForkCount } from "@/lib/analytics";
 import { getAvailableLocales } from "@/lib/i18n";
 import nodePath from "node:path";
 import { SkillsShBadge } from "@/components/skill-mall/skill-detail/SkillsShBadge";
+import { FeedbackForm } from "@/components/skill-mall/improvements/FeedbackForm";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
 import { ForkButton } from "@/components/skill-mall/fork-button";
 import { ReviewForm } from "@/components/skill-mall/reviews/ReviewForm";
@@ -261,6 +262,13 @@ export default async function SkillPage({ params }: Props) {
             {reviews.length > 0 && (
               <div className="mt-6">
                 <ReviewFeed reviews={reviews} />
+              </div>
+            )}
+
+            {/* Feedback form — opt-in only, collapsed by default, shown only when authenticated */}
+            {session && (
+              <div className="mt-6">
+                <FeedbackForm skillSlug={skill.slug} />
               </div>
             )}
           </div>

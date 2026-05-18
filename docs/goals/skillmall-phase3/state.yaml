@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T204
+active_task: T205
 
 tasks:
 
@@ -977,7 +977,7 @@ tasks:
   - id: T204
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement feedback collection: lib/self-improvement/feedback.ts (createFeedback, getFeedbackCount, getRecentFeedback), POST /api/feedback route (auth required), feedback form on skill detail page (satisfaction 1-5 + 200-char text, opt-in, never auto-prompted), trigger analysis at 10+ submissions."
     allowed_files:
@@ -995,12 +995,27 @@ tasks:
       - "Feedback form renders on skill detail page (smoke test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/self-improvement/feedback.ts
+        - lib/__tests__/feedback.test.ts
+        - app/api/feedback/route.ts
+        - components/skill-mall/improvements/FeedbackForm.tsx
+        - app/skills/[category]/[slug]/page.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/feedback"
+          status: pass
+      summary: "lib/self-improvement/feedback.ts: createFeedback() (validates 1-5 satisfaction, ≤200 char body, inserts to skill_feedback), getFeedbackCount(), getRecentFeedback() (ORDER BY id DESC), shouldTriggerAnalysis() (returns true at ≥10 submissions). POST /api/feedback: auth required (401 without cookie), 400 on validation errors, 201 with {feedback, analysisTriggered}. FeedbackForm.tsx: opt-in only (collapsed by default, never auto-shown), 1-5 satisfaction buttons, 200-char textarea with char count. Shown only when authenticated. 10 tests passing."
 
   - id: T205
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement self-improvement suggestion generation and approval: lib/self-improvement/analyzer.ts (analyzeFeedback LLM call), lib/self-improvement/applier.ts (applySuggestion — LLM edit + version bump), POST/GET /api/improvements routes, suggestion review UI at /skills/[category]/[slug]/improvements. CRITICAL: verify session.github_login === skill.author before applying any suggestion."
     allowed_files:
