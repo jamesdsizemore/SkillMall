@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T207
+active_task: T208
 
 tasks:
 
@@ -1110,7 +1110,7 @@ tasks:
   - id: T207
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement Stripe payment integration: lib/marketplace/payments.ts (createCheckoutSession, handleWebhook with signature verification), POST /api/marketplace/checkout, POST /api/webhooks/stripe (bodyParser: false, MUST verify Stripe-Signature header), GET /api/marketplace/entitlement. Stripe test mode only — live mode gated on marketplace launch conditions."
     allowed_files:
@@ -1128,14 +1128,26 @@ tasks:
       - "STRIPE_SECRET_KEY not in .env.local — add it before continuing"
       - "export const config = {api: {bodyParser: false}} missing from webhook route — add it before any other code"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/marketplace/payments.ts
+        - app/api/marketplace/checkout/route.ts
+        - app/api/webhooks/stripe/route.ts
+        - app/api/marketplace/entitlement/route.ts
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+      summary: "lib/marketplace/payments.ts: createCheckoutSession() (requires marketplace ready + premium tier, creates Stripe session), handleWebhook() reads raw Buffer, verifies Stripe-Signature with stripe.webhooks.constructEvent(), processes checkout.session.completed, stores purchase idempotently. POST /api/marketplace/checkout: auth-required, creates session, returns checkoutUrl. POST /api/webhooks/stripe: reads rawBody via req.arrayBuffer() + Buffer.from() (App Router native — no bodyParser config needed), returns 400 on invalid signature. Note: stop_if 'bodyParser:false config' does not apply to Next.js App Router — raw body is available natively. Stripe test mode only."
 
   # ─── DOCUMENTATION ────────────────────────────────────────────────────────
 
   - id: T208
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write all 5 Phase 3 documentation files, each >= 500 words: docs/user/skill-chains.md (canvas walkthrough, chain.json format, chain SKILL.md spec), docs/user/rag-enhanced-skills.md (provider embedding support matrix, attach-knowledge CLI, /api/retrieve usage), docs/user/self-improvement-loop.md (feedback submission, suggestion generation, approval workflow), docs/user/marketplace.md (3 tiers, revenue split, launch conditions, Stripe test mode), docs/reference/chain-format.md (chain SKILL.md frontmatter + chain.json spec)."
     allowed_files:
