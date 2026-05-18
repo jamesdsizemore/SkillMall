@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T253
+active_task: T254
 
 tasks:
 
@@ -179,7 +179,7 @@ tasks:
   - id: T253
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement Codebase-to-Skill Extractor: CLI npx skill-mall extract <dir> --output <slug> [--category <cat>] [--focus 'error handling,naming']. Reads .md, .ts, .js, .py files in the directory. Passes content to Research Engine variant (same LLM extraction, same pipeline). Writes research-result.json, then user runs confirm-research as usual."
     allowed_files:
@@ -198,12 +198,27 @@ tasks:
       - "Extractor reads files outside the specified directory (path traversal) — validate all paths stay within the target directory"
       - "Extractor duplicates LLM extraction logic from research-engine.ts instead of reusing it — add a runResearchEngineFromText(text, topic, client) overload to research-engine.ts and call it"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/codebase-extractor.ts
+        - lib/__tests__/codebase-extractor.test.ts
+        - lib/research-engine.ts
+        - cli/src/commands/extract.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/codebase-extractor"
+          status: pass
+      summary: "Added runResearchEngineFromText() to research-engine.ts reusing buildExtractionPromptWithContent. lib/codebase-extractor.ts collects .md/.ts/.js/.py/.go/.rb/.java files, validates path stays in process.cwd(), skips node_modules/.git/dist/.next, caps at 20k chars, applies focus clause. CLI extract writes skill-builder-output/<slug>/research-result.json. 6 tests pass including path traversal guard."
 
   - id: T254
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement Skill Dependency Graph at /graph: force-directed graph visualization. Use reactflow (already installed for T202) as the graph library — do NOT implement a physics simulation from scratch. Nodes are skills, edges are linked-skills connections. Nodes are skills, edges are linked-skills connections. Node color maps to category. Hub skills (many connections) highlighted. Orphan skills (zero connections) shown with distinct border. Click node navigates to skill detail."
     allowed_files:

@@ -1,0 +1,13 @@
+---
+framework: Prompt Chaining, Role / Expert Persona
+original_framework: Prompt Chaining, Role / Expert Persona
+skill: wrong-slug
+tool: shift-category-analysis
+type: category
+produces: ["shift-analysismd.md"]
+when_to_use: "Use when you need to produce a Shift Category Analysis for Shift analysis"
+complexity: thorough
+generated_by: prompt-engine
+---
+
+{"topic":"x","sources":["https://blueoceanstrategy.com/tools/"],"summary":"Apply Blue Ocean Strategy to identify and create uncontested market spaces. Use analytical tools to shift focus from competing in existing markets to creating new demand.","tools":[{"name":"Strategy Canvas","category":"Strategy","description":"Visualizes the competitive landscape by charting how companies invest in competing factors.","artifactType":"canvas","artifactStructure":"| Competing Factor | Company A | Company B | Our Proposal |\n|---|---|---|---|\n| Price | | | |\n| Product Range | | | |\n| Service Quality | | | |","inputs":["competing factors","company performance scores"],"outputs":["current-state canvas","proposed strategic position"],"howUsed":"1. List key competing factors. 2. Score each company 1-5. 3. Plot the curves. 4. Design a divergent proposed curve."},{"name":"ERRC Grid","category":"Strategy","description":"Defines the four strategic actions — Eliminate, Reduce, Raise, Create — that reshape the value curve.","artifactType":"grid","artifactStructure":"| ELIMINATE | REDUCE | RAISE | CREATE |\n|---|---|---|---|\n| | | | |","inputs":["competing factors","current value curve"],"outputs":["ERRC grid with strategic decisions"],"howUsed":"1. List factors across four quadrants. 2. Assign each factor to one quadrant. 3. Verify no factor appears twice. 4. Validate CREATE quadrant introduces new demand."},{"name":"Three Tiers of Noncustomers","category":"Shift","description":"Identifies three tiers of potential customers who currently reject or ignore the industry.","artifactType":"analysis","artifactStructure":"## Tier 1 — Soon-to-be noncustomers\n- Who: \n- Why they leave: \n\n## Tier 2 — Refusing noncustomers\n- Who: \n- Why they refuse: \n\n## Tier 3 — Unexplored noncustomers\n- Who: \n- Why unexplored: ","inputs":["industry definition","customer segmentation data"],"outputs":["three-tier noncustomer analysis"],"howUsed":"1. Define the industry boundary. 2. Identify each tier. 3. Analyze the biggest tier for opportunity."}],"principles":["Value innovation — simultaneously pursue differentiation and low cost","Focus on the big picture, not the numbers","Reach beyond existing demand","Get the strategic sequence right"],"suggestedCategory":"business","suggestedTags":["strategy","blue-ocean","business","competitive-analysis","market-creation"]}

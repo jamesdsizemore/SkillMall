@@ -183,6 +183,23 @@ async function extractWithRetry(
 }
 
 /**
+ * Run extraction on pre-supplied text (e.g., codebase content) instead of fetched URLs.
+ * Always sets researchUnverified: true since no authoritative URL is provided.
+ */
+export async function runResearchEngineFromText(
+  topic: string,
+  text: string,
+  client: LLMClient,
+  additionalInstruction = ''
+): Promise<ResearchResult> {
+  const prompt =
+    buildExtractionPromptWithContent(topic, text, []) +
+    (additionalInstruction ? `\n\n${additionalInstruction}` : '')
+  const result = await extractWithRetry(prompt, client)
+  return { ...result, researchUnverified: true }
+}
+
+/**
  * Run the Research Engine for the given topic and optional source URLs.
  * - With URLs: fetches content, extracts tools, returns validated ResearchResult
  * - Without URLs: uses LLM training knowledge, sets researchUnverified: true
