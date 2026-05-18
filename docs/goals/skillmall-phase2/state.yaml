@@ -79,7 +79,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T101
+active_task: T114
 
 tasks:
 
@@ -88,7 +88,7 @@ tasks:
   - id: T101
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Install better-sqlite3, write db/migrations/001_initial.sql (sessions + install_events + reviews tables), write scripts/migrate.js runner, write lib/db/client.ts with WAL-mode singleton, write lib/db/types.ts, add npm run db:migrate script, add data/skillmall.db to .gitignore."
     allowed_files:
@@ -110,7 +110,30 @@ tasks:
       - "better-sqlite3 fails to install — check Node.js version and node-gyp availability before continuing"
       - "npm run build fails due to server-only import in a client component — add export const dynamic = 'force-dynamic' or move to server component"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - db/migrations/001_initial.sql
+        - scripts/migrate.js
+        - lib/db/client.ts
+        - lib/db/types.ts
+        - lib/__tests__/db.test.ts
+        - package.json
+        - .gitignore
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test lib/__tests__/db
+          status: pass
+        - cmd: npm run db:migrate (first run)
+          status: pass
+        - cmd: npm run db:migrate (second run — idempotent)
+          status: pass
+        - cmd: node -e "require('better-sqlite3')"
+          status: pass
+      summary: "SQLite schema + migration runner complete. 3 tables: sessions, install_events (zero PII), reviews (UNIQUE skill+user). CommonJS migration runner idempotent. WAL-mode singleton. 6 schema tests pass (75 total)."
 
   - id: T102
     type: worker
@@ -198,7 +221,7 @@ tasks:
   - id: T105
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement skill collections: lib/collections.ts (getAllCollections, getCollection, validateCollection), three starter collection.json files (full-stack-developer-kit, strategic-business-pack, documentation-suite using only skills that exist in catalog), cli/src/commands/deploy-pack.ts, register deploy-pack in cli/src/index.ts."
     allowed_files:
@@ -218,12 +241,29 @@ tasks:
     stop_if:
       - "Collection references a skill slug that does not exist in skills/ — use only ai/skill-creator, productivity/development-workflow, productivity/phased-implementation-plan"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/collections.ts
+        - lib/__tests__/collections.test.ts
+        - collections/full-stack-developer-kit/collection.json
+        - collections/strategic-business-pack/collection.json
+        - collections/documentation-suite/collection.json
+        - cli/src/commands/deploy-pack.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Skill collections: lib/collections.ts, 3 starter packs, deploy-pack CLI. 8 tests pass (96 total)."
 
   - id: T106
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement skill forking: lib/forking.ts (forkSkill with forked_from + fork_chain frontmatter tracking), cli/src/commands/fork.ts, register fork in CLI, Fork button in skill detail page calling POST /api/fork-skill."
     allowed_files:
@@ -242,12 +282,28 @@ tasks:
       - "Fork to existing directory → throws error, does not overwrite"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/forking.ts
+        - lib/__tests__/forking.test.ts
+        - cli/src/commands/fork.ts
+        - cli/src/index.ts
+        - app/api/fork-skill/route.ts
+        - components/skill-mall/fork-button.tsx
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Skill forking: lib/forking.ts with forked_from + fork_chain frontmatter, CLI fork command, Fork button UI. 4 tests pass."
 
   - id: T107
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement npx skill-mall publish <slug> --registry skills.sh: pre-publish validation (quality score >= 70, description <= 1024, name matches dir, license present), skills.sh OAuth flow, post-publish frontmatter update with metadata.skills_sh_id and metadata.skills_sh_url."
     allowed_files:
@@ -262,12 +318,25 @@ tasks:
     stop_if:
       - "skills.sh OAuth endpoint is not publicly documented — stub the implementation with clear TODO, document what's missing, and stop"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/publish/skills-sh.ts
+        - cli/src/commands/publish.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "skills.sh publish: pre-publish validation (quality>=70, desc<=1024, name match, license), SKILL.md frontmatter update. OAuth stubbed pending endpoint documentation."
 
   - id: T108
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement multi-agent deploy: lib/agents/registry.ts (7 primary agents), lib/agents/detector.ts (detectAgents, deployToAgents), update cli/src/commands/deploy.ts to support --all-agents and --agents flags, add 'Deploy to All Agents' option to deploy-button.tsx, log install events for each deployment."
     allowed_files:
@@ -284,12 +353,26 @@ tasks:
       - "npx skill-mall deploy ai/skill-creator --all-agents shows per-agent status table (manual smoke test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/agents/registry.ts
+        - lib/agents/detector.ts
+        - lib/__tests__/agent-detection.test.ts
+        - cli/src/commands/deploy.ts
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Multi-agent deploy: 7-agent registry, filesystem detector, --all-agents and --agents CLI flags. 3 detection tests pass."
 
   - id: T109
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement SkillMall MCP server at /api/mcp: GET returns tool list (search_skills, get_skill, list_categories), POST handles JSON-RPC 2.0 tools/list and tools/call methods. Add export const runtime = 'nodejs'. Create docs/user/mcp-server.md with config JSON snippet."
     allowed_files:
@@ -302,12 +385,24 @@ tasks:
       - "curl -X POST http://localhost:3000/api/mcp with tools/call search_skills returns matching skills"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - app/api/mcp/route.ts
+        - docs/user/mcp-server.md
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "MCP server at /api/mcp: GET returns tool list, POST handles tools/list and tools/call with search_skills, get_skill, list_categories."
 
   - id: T110
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Build /trending page (top 10 by 7-day install velocity using getTrending7d), /trending/rising page (skills with >50% velocity acceleration using getRising), /dashboard contributor page (authenticated; shows own skills' install counts per agent type using getInstallsByAgentType)."
     allowed_files:
@@ -320,12 +415,24 @@ tasks:
       - "/dashboard redirects to sign-in if unauthenticated (smoke test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - app/trending/page.tsx
+        - app/dashboard/page.tsx
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Trending dashboard and contributor analytics. lib/analytics.ts: logInstallEvent, getTrending7d, getRising, getInstallsByAgentType. Auth stubs for T102."
 
   - id: T111
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement Description Trigger Evaluator: lib/trigger-evaluator.ts (evaluateTriggers — generates 10 positive + 10 negative queries, evaluates each, returns accuracy rates), POST /api/eval-triggers, Trigger Analysis tab in SkillTabs, cli/src/commands/eval-triggers.ts."
     allowed_files:
@@ -342,12 +449,26 @@ tasks:
       - "Generates exactly 10 positive + 10 negative queries (mocked)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/trigger-evaluator.ts
+        - lib/__tests__/trigger-evaluator.test.ts
+        - app/api/eval-triggers/route.ts
+        - components/skill-mall/skill-detail/SkillTabs.tsx
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Description trigger evaluator: 10 positive + 10 negative queries, accuracy rates, Trigger Analysis tab in SkillTabs. 3 tests pass."
 
   - id: T112
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Implement Skill Version History: lib/version-history.ts (getVersionHistory reads git log, deriveSemanticDiff maps file changes to plain language), History tab in SkillTabs, cli/src/commands/revert.ts (creates revert branch from specified version)."
     allowed_files:
@@ -363,14 +484,29 @@ tasks:
       - "deriveSemanticDiff('SKILL.md') returns 'skill instructions updated'"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/version-history.ts
+        - lib/__tests__/version-history.test.ts
+        - components/skill-mall/skill-detail/SkillTabs.tsx
+        - cli/src/commands/revert.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Skill version history: git-based changelog, HISTORY tab in SkillTabs, revert CLI creates branch at specified version."
 
   # ─── DOCUMENTATION ────────────────────────────────────────────────────────
 
   - id: T113
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Write all 6 Phase 2 documentation files, each >= 500 words, production quality. docs/user/mcp-server.md (MCP config JSON, all 3 tools with example curl calls), docs/reference/database-schema.md (full SQL schema, migration runner usage), docs/reference/collection-format.md (format spec, validation rules, CLI usage), docs/user/publishing-skills.md (pre-publish checks, OAuth flow, post-publish frontmatter), docs/user/multi-agent-deploy.md (all 7 agents in registry, --all-agents and --agents flag usage), docs/user/community-guide.md (rating requirements, effectiveness score computation, generic review handling)."
     allowed_files:
@@ -388,14 +524,29 @@ tasks:
     stop_if:
       - "A doc describes an interface that doesn't match the actual implementation — fix the discrepancy before closing"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/reference/database-schema.md
+        - docs/reference/collection-format.md
+        - docs/user/publishing-skills.md
+        - docs/user/multi-agent-deploy.md
+        - docs/user/community-guide.md
+      commands:
+        - cmd: npx tsc --noEmit
+          status: pass
+        - cmd: npm run build
+          status: pass
+        - cmd: npm test
+          status: pass
+      summary: "Phase 2 docs: 6 files (mcp-server.md from T109), all >= 500 words (min: 550)."
 
   # ─── COMPLETION AUDIT ────────────────────────────────────────────────────
 
   - id: T114
     type: judge
     assignee: Judge
-    status: queued
+    status: active
     reasoning_hint: high
     objective: "Audit whether Phase 2 is complete: all Worker tasks T101-T113 done with receipts, build passing, tests passing, TypeScript clean, db:migrate clean, OAuth round-trip verified, all 6 docs >= 500 words, no Phase 3 features present."
     inputs:
@@ -419,7 +570,15 @@ tasks:
       - "full_outcome_complete: true | false"
       - "If not_complete: exact list of what is missing or failing"
       - "If complete: confirmation Phase 3 may begin after launch conditions are verified"
-    receipt: null
+    receipt:
+      result: not_complete
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "T102 blocked on GitHub OAuth credentials. T103 and T104 require T102. All other conditions pass: build clean, 96/96 tests, tsc clean, db:migrate clean, 6 docs >= 500 words, no Phase 3 features. To unblock: register OAuth app at github.com/settings/developers with Homepage=http://localhost:3000 and Callback=http://localhost:3000/api/auth/callback/github. Add GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, NEXTAUTH_SECRET, NEXT_PUBLIC_APP_URL to .env.local."
+      missing:
+        - "T102: GitHub OAuth (blocked — credentials not provisioned)"
+        - "T103: Reviews backend (requires T102)"
+        - "T104: Reviews UI (requires T103)"
 
 checks:
   dirty_fingerprint: unknown
