@@ -221,6 +221,171 @@ tasks:
       - "Need files outside allowed_files"
     receipt: null
 
+  # ─── SPEC FEATURES MISSED FROM PHASE 1 (round 2) ────────────────────────
+
+  - id: T261
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement User Framework Override: each prompt card on skill detail page shows the framework as a clickable badge; clicking opens a dropdown (default: artifact-type-appropriate frameworks; Advanced toggle: full 40+); selecting triggers POST /api/regen-prompt which regenerates the prompt body with the new framework, updates frontmatter framework field, preserves original_framework. CLI: npx skill-mall regen-prompt <skill> <prompt-file> --framework 'Tree of Thoughts'."
+    allowed_files:
+      - app/api/regen-prompt/route.ts
+      - components/skill-mall/skill-detail/PromptCard.tsx
+      - components/skill-mall/skill-detail/FrameworkPicker.tsx
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - cli/src/commands/regen-prompt.ts
+      - cli/src/index.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "cd cli && npm run build exits 0"
+      - "POST /api/regen-prompt returns updated prompt with new framework in frontmatter"
+      - "original_framework field is never overwritten (test)"
+      - "npx skill-mall regen-prompt ai/skill-creator resources/prompts/tool-example.md --framework 'Chain of Thought' updates the file"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T262
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement npx skill-mall optimize-prompt CLI command. Accepts file path or --stdin. Calls the same optimizePrompt() from lib/prompt-optimizer.ts. Prints 4-dimension audit to terminal. Writes optimized version to <filename>-optimized.md and diff to <filename>.diff."
+    allowed_files:
+      - cli/src/commands/optimize-prompt.ts
+      - cli/src/index.ts
+    verify:
+      - "cd cli && npm run type-check exits 0"
+      - "cd cli && npm run build exits 0"
+      - "npx skill-mall optimize-prompt --help prints usage"
+      - "echo 'This prompt helps you...' | npx skill-mall optimize-prompt --stdin prints audit results"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T263
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add Prompts tab to skill detail page (SkillTabs). Display all prompt files from resources/prompts/ grouped by use case in plain English (not framework name). Each prompt card shows: name, complexity dot (blue=quick, grey=thorough, red=exhaustive), when_to_use text, collapsed DETAILS with framework names. Fixed-width grid so all names start at same horizontal position."
+    allowed_files:
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - components/skill-mall/skill-detail/PromptCard.tsx
+      - app/skills/[category]/[slug]/page.tsx
+      - lib/skills.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "PROMPTS tab renders on skill detail page (smoke test)"
+      - "Prompts grouped by plain-English use case label, not PE framework name (smoke test)"
+    stop_if:
+      - "Skill prompts directory does not exist for all skills — render empty state gracefully"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── SPEC FEATURES MISSED FROM PHASE 2 (round 2) ────────────────────────
+
+  - id: T264
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement npm Package Publisher: npx skill-mall publish <skill> --registry npm. Auto-generates package.json from SKILL.md metadata (@skill-mall/<slug>, version synced to metadata.version). Pre-publish: validates metadata.version matches any existing npm package version. Runs npm publish with --access public. Post-publish: writes metadata.npm_package to SKILL.md frontmatter."
+    allowed_files:
+      - cli/src/commands/publish.ts
+      - lib/publish/npm.ts
+    verify:
+      - "cd cli && npm run build exits 0"
+      - "npx skill-mall publish ai/skill-creator --registry npm --dry-run prints generated package.json without publishing"
+      - "Version mismatch between metadata.version and existing npm package exits 1 with specific message"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T265
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add missing MCP tools: get_prompts(category, slug) returns prompt files list; deploy_skill(slug, agent, scope) calls deployToAgents() and returns per-agent status. Add these to the tools array in /api/mcp and the handleTool() switch. Also add search click-through tracking to lib/analytics.ts (logSearchClickEvent) and wire it when a skill card in search results is clicked."
+    allowed_files:
+      - app/api/mcp/route.ts
+      - lib/analytics.ts
+      - components/skill-mall/skill-card.tsx
+      - app/page.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "GET /api/mcp shows 5 tools in the tools array"
+      - "POST /api/mcp with get_prompts tool returns prompt file list (smoke test)"
+      - "POST /api/mcp with deploy_skill tool calls detection and returns status (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T266
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add missing Trending views and analytics tracking. Add Community Favorites view (top skills by fork count — requires tracking forks in install_events or a separate fork_events table). Add High Quality view (quality score > 90 AND effectiveness score > 4.5). Add fork count tracking to forkSkill() in lib/forking.ts. Add Forked X times count display on skill detail page sidebar."
+    allowed_files:
+      - lib/analytics.ts
+      - lib/forking.ts
+      - app/trending/page.tsx
+      - app/skills/[category]/[slug]/page.tsx
+      - db/migrations/003_fork_events.sql
+      - scripts/migrate.js
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm run db:migrate exits 0"
+      - "/trending shows Community Favorites and High Quality sections (smoke test — may be empty)"
+      - "Forking a skill increments fork count in fork_events table (test)"
+      - "Skill detail page shows fork count (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T267
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add --scope project flag to deploy and deploy-pack CLI commands. --scope project deploys to .claude/skills/ (or equivalent) in the current working directory instead of ~/.claude/skills/. Update lib/agents/detector.ts to accept scope parameter. Update deploy-button.tsx to show project scope option."
+    allowed_files:
+      - cli/src/commands/deploy.ts
+      - cli/src/commands/deploy-pack.ts
+      - lib/agents/detector.ts
+      - components/skill-mall/deploy-button.tsx
+    verify:
+      - "cd cli && npm run build exits 0"
+      - "npx tsc --noEmit exits 0"
+      - "npx skill-mall deploy ai/skill-creator --scope project deploys to .claude/skills/ in cwd"
+      - "npx skill-mall deploy-pack full-stack-developer-kit --scope project deploys all skills to project-local dirs"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T268
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Wire trigger evaluator accuracy into CI validation action. Add trigger_accuracy_threshold (default 80%) and budget_warn_at_installed (default 25) as configurable options in .github/workflows/validate-skills.yml and .github/actions/skill-mall-validate/action.yml. When a PR touches a skill that has a trigger_accuracy flag set, run eval-triggers and warn (or block) based on threshold."
+    allowed_files:
+      - .github/workflows/validate-skills.yml
+      - .github/actions/skill-mall-validate/action.yml
+    verify:
+      - "python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))" exits 0"
+      - "action.yml documents trigger_accuracy_threshold and budget_warn_at_installed inputs"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
   # ─── FOUNDATION — SQLite Phase 3 migration ────────────────────────────────
 
   - id: T201
