@@ -1,0 +1,581 @@
+# GoalBuddy v2 state.yaml — SkillMall Phase 4
+
+version: 2
+
+goal:
+  title: "SkillMall Phase 4 — Comprehensive Documentation"
+  slug: skillmall-phase4
+  kind: existing_plan
+  tranche: "Write 20 new documentation files totaling 67,000+ words: 9 developer docs, 8 end-user guide docs, 5 marketing docs. Replace existing stub docs. Build /docs site infrastructure. All commands verified against running app before publishing."
+  status: active
+  intake:
+    original_request: "Create full developer docs, full end-user tutorial docs, full marketing docs"
+    interpreted_outcome: "Three complete documentation suites that a developer can onboard from, a beginner can learn from, and a journalist can quote from — not 500-word stubs"
+    input_shape: existing_plan
+    audience: "James Sizemore — project owner"
+    authority: approved
+    proof_type: artifact
+    completion_proof: "20 new docs above word count minimums, /docs site renders, T427 audit passes, every command verified, total >= 67,000 words, npm run build succeeds"
+    likely_misfire: "Writing thin docs that hit the word count minimum without actually being comprehensive. Documenting features that don't work. Starting end-user docs for Phase 3 features before Phase 3 is built."
+    blind_spots_considered:
+      - "Every CLI command must be tested against the ACTUAL running CLI — not documentation from memory"
+      - "Every API curl example must return the documented response — run it first"
+      - "End-user docs assume NOTHING — if you need to explain what a terminal is, do it"
+      - "Marketing docs must be honest — never promise features that are Phase 3 or later"
+      - "T428 (stub replacement) must happen LAST — after all new docs exist to link to"
+      - "T426 (docs infrastructure) can happen any time — independent of content tasks"
+    existing_plan_facts:
+      - "Full plan: docs/superpowers/plans/PHASE-4-PLAN.md — 84KB, all content specs embedded"
+      - "Developer docs target: TypeScript developer, never seen this codebase, can onboard without asking anyone"
+      - "End-user docs target: non-technical user, tutorial format, step-by-step, celebrate every milestone"
+      - "Marketing docs target: decision-maker/journalist, benefit-first, specific not vague, honest"
+      - "Every doc has: one-sentence summary, TOC (if >1000 words), what-you-will-learn statement, cross-links, next-steps section"
+      - "Code examples are REAL — run every command, compile every snippet, verify every curl"
+      - "Word count minimums in plan are FLOORS not targets — write more if the topic needs it"
+      - "Total docs infrastructure target: /docs section in Next.js using next-mdx-remote or contentlayer"
+      - "67,000+ words total across all 20 new documents"
+      - "FILE CONFLICT: README.md — T401 first (developer section), T421 second (marketing section)"
+      - "FILE CONFLICT: docs/guide/index.md — T411 first, T412 second"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: bundled_not_installed
+  worker: bundled_not_installed
+  judge: bundled_not_installed
+
+visual_board:
+  selected: local
+  local:
+    status: starting
+    url: null
+    command: "npx goalbuddy board /Users/jamesdsizemore/Developer/skill-mall/docs/goals/skillmall-phase4"
+  github_projects:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy extend github-projects"
+    missing: []
+
+active_task: T401
+
+tasks:
+
+  # ─── SUITE 1: DEVELOPER DOCUMENTATION ────────────────────────────────────
+
+  - id: T401
+    type: worker
+    assignee: Worker
+    status: active
+    reasoning_hint: default
+    objective: "Write docs/developer/getting-started.md (3000+ words) covering prerequisites, clone/install, all 5 LLM provider configurations with exact commands, database setup, run app, run tests, project structure with WHY explanations, first contribution walkthrough, architecture overview (500+ words), common dev tasks reference table, full env var reference table. Update README.md developer section."
+    allowed_files:
+      - docs/developer/getting-started.md
+      - README.md
+    verify:
+      - "wc -w docs/developer/getting-started.md shows >= 3000"
+      - "Every command shown runs without error on fresh clone"
+      - "Project structure matches actual directory layout (grep against actual dirs)"
+      - "All 5 provider configure commands shown"
+    stop_if:
+      - "Any command produces an error — fix or document workaround, never document broken commands"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T402
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/architecture.md (4000+ words) covering: system overview with ASCII diagram, provider abstraction with full TypeScript interface, all 5 pipeline stages in detail (what flows in, what flows out, how LLM calls work, how Zod validation works), state management (WizardContext), database design (all tables + WHY SQLite), GitHub OAuth flow step-by-step, Nothing design system with token values, performance characteristics (60+ LLM calls for 20-tool domain), security model (Zod, parameterized SQL, path traversal, author verification)."
+    allowed_files:
+      - docs/developer/architecture.md
+    verify:
+      - "wc -w docs/developer/architecture.md shows >= 4000"
+      - "Every TypeScript type shown matches actual type in codebase (grep to verify)"
+      - "Every SQL schema shown matches db/migrations/001_initial.sql"
+      - "ASCII diagram matches actual system structure"
+    stop_if:
+      - "Any TypeScript type shown doesn't match actual codebase type — grep before writing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T403
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/api-reference.md (5000+ words) covering ALL 23 API routes: auth routes (login/callback/logout), provider routes, pipeline routes (research/confirm-research/create-skill), tool routes (optimize-prompt/regen-prompt/eval-triggers/budget-check/fork-skill/version-history), community routes (reviews/feedback/improvements), MCP route, analytics route, marketplace routes (Phase 3), Stripe webhook. Each route: method, path, auth requirement, complete request/response schema tables, all error codes with exact error string values, working curl example."
+    allowed_files:
+      - docs/developer/api-reference.md
+    verify:
+      - "wc -w docs/developer/api-reference.md shows >= 5000"
+      - "Every curl example runs against localhost:3000 and returns documented response shape"
+      - "All 23 routes documented — count against app/api/ directory"
+      - "Stripe webhook entry documents the raw body requirement explicitly"
+    stop_if:
+      - "Any curl example returns unexpected response — fix the doc or flag the bug"
+      - "A route in app/api/ is not documented — add it"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T404
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/cli-reference.md (3000+ words) covering ALL CLI commands with full flag tables, behavior description, numbered steps, examples with expected outputs, and exit codes. Commands: configure, create, confirm-research, deploy (--all-agents/--agents/--scope), deploy-pack, fork, revert, publish (npm and skills.sh), validate, new (template-based and --from-template), extract, test, budget-check, optimize-prompt, regen-prompt, eval-triggers, mcp-server, attach-knowledge, list, find."
+    allowed_files:
+      - docs/developer/cli-reference.md
+    verify:
+      - "wc -w docs/developer/cli-reference.md shows >= 3000"
+      - "Every command example produces documented output on actual built CLI (cd cli && npm run build first)"
+      - "All commands listed in cli/src/index.ts are documented"
+    stop_if:
+      - "Any command shown exits with unexpected error — verify against actual CLI"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T405
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/contributing.md (2500+ words) covering: types of contributions (skills easiest, code, docs), complete skill contribution workflow (feature-inventory-check, create, validate, test, PR), quality bar for skills (exact rubric, required score, CI checks), code contribution workflow (16-step loop, commit convention, PR template, review process), code standards (TypeScript strict, Zod, parameterized SQL, atomic writes, Nothing design rules), test writing guide (MockLLMClient pattern, file locations, naming), documentation contribution guide (plan-review skill, word count minimums, accuracy requirements)."
+    allowed_files:
+      - docs/developer/contributing.md
+    verify:
+      - "wc -w docs/developer/contributing.md shows >= 2500"
+      - "Quality bar section shows the exact 5-dimension rubric with point values"
+      - "Every command in the contribution workflow runs without error"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T406
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/extending.md (2000+ words) covering exactly how to: add a new LLM provider (5-step process with code), add a new CLI command (file location, template, registration in index.ts), add a new API route (convention, Zod validation pattern, error format), add a new quality score dimension (DimensionScore type, feedback format), add a new PE framework (FRAMEWORK_DESCRIPTIONS and FRAMEWORK_CANDIDATES entries). Every step shown with actual file paths from the codebase."
+    allowed_files:
+      - docs/developer/extending.md
+    verify:
+      - "wc -w docs/developer/extending.md shows >= 2000"
+      - "Every file path referenced exists in the actual codebase"
+      - "Provider addition steps can be followed to create a working stub provider"
+    stop_if:
+      - "A referenced file path doesn't exist — check before writing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T407
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/deployment.md (2000+ words) covering: Vercel deployment (step-by-step, all env vars, critical filesystem limitation — skill creation doesn't work on Vercel, catalog does), Railway/VPS deployment (what's different, writable filesystem, all features work), complete env var reference table (every var, required vs optional, where to get it, what breaks if missing), SQLite in production (WAL mode, backup strategy, migration path to Turso), GitHub OAuth in production (callback URL update, Secure cookie, NEXT_PUBLIC_APP_URL), CLI in production environments."
+    allowed_files:
+      - docs/developer/deployment.md
+    verify:
+      - "wc -w docs/developer/deployment.md shows >= 2000"
+      - "Vercel filesystem limitation is clearly documented — this is critical and must not be buried"
+      - "Complete env var table covers every variable in .env.example"
+    stop_if:
+      - "Vercel limitation is understated or missing — this causes major confusion"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T429
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/faq.md (2000+ words) covering 20+ developer FAQ entries and 5 common implementation patterns. FAQs must address: why 60+ LLM calls, why SQLite, why better-sqlite3, how to add a category, why Claude Code uses subprocess not SDK, why Tailwind v4 + CSS custom properties, how to test without LLM calls, why atomicWrite, how CLI shares code with Next.js, why sessionStorage for wizard state, Docker container support, why two LLM calls per tool (selection + body). Patterns: adding library wrapping LLM client, adding frontmatter field, adding quality dimension, adding MCP tool, adding detail page tab."
+    allowed_files:
+      - docs/developer/faq.md
+    verify:
+      - "wc -w docs/developer/faq.md shows >= 2000"
+      - ">= 20 Q&A entries"
+      - "Every answer is correct — verified against actual codebase"
+      - "Code snippets in patterns section compile without errors"
+    stop_if:
+      - "Any Q&A answer is factually incorrect — verify against codebase before writing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T430
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/developer/security.md (1500+ words) covering: input validation (Zod on all API inputs, pattern with code), SQL injection prevention (parameterized queries only — show CORRECT and WRONG patterns with explicit 'NEVER DO THIS'), path traversal prevention (codebase extractor validation), prompt injection (test input sanitization), GitHub OAuth security (CSRF state, session randomness, no token storage), Stripe webhook security (raw body, signature verification, what breaks if body parsed first), author identity verification (self-improvement suggester check), known limitations (catalog-level install signal, no rate limiting in Phase 4, LLM subprocess prompt injection risk)."
+    allowed_files:
+      - docs/developer/security.md
+    verify:
+      - "wc -w docs/developer/security.md shows >= 1500"
+      - "WRONG pattern examples are clearly labeled NEVER DO THIS"
+      - "Known limitations section is honest and complete"
+    stop_if:
+      - "Security patterns shown are incorrect — verify every pattern against actual implementation"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── SUITE 2: END-USER GUIDE ──────────────────────────────────────────────
+
+  - id: T411
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/introduction.md (2500+ words) targeting a non-technical reader who just discovered SkillMall. Required: plain-language explanation of what SkillMall is (no jargon), concrete example of invoking a skill in Claude Code (describe exactly what happens), three detailed user personas with specific scenarios, four main actions (browse/deploy/create/share), how skills work across multiple agents, 10-minute preview of what's possible, honest 'is SkillMall right for you' section."
+    allowed_files:
+      - docs/guide/introduction.md
+    verify:
+      - "wc -w docs/guide/introduction.md shows >= 2500"
+      - "No jargon used without being defined first"
+      - "Three complete user personas with specific names and scenarios"
+      - "The 10-minute preview accurately describes what the app actually does"
+    stop_if:
+      - "Technical terms appear without plain-English explanation — rewrite"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T412
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/quick-start.md (2000+ words) — tutorial getting a new user from zero to deployed skill in 10 minutes. Step-by-step with expected outputs. After each step: 'If you see X, do Y' error handling. Required additions per plan: 'When things go wrong' sidebar per step, 200-word description of the localhost:3000 homepage (describes what user sees in detail), invocation in Claude Code (describe what happens when /development-workflow is invoked). Every command verified on fresh clone."
+    allowed_files:
+      - docs/guide/quick-start.md
+    verify:
+      - "wc -w docs/guide/quick-start.md shows >= 2000"
+      - "Tutorial works end-to-end on fresh clone (test it)"
+      - "Every step has at least one 'if you see X, do Y' error entry"
+      - "Homepage description is accurate to current app state"
+    stop_if:
+      - "Tutorial fails on fresh clone — fix the tutorial or the code"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T413
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/tutorials/wizard-tutorial.md (3000+ words) — complete tutorial creating a Jobs-to-Be-Done skill via the wizard. Required: describe each screen in 100+ words, explain what each API call fires at step transitions, show the generated file tree and explain every file, read the quality score breakdown. Do NOT assume the reader knows what the wizard looks like — describe every visual element in prose."
+    allowed_files:
+      - docs/guide/tutorials/wizard-tutorial.md
+    verify:
+      - "wc -w docs/guide/tutorials/wizard-tutorial.md shows >= 3000"
+      - "Tutorial can be followed to create a real working skill"
+      - "API calls mentioned match actual routes in app/api/"
+      - "File tree shown matches what the pipeline actually generates"
+    stop_if:
+      - "Any described UI element doesn't match the actual app — verify visually"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T414
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/tutorials/cli-tutorial.md (2500+ words) — tutorial creating an OKR Framework skill via CLI. Step-by-step with full command output shown. Required: explain why CLI vs wizard (power users, scriptable, JSON review step), show the research-result.json structure and explain every field, show full expected output for each command including the quality score printout. All commands tested."
+    allowed_files:
+      - docs/guide/tutorials/cli-tutorial.md
+    verify:
+      - "wc -w docs/guide/tutorials/cli-tutorial.md shows >= 2500"
+      - "All commands tested on actual CLI — every expected output is real"
+      - "research-result.json structure matches actual ResearchResult schema"
+    stop_if:
+      - "Any expected output doesn't match real command output — fix it"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T415
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/tutorials/customizing-skills.md (2000+ words) — tutorial forking development-workflow and adding team-specific rules. Cover: why fork not edit, the forked_from frontmatter field and what it means, editing SKILL.md rules section, editing a template, updating the description to be team-specific, validating, deploying. Also cover the Fork button UI. Explain what 'independent' means (changes to original don't propagate)."
+    allowed_files:
+      - docs/guide/tutorials/customizing-skills.md
+    verify:
+      - "wc -w docs/guide/tutorials/customizing-skills.md shows >= 2000"
+      - "fork command tested and produces documented output"
+      - "forked_from frontmatter appears in the generated file after fork"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T416
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/understanding-quality.md (2000+ words) covering the full quality score rubric in plain English: what the 0-100 score means, all 5 dimensions explained with good/bad examples, how to improve each dimension (3-step plan per dimension), the Budget Analyzer feature (--chars-available flag, what it shows), writing effective skill descriptions (trigger phrase, 150-char limit, first-80-chars rule, imperative verbs with examples)."
+    allowed_files:
+      - docs/guide/understanding-quality.md
+    verify:
+      - "wc -w docs/guide/understanding-quality.md shows >= 2000"
+      - "Every dimension has a good-example vs bad-example comparison"
+      - "Budget analyzer section describes the actual --chars-available flag (not per-agent values)"
+    stop_if:
+      - "Quality score rubric doesn't match lib/quality-score.ts actual implementation — verify"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T417
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/using-collections.md (1500+ words) covering: what a collection is, deploying all 3 starter packs with exact commands, creating your own collection.json (complete format walkthrough), submitting a community pack (PR process, CI validation, quality requirements)."
+    allowed_files:
+      - docs/guide/using-collections.md
+    verify:
+      - "wc -w docs/guide/using-collections.md shows >= 1500"
+      - "deploy-pack commands work for all 3 starter collections"
+      - "collection.json format matches lib/collections.ts schema"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T418
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/prompt-optimization.md (2000+ words) covering: the prompt library (/prompt-library) with browsing/filtering/one-click copy, 8-10 most useful frameworks explained with real examples, a complete prompt optimizer session (bad prompt → audit → improved version), framework override (when/why to override, how to use the UI dropdown), writing effective skill descriptions (same content as T416 quality section but from the prompting angle)."
+    allowed_files:
+      - docs/guide/prompt-optimization.md
+    verify:
+      - "wc -w docs/guide/prompt-optimization.md shows >= 2000"
+      - "Framework descriptions match FRAMEWORK_DESCRIPTIONS in lib/pe-frameworks.ts"
+      - "Prompt optimizer session example uses /api/optimize-prompt and shows real output"
+    stop_if:
+      - "Framework descriptions don't match actual implementation — grep pe-frameworks.ts"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T419
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/troubleshooting.md (3000+ words) with >= 25 specific problem entries. Format: symptom → what it means → fix steps (numbered) → if none work. Categories: provider/LLM problems (6+ entries), wizard problems (5+ entries), CLI problems (5+ entries), authentication problems (4+ entries), build/development problems (5+ entries including the 10 most common TypeScript errors). Every fix tested."
+    allowed_files:
+      - docs/guide/troubleshooting.md
+    verify:
+      - "wc -w docs/guide/troubleshooting.md shows >= 3000"
+      - ">= 25 specific problem entries, each in the correct format"
+      - "Every fix suggestion tested — doesn't document broken advice"
+      - "Alphabetical or logical grouping — not random"
+    stop_if:
+      - "Any fix suggestion doesn't work — test before documenting"
+      - "Fewer than 25 problems documented — the topic demands more"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T420
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/guide/glossary.md (2000+ words) with >= 40 alphabetically-sorted terms. Every term: 1-3 sentence definition in plain English + 'See also' cross-links where relevant. Terms must include all jargon used across the guide docs. No circular definitions. No technical jargon in definitions without being defined first."
+    allowed_files:
+      - docs/guide/glossary.md
+    verify:
+      - "wc -w docs/guide/glossary.md shows >= 2000"
+      - ">= 40 defined terms, alphabetically sorted"
+      - "Every term used in guide docs is in the glossary (spot-check 10 terms)"
+      - "No circular definitions"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── SUITE 3: MARKETING DOCUMENTATION ────────────────────────────────────
+
+  - id: T421
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/marketing/landing-page-copy.md (2500+ words of actual copy) with: hero section (headline 10 words max, subheadline 20 words, CTAs), problem statement paragraph, product overview paragraph, 3 core features (50 words each benefit-first), social proof structure (3 testimonial placeholders with topic focus), 4-step how-it-works, 6-question FAQ with direct answers, final CTA. ADDITIONAL REQUIREMENTS per plan: 3-email drip sequence, 5 Twitter/X post templates, 2 LinkedIn posts, GitHub README badge markdown."
+    allowed_files:
+      - docs/marketing/landing-page-copy.md
+    verify:
+      - "wc -w docs/marketing/landing-page-copy.md shows >= 2500"
+      - "Hero headline is <= 10 words"
+      - "FAQ has 6 questions with direct, honest answers"
+      - "All 3 drip emails and 5 social posts present"
+    stop_if:
+      - "Copy promises features that don't exist — verify every claim against codebase"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T422
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/marketing/value-proposition.md (2000+ words) with: one-sentence pitch for 4 audiences (developers, team leads, consultants, open-source maintainers), 3-paragraph core value proposition, value by use case for 5 specific scenarios (code review, strategy analysis, documentation, debugging, API docs) with specifics not generalities, competitive differentiation (5 specific points with evidence), honest 'what SkillMall is NOT' section."
+    allowed_files:
+      - docs/marketing/value-proposition.md
+    verify:
+      - "wc -w docs/marketing/value-proposition.md shows >= 2000"
+      - "4 audience-specific pitches present"
+      - "'What SkillMall is NOT' section is honest and complete"
+      - "No claim made that can't be verified against actual product"
+    stop_if:
+      - "Any value claim is vague ('significantly better') without specifics — add specifics or remove"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T423
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/marketing/use-cases.md (3500+ words) with 6 complete case studies each containing: the situation (who, problem), the skill they created (how, what source URL, how long), what it produces (specific artifacts, specific time savings), the result (concrete outcome with specifics). REQUIRED per plan for each: before state (specific time/effort), after state, skill specification (topic/URLs/category/tool count), sample output (100-200 words of real skill output)."
+    allowed_files:
+      - docs/marketing/use-cases.md
+    verify:
+      - "wc -w docs/marketing/use-cases.md shows >= 3500"
+      - "6 complete case studies present"
+      - "Every case study has before/after metrics (not vague — specific minutes/hours)"
+      - "Sample outputs are realistic (not marketing fluff)"
+    stop_if:
+      - "Case studies use vague metrics ('saved time') without specifics — add specifics"
+      - "Sample outputs are generic or invented — base them on what the actual skill would produce"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T424
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/marketing/comparison.md (2000+ words) comparing SkillMall against: custom system prompts, skills.sh registry (complementary, not competing), Claude's Projects feature, custom instructions/memory, documentation + prompting from scratch. For each: what it is, where it falls short, where SkillMall wins, where the alternative wins. End with an honest decision framework ('which should I use?')."
+    allowed_files:
+      - docs/marketing/comparison.md
+    verify:
+      - "wc -w docs/marketing/comparison.md shows >= 2000"
+      - "Acknowledges where alternatives are legitimately better"
+      - "Decision framework present at the end"
+      - "No comparison claim is misleading or inaccurate"
+    stop_if:
+      - "Comparison is one-sided or omits legitimate strengths of alternatives — be fair"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T425
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write docs/marketing/press-kit.md (1500+ words) with: 3 About SkillMall versions (50/100/300 words), key facts bullet list, founding context, technical differentiators for technical publications, 5 media-ready one-liners for different contexts (developer podcast, business publication, tech blog, product newsletter, general audience), 5 journalist FAQs with direct answers, contact section."
+    allowed_files:
+      - docs/marketing/press-kit.md
+    verify:
+      - "wc -w docs/marketing/press-kit.md shows >= 1500"
+      - "3 length variants of About section present (50/100/300 words)"
+      - "5 media-ready one-liners present for different contexts"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── INFRASTRUCTURE + REPLACEMENT ────────────────────────────────────────
+
+  - id: T426
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Build /docs section in Next.js app for rendering documentation. Install next-mdx-remote or contentlayer. Create docs layout with: left sidebar navigation (Developer / Guide / Marketing sections), right sidebar TOC from headings, syntax highlighting (shiki), browser-side search across loaded content. Apply Nothing design tokens to docs pages. Wire all Phase 4 docs into the navigation."
+    allowed_files:
+      - app/docs/
+      - components/docs/
+      - lib/docs.ts
+      - package.json
+    verify:
+      - "npm run build exits 0 with docs pages included"
+      - "/docs renders the documentation index"
+      - "Code blocks have syntax highlighting"
+      - "Navigation links work across all suites"
+      - "Search finds content"
+    stop_if:
+      - "next-mdx-remote has version conflicts — try contentlayer or @next/mdx instead"
+      - "docs pages cause npm run build to fail — fix before continuing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T428
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Replace or redirect all existing stub docs in docs/user/ and docs/reference/. For each stub: if Phase 4 covers the topic, replace with a redirect file pointing to the new location. If Phase 4 doesn't cover it, expand it to 2000+ words to Phase 4 standards. Run AFTER all T401-T425 are complete — stubs can only redirect to docs that exist."
+    allowed_files:
+      - docs/user/
+      - docs/reference/
+    verify:
+      - "No file in docs/user/ or docs/reference/ has < 500 words without being a redirect"
+      - "All redirect files contain a working link to the new document"
+      - "Redirect links resolve to existing Phase 4 files"
+    stop_if:
+      - "T428 runs before all Phase 4 docs exist — wait until T401-T425 are all complete"
+      - "Redirecting to a doc that doesn't exist yet — add the redirect after the target exists"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── COMPLETION AUDIT ────────────────────────────────────────────────────
+
+  - id: T427
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit all Phase 4 documentation. Every document above its word count minimum. Every command verified on fresh clone. Every API example returns documented response. Docs site renders. Existing stubs replaced."
+    inputs:
+      - "All T401-T426 and T428-T430 receipts"
+      - "Word counts: wc -w for every new document"
+      - "Fresh clone test: every tutorial command run on clean machine"
+      - "Build: npm run build exits 0 with docs included"
+      - "Stub replacement: every docs/user/ and docs/reference/ file reviewed"
+    constraints:
+      - "Do not approve if any document is below its word count minimum"
+      - "Do not approve if any CLI command in any tutorial produces an error"
+      - "Do not approve if any API curl example returns unexpected response"
+      - "Do not approve if docs site fails to render"
+      - "Do not approve if existing stubs remain at < 500 words without redirect"
+      - "Do not approve if total word count across all new docs is below 67,000"
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "If not_complete: exact list of failing documents with word count and specific issues"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
