@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T264
+active_task: T265
 
 tasks:
 
@@ -478,7 +478,7 @@ tasks:
   - id: T264
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement npm Package Publisher: npx skill-mall publish <skill> --registry npm. Auto-generates package.json from SKILL.md metadata (@skill-mall/<slug>, version synced to metadata.version). Pre-publish: validates metadata.version matches any existing npm package version. Runs npm publish with --access public. Post-publish: writes metadata.npm_package to SKILL.md frontmatter."
     allowed_files:
@@ -492,14 +492,24 @@ tasks:
       - "npx skill-mall publish ai/skill-creator --registry npm --dry-run prints generated package.json without publishing"
       - "Version mismatch between metadata.version and existing npm package exits 1 with specific message"
       - "--dry-run flag exists and is the DEFAULT behavior. Actual publish only happens with --publish flag. Never publish without explicit --publish flag."
-    stop_if:
-      - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - cli/src/commands/publish.ts
+        - lib/publish/npm.ts
+      commands:
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "node cli/dist/index.js publish ai/skill-creator --registry npm --dry-run"
+          status: pass
+      summary: "lib/publish/npm.ts: buildNpmPackageJson() generates @skill-mall/<slug> package.json from SKILL.md metadata, checkNpmVersion() checks npm registry for version conflicts, publishToNpm() writes temp package.json and runs npm publish --access public (cleaned up after). publish.ts extended with --registry npm routing: default is --dry-run (prints generated package.json), actual publish ONLY with --publish flag. Version mismatch exits 1 with specific message."
 
   - id: T265
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Add missing MCP tools: get_prompts(category, slug) returns prompt files list; deploy_skill(slug, agent, scope) calls deployToAgents() and returns per-agent status. Add these to the tools array in /api/mcp and the handleTool() switch. Also add search click-through tracking to lib/analytics.ts (logSearchClickEvent) and wire it when a skill card in search results is clicked."
     allowed_files:

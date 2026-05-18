@@ -1,20 +1,28 @@
 import path from "node:path";
 import * as p from "@clack/prompts";
-import { pc } from "../utils.js";
+import { requireRepoRoot, pc } from "../utils.js";
 import { validateForPublish } from "@/lib/publish/skills-sh.js";
 import { getAllSkills } from "@/lib/skills.js";
+import { buildNpmPackageJson, checkNpmVersion, publishToNpm } from "@/lib/publish/npm.js";
 
 export async function publishCommand(args: string[]): Promise<void> {
   const slug = args[0];
   let registry = "skills.sh";
+  let dryRun = true; // DEFAULT: always dry-run unless --publish is explicit
+  let actualPublish = false;
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === "--registry" && args[i + 1]) registry = args[++i];
+    else if (args[i] === "--dry-run") dryRun = true;
+    else if (args[i] === "--publish") { actualPublish = true; dryRun = false; }
   }
 
   if (!slug) {
     process.stderr.write(
-      pc.red("Usage: skill-mall publish <category/slug> --registry skills.sh\n")
+      pc.red(
+        "Usage: skill-mall publish <category/slug> --registry <npm|skills.sh> [--dry-run|--publish]\n" +
+        "       Default behavior is --dry-run. Pass --publish to actually publish.\n"
+      )
     );
     process.exit(1);
   }
@@ -37,7 +45,12 @@ export async function publishCommand(args: string[]): Promise<void> {
   console.log();
   p.intro(pc.bold(`  skill-mall publish: ${skill.name} → ${registry}`));
 
-  // Pre-publish validation
+  if (registry === "npm") {
+    await publishNpmRegistry(skill, dryRun);
+    return;
+  }
+
+  // skills.sh registry (original behavior)
   const allSlugs = new Set(allSkills.map((s) => s.slug));
   const validation = validateForPublish(skill, allSlugs);
 
@@ -55,7 +68,6 @@ export async function publishCommand(args: string[]): Promise<void> {
   console.log(pc.green("  ✓ Pre-publish validation passed."));
   console.log();
 
-  // OAuth flow — currently stubbed
   try {
     const { openSkillsShOAuth } = await import("@/lib/publish/skills-sh.js");
     const token = await openSkillsShOAuth();
@@ -77,6 +89,65 @@ export async function publishCommand(args: string[]): Promise<void> {
     console.log(pc.yellow("  " + message));
     console.log();
     p.outro(pc.bold(pc.yellow("  Publish incomplete — see above.")));
+    process.exit(1);
+  }
+}
+
+type SkillItem = ReturnType<typeof getAllSkills>[0];
+
+async function publishNpmRegistry(skill: SkillItem, dryRun: boolean): Promise<void> {
+  const pkg = buildNpmPackageJson(skill);
+  const packageName = pkg.name;
+  const repoRoot = requireRepoRoot();
+  const skillDir = path.join(repoRoot, "skills", skill.category, skill.slug);
+
+  console.log();
+  console.log(pc.bold("  Generated package.json:"));
+  console.log(pc.dim(JSON.stringify(pkg, null, 2)));
+  console.log();
+
+  // Pre-publish: check version conflict with existing npm package
+  console.log(pc.dim(`  Checking npm registry for ${packageName}...`));
+  const versionCheck = checkNpmVersion(packageName, pkg.version);
+
+  if (versionCheck.exists && versionCheck.versionMismatch) {
+    process.stderr.write(
+      pc.red(
+        `Version conflict: ${packageName}@${versionCheck.publishedVersion} already exists on npm.\n` +
+        `Local version (${pkg.version}) matches the already-published version.\n` +
+        `Bump metadata.version in SKILL.md before publishing.\n`
+      )
+    );
+    process.exit(1);
+  }
+
+  if (versionCheck.exists) {
+    console.log(pc.dim(`  Existing package: ${versionCheck.publishedVersion} → new: ${pkg.version}`));
+  } else {
+    console.log(pc.dim(`  First publish — package does not exist on npm yet.`));
+  }
+
+  if (dryRun) {
+    console.log();
+    console.log(pc.yellow("  DRY RUN — not publishing. Pass --publish to actually publish."));
+    console.log(pc.dim(`  Would run: npm publish --access public in ${skillDir}`));
+    console.log();
+    p.outro(pc.bold(pc.yellow("  Dry run complete. No changes made.")));
+    return;
+  }
+
+  // Actual publish — only reachable with explicit --publish flag
+  console.log();
+  console.log(pc.dim(`  Publishing ${packageName}@${pkg.version}...`));
+
+  try {
+    publishToNpm(skill, { dryRun: false, skillDir });
+    console.log();
+    p.outro(pc.bold(pc.green(`  Published: ${packageName}@${pkg.version}`)));
+  } catch (err) {
+    process.stderr.write(
+      pc.red(`npm publish failed: ${err instanceof Error ? err.message : String(err)}\n`)
+    );
     process.exit(1);
   }
 }
