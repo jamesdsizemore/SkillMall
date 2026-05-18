@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jamesdsizemore/Developer/skill-mall/.claude/hooks/plan-write-guard.sh",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jamesdsizemore/Developer/skill-mall/.claude/hooks/stop-process-check.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jamesdsizemore/Developer/skill-mall/.claude/hooks/phase-plan-preflight.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}
