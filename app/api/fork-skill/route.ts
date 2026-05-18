@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { forkSkill } from "@/lib/forking";
+import { getSession } from "@/lib/auth/github";
 
 const ForkBodySchema = z.object({
   category: z.string().min(1),
@@ -9,6 +10,12 @@ const ForkBodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const token = req.cookies.get("sm_session")?.value;
+  const session = token ? getSession(token) : null;
+  if (!session) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = ForkBodySchema.safeParse(body);
 

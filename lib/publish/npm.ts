@@ -58,7 +58,7 @@ export function checkNpmVersion(packageName: string, localVersion: string): NpmV
     return {
       exists: true,
       publishedVersion,
-      versionMismatch: publishedVersion === localVersion,
+      versionMismatch: publishedVersion !== localVersion,
     }
   } catch {
     return { exists: false, publishedVersion: null, versionMismatch: false }

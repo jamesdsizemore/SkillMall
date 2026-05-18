@@ -34,6 +34,7 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
       client_secret: GITHUB_CLIENT_SECRET,
       code,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   const data = (await res.json()) as { access_token?: string; error?: string };
@@ -52,6 +53,7 @@ export async function fetchGitHubUser(
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
     },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     throw new Error(`GitHub user fetch failed: HTTP ${res.status}`);

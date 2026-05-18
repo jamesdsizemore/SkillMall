@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { getSkill, getAllSkills } from "./skills";
+import matter from "gray-matter";
+import { getSkill } from "./skills";
 
 export interface ForkResult {
   sourceSlug: string;
@@ -20,16 +21,6 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
-function getExistingForkChain(content: string): string[] {
-  const match = content.match(/fork_chain:\s*\n((?:\s+-\s+.+\n?)+)/);
-  if (!match) return [];
-  return match[1]
-    .trim()
-    .split("\n")
-    .map((l) => l.replace(/^\s+-\s+"?/, "").replace(/"?$/, "").trim())
-    .filter(Boolean);
-}
-
 /**
  * Fork a skill into a new directory with forked_from frontmatter tracking.
  * Creates an independent copy — changes to the original never propagate automatically.
@@ -46,7 +37,6 @@ export function forkSkill(
   }
 
   const effectiveCategory = targetCategory ?? sourceCategory;
-  // source.path is relative to the skills/ directory
   const sourceDir = path.join(process.cwd(), "skills", path.dirname(source.path));
   const destDir = path.join(process.cwd(), "skills", effectiveCategory, newSlug);
 
@@ -59,35 +49,29 @@ export function forkSkill(
   copyDirRecursive(sourceDir, destDir);
 
   const skillMdPath = path.join(destDir, "SKILL.md");
-  let content = fs.readFileSync(skillMdPath, "utf-8");
+  const raw = fs.readFileSync(skillMdPath, "utf-8");
+  const { data: fm, content: body } = matter(raw);
 
-  // Update name field
-  content = content.replace(/^name:\s*.+$/m, `name: ${newSlug}`);
+  // Update name field safely via parsed frontmatter (not regex)
+  fm.name = newSlug;
 
-  // Build fork metadata
-  const existingChain = getExistingForkChain(content);
+  // Build fork chain from existing metadata (if this is a fork of a fork)
+  const meta = (fm.metadata && typeof fm.metadata === "object")
+    ? fm.metadata as Record<string, unknown>
+    : {};
+  const existingChain: string[] = Array.isArray(meta.fork_chain)
+    ? (meta.fork_chain as unknown[]).map(String)
+    : [];
   const forkedFrom = `${sourceSlug}@${source.version}`;
   const fullChain = [...existingChain, forkedFrom];
 
-  const metaLines =
-    fullChain.length === 1
-      ? `  forked_from: "${forkedFrom}"`
-      : `  forked_from: "${forkedFrom}"\n  fork_chain:\n${fullChain
-          .map((e) => `    - "${e}"`)
-          .join("\n")}`;
-
-  // Inject into existing metadata section or create one
-  if (/^metadata:/m.test(content)) {
-    content = content.replace(/^(metadata:\n)/m, `$1${metaLines}\n`);
-  } else {
-    // Add before closing ---
-    const parts = content.split(/^---\s*$/m);
-    if (parts.length >= 2) {
-      content = `${parts[0]}metadata:\n${metaLines}\n---${parts.slice(2).join("---")}`;
-    }
+  meta.forked_from = forkedFrom;
+  if (fullChain.length > 1) {
+    meta.fork_chain = fullChain;
   }
+  fm.metadata = meta;
 
-  fs.writeFileSync(skillMdPath, content, "utf-8");
+  fs.writeFileSync(skillMdPath, matter.stringify(body, fm), "utf-8");
 
   // Track fork event via dynamic import to avoid bundling SQLite into CLI
   import("./analytics").then(({ logForkEvent }) => logForkEvent(sourceSlug, newSlug)).catch(() => {});

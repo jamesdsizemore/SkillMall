@@ -13,7 +13,6 @@ import type { LLMClient, ProviderConfig, ProviderID } from './types'
 export { ConfigError } from './types'
 export type { LLMClient, ProviderConfig, ProviderID, CompletionOptions } from './types'
 
-/** Create an LLMClient for the given provider config. */
 /** Create an LLMClient for the given provider configuration. */
 export function createLLMClient(config: ProviderConfig): LLMClient {
   switch (config.provider) {
@@ -35,11 +34,6 @@ export function createLLMClient(config: ProviderConfig): LLMClient {
 }
 
 /**
- * Resolve provider config from environment variables or ~/.skill-mall/config.json.
- * Resolution order: env vars → ~/.skill-mall/config.json
- * Throws ConfigError if no provider is configured.
- */
-/**
  * Resolve provider config from env vars or ~/.skill-mall/config.json.
  * Resolution order: SKILL_MALL_PROVIDER env var → config file.
  * Throws ConfigError if no provider is configured.
@@ -59,13 +53,20 @@ export function resolveProviderConfig(): ProviderConfig {
 
   const configPath = path.join(os.homedir(), '.skill-mall', 'config.json')
   if (fs.existsSync(configPath)) {
-    const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    let raw: Record<string, unknown>
+    try {
+      raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    } catch {
+      throw new ConfigError(
+        `~/.skill-mall/config.json is malformed JSON. Run: npx skill-mall configure`
+      )
+    }
     const provider = raw.provider as ProviderID
-    const providerSection = raw.providers?.[provider] ?? {}
+    const providerSection = (raw.providers as Record<string, Record<string, unknown>> | undefined)?.[provider] ?? {}
     return {
       provider,
-      apiKey: raw.apiKey ?? providerSection.apiKey,
-      model: raw.model ?? providerSection.model ?? DEFAULT_MODELS[provider],
+      apiKey: (raw.apiKey ?? providerSection.apiKey) as string | undefined,
+      model: (raw.model ?? providerSection.model ?? DEFAULT_MODELS[provider]) as string,
     }
   }
 

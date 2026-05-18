@@ -106,7 +106,8 @@ function parseSkill(filePath: string): Skill | null {
       hasSamples,
       skills_sh_id: meta["skills_sh_id"] ? String(meta["skills_sh_id"]) : null,
     };
-  } catch {
+  } catch (err) {
+    console.error(`[skill-catalog] failed to parse ${filePath}:`, err)
     return null;
   }
 }

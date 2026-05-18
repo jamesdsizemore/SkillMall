@@ -144,7 +144,11 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
     const slug = String(params.slug ?? "");
     const agentId = params.agent ? String(params.agent) : undefined;
 
-    const [cat, skillName] = slug.includes("/") ? slug.split("/") : ["", slug];
+    const parts = slug.split("/");
+    if (slug.includes("/") && parts.length !== 2) {
+      return { error: "slug must be in category/slug format (e.g. ai/my-skill)", success: false };
+    }
+    const [cat, skillName] = slug.includes("/") ? parts : ["", slug];
     const skillDir = path.join(process.cwd(), "skills", cat, skillName);
 
     if (!fs.existsSync(skillDir)) {

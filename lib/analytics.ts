@@ -5,11 +5,9 @@ import type { AgentType } from "./db/types";
 export function logSearchClickEvent(query: string, skillSlug: string): void {
   try {
     const db = getDb();
-    // Re-use install_events table structure — log as a 'search-click' agent type
-    // This avoids a new migration while capturing the click signal
     db.prepare(
-      "INSERT INTO install_events (skill_slug, agent_type) VALUES (?, ?)"
-    ).run(skillSlug, `search-click:${query.slice(0, 64)}`);
+      "INSERT INTO search_clicks (skill_slug, query) VALUES (?, ?)"
+    ).run(skillSlug, query.slice(0, 64));
   } catch {
     // Non-fatal — analytics only
   }
@@ -31,7 +29,7 @@ export function logInstallEvent(skillSlug: string, agentType: AgentType): void {
 export function getInstallCount(skillSlug: string): number {
   const db = getDb();
   const row = db
-    .prepare("SELECT COUNT(*) as count FROM install_events WHERE skill_slug = ?")
+    .prepare("SELECT COUNT(*) as count FROM install_events WHERE skill_slug = ? AND agent_type NOT LIKE 'search-click:%'")
     .get(skillSlug) as { count: number };
   return row.count;
 }
@@ -41,7 +39,7 @@ export function getInstallVelocity7d(skillSlug: string): number {
   const db = getDb();
   const row = db
     .prepare(
-      "SELECT COUNT(*) as count FROM install_events WHERE skill_slug = ? AND installed_at > datetime('now', '-7 days')"
+      "SELECT COUNT(*) as count FROM install_events WHERE skill_slug = ? AND agent_type NOT LIKE 'search-click:%' AND installed_at > datetime('now', '-7 days')"
     )
     .get(skillSlug) as { count: number };
   return row.count;
@@ -57,6 +55,7 @@ export function getTrending7d(
       `SELECT skill_slug, COUNT(*) as velocity
        FROM install_events
        WHERE installed_at > datetime('now', '-7 days')
+         AND agent_type NOT LIKE 'search-click:%'
        GROUP BY skill_slug
        ORDER BY velocity DESC
        LIMIT ?`
@@ -79,6 +78,7 @@ export function getRising(): Array<{
         SUM(CASE WHEN installed_at BETWEEN datetime('now', '-14 days') AND datetime('now', '-7 days') THEN 1 ELSE 0 END) as prior
        FROM install_events
        WHERE installed_at > datetime('now', '-14 days')
+         AND agent_type NOT LIKE 'search-click:%'
        GROUP BY skill_slug
        HAVING recent > 0 AND prior > 0 AND (CAST(recent AS REAL) / prior) > 1.5
        ORDER BY (CAST(recent AS REAL) / prior) DESC
@@ -137,19 +137,19 @@ export function getTopByForkCount(limit = 10): Array<{ slug: string; forkCount: 
   }
 }
 
-/** Get High Quality skills: quality score > 90 AND effectiveness score > 4.5. */
+/**
+ * Get skills with effectiveness score above threshold.
+ * Note: quality scores are not yet persisted server-side; this filters by effectiveness only.
+ */
 export function getHighQualitySkills(
-  qualityThreshold = 90,
   effectivenessThreshold = 4.5
-): Array<{ slug: string; qualityScore: number; effectivenessScore: number }> {
+): Array<{ slug: string; effectivenessScore: number }> {
   try {
     const db = getDb();
-    // Join install_events quality approximation with reviews effectiveness
     const rows = db
       .prepare(
         `SELECT r.skill_slug,
-                AVG(r.effectiveness) as avg_effectiveness,
-                COUNT(r.id) as review_count
+                AVG(r.rating) as avg_effectiveness
          FROM reviews r
          GROUP BY r.skill_slug
          HAVING avg_effectiveness > ?`
@@ -157,11 +157,9 @@ export function getHighQualitySkills(
       .all(effectivenessThreshold) as Array<{
         skill_slug: string;
         avg_effectiveness: number;
-        review_count: number;
       }>;
     return rows.map(r => ({
       slug: r.skill_slug,
-      qualityScore: 95, // Placeholder until quality scores are persisted server-side
       effectivenessScore: Math.round(r.avg_effectiveness * 10) / 10,
     }));
   } catch {
@@ -181,30 +179,30 @@ export interface EffectivenessTrendPoint {
  */
 export function getEffectivenessTrend(skillSlug: string): EffectivenessTrendPoint[] {
   const db = getDb()
-  const points: EffectivenessTrendPoint[] = []
 
+  // Single query for all 30 days; missing days are filled in below.
+  const rows = db
+    .prepare(
+      `SELECT date(created_at) as day, AVG(rating) as avg_score
+       FROM reviews
+       WHERE skill_slug = ?
+         AND created_at >= datetime('now', '-30 days')
+       GROUP BY date(created_at)`
+    )
+    .all(skillSlug) as Array<{ day: string; avg_score: number | null }>
+
+  const scoreByDay = new Map(rows.map(r => [r.day, r.avg_score]))
+
+  const points: EffectivenessTrendPoint[] = []
   for (let daysAgo = 29; daysAgo >= 0; daysAgo--) {
     const date = new Date()
     date.setDate(date.getDate() - daysAgo)
-    const dateStr = date.toISOString().slice(0, 10) // YYYY-MM-DD
-
-    try {
-      const row = db
-        .prepare(
-          `SELECT AVG(effectiveness) as avg_score
-           FROM reviews
-           WHERE skill_slug = ?
-             AND date(created_at) = ?`
-        )
-        .get(skillSlug, dateStr) as { avg_score: number | null } | undefined
-
-      points.push({
-        date: dateStr,
-        averageScore: row?.avg_score != null ? Math.round(row.avg_score * 10) / 10 : null,
-      })
-    } catch {
-      points.push({ date: dateStr, averageScore: null })
-    }
+    const dateStr = date.toISOString().slice(0, 10)
+    const score = scoreByDay.get(dateStr) ?? null
+    points.push({
+      date: dateStr,
+      averageScore: score != null ? Math.round(score * 10) / 10 : null,
+    })
   }
 
   return points
@@ -217,7 +215,7 @@ export function getInstallsByAgentType(skillSlug: string): Record<string, number
     .prepare(
       `SELECT agent_type, COUNT(*) as count
        FROM install_events
-       WHERE skill_slug = ?
+       WHERE skill_slug = ? AND agent_type NOT LIKE 'search-click:%'
        GROUP BY agent_type`
     )
     .all(skillSlug) as Array<{ agent_type: string; count: number }>;

@@ -34,7 +34,7 @@ export function hasInstallSignal(skillSlug: string): boolean {
   const db = getDb();
   const row = db
     .prepare(
-      "SELECT COUNT(*) as count FROM install_events WHERE skill_slug = ?"
+      "SELECT COUNT(*) as count FROM install_events WHERE skill_slug = ? AND agent_type NOT LIKE 'search-click:%'"
     )
     .get(skillSlug) as { count: number };
   return row.count > 0;

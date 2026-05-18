@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "OAuth failed";
-    return NextResponse.json({ error: "oauth_failed", message }, { status: 500 });
+    console.error("[auth] GitHub OAuth callback failed:", err);
+    return NextResponse.json({ error: "oauth_failed", message: "Authentication failed" }, { status: 500 });
   }
 }

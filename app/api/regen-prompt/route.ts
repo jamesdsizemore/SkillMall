@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers'
+import { getSession } from '@/lib/auth/github'
+import { getSkill } from '@/lib/skills'
 
 const SYSTEM_PROMPT =
   'You are a prompt engineering expert. You rewrite skill prompts using a new reasoning framework while preserving the original tool structure, artifact format, and output requirements. Return only the rewritten prompt body — no frontmatter, no markdown fences, no explanation.'
@@ -69,6 +71,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/regen-prompt — regenerate prompt with new framework
 export async function POST(req: NextRequest) {
+  const token = req.cookies.get('sm_session')?.value
+  const session = token ? getSession(token) : null
+  if (!session) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
   const body = await req.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
 
@@ -84,6 +92,15 @@ export async function POST(req: NextRequest) {
       { error: 'category, slug, promptFile, and framework are required' },
       { status: 400 }
     )
+  }
+
+  // Only the skill author may regenerate prompts
+  const skill = getSkill(category, slug)
+  if (!skill) {
+    return NextResponse.json({ error: `Skill not found: ${category}/${slug}` }, { status: 404 })
+  }
+  if (skill.author && skill.author !== session.github_login) {
+    return NextResponse.json({ error: 'Only the skill author can regenerate prompts' }, { status: 403 })
   }
 
   // Security: validate promptFile path stays within skill directory

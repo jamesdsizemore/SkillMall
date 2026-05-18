@@ -1,0 +1,105 @@
+goal:
+  title: "Full Codebase Review Fixes"
+  slug: codebase-review-fixes
+  status: active
+  created_at: "2026-05-18"
+  goal_file: docs/goals/codebase-review-fixes/goal.md
+  intake:
+    input_shape: existing_plan
+    authority: approved
+    proof_type: artifact + test
+  agents:
+    scout: bundled_not_installed
+    worker: bundled_not_installed
+    judge: bundled_not_installed
+
+tasks:
+  - id: T001
+    type: worker
+    assignee: Worker
+    status: active
+    objective: "Apply B1 (regen-prompt auth), B2 (fork-skill auth), B4 (versionMismatch inversion), R5 (GitHub timeouts), R6 (auth error leak), R11 (duplicate JSDoc), R12 (JSON.parse guard), R13 (MCP slug validation). Verify tsc and tests pass."
+    allowed_files:
+      - app/api/regen-prompt/route.ts
+      - app/api/fork-skill/route.ts
+      - lib/publish/npm.ts
+      - lib/auth/github.ts
+      - app/api/auth/callback/github/route.ts
+      - lib/providers/index.ts
+      - app/api/mcp/route.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Fix requires changes outside allowed_files."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Apply B3 (analytics: search_clicks migration + filter existing queries), R9 (30-query loop → single query), R10 (getHighQualitySkills qualityThreshold dead param + hardcoded 95). Verify tsc and tests pass."
+    allowed_files:
+      - lib/analytics.ts
+      - db/migrations/005_search_clicks.sql
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Fix requires changing install_events schema (migration risk)."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Apply R7+R8 (forking.ts: replace regex-based name/frontmatter manipulation with gray-matter round-trip). Verify tsc and tests pass."
+    allowed_files:
+      - lib/forking.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "gray-matter stringify changes semantics in a way that breaks existing tests."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Apply S14 (db/client.ts migration TODO), S15 (skills.ts silent error → console.error), S16 (db/client.ts WAL TODO). Verify tsc and tests pass."
+    allowed_files:
+      - lib/db/client.ts
+      - lib/skills.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T005
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: "Audit: verify all 16 issues addressed (or explicitly deferred), tsc clean, tests pass, changes committed. full_outcome_complete."
+    inputs:
+      - "All T001-T004 receipts"
+      - "npx tsc --noEmit"
+      - "npm test output"
+      - "git diff --stat"
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+    receipt: null
