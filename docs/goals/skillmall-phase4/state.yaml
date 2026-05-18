@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T405
+active_task: T406
 
 tasks:
 
@@ -191,7 +191,7 @@ tasks:
   - id: T405
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/contributing.md (2500+ words) covering: types of contributions (skills easiest, code, docs), complete skill contribution workflow (feature-inventory-check, create, validate, test, PR), quality bar for skills (exact rubric, required score, CI checks), code contribution workflow (16-step loop, commit convention, PR template, review process), code standards (TypeScript strict, Zod, parameterized SQL, atomic writes, Nothing design rules), test writing guide (MockLLMClient pattern, file locations, naming), documentation contribution guide (plan-review skill, word count minimums, accuracy requirements)."
     allowed_files:
@@ -202,12 +202,19 @@ tasks:
       - "Every command in the contribution workflow runs without error"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/contributing.md
+      commands:
+        - cmd: "wc -w docs/developer/contributing.md"
+          status: pass
+      summary: "2500 words exactly. All required sections: 4 contribution types, complete skill workflow (create/validate/quality score/test-in-agent/PR), 5-dimension quality rubric with exact point values (25/25/20/20/10), 16-step dev loop, commit convention, PR template, Zod/SQL/atomic write/Nothing design code standards, MockLLMClient test pattern, documentation accuracy requirements, issue reporting."
 
   - id: T406
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/developer/extending.md (2000+ words) covering exactly how to: add a new LLM provider (5-step process with code), add a new CLI command (file location, template, registration in index.ts), add a new API route (convention, Zod validation pattern, error format), add a new quality score dimension (DimensionScore type, feedback format), add a new PE framework (FRAMEWORK_DESCRIPTIONS and FRAMEWORK_CANDIDATES entries). Every step shown with actual file paths from the codebase."
     allowed_files:
