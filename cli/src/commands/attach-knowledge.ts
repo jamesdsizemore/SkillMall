@@ -3,7 +3,13 @@ import path from 'node:path'
 import * as p from '@clack/prompts'
 import { requireRepoRoot, pc } from '../utils.js'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers/index.js'
-import { createKnowledgeBase, attachKnowledge } from '@/lib/rag/knowledge-base.js'
+
+// Dynamic import to prevent better-sqlite3 (CJS) from loading at CLI startup,
+// which crashes all commands regardless of which one is being run.
+async function getRagModules() {
+  const { createKnowledgeBase, attachKnowledge } = await import('@/lib/rag/knowledge-base.js')
+  return { createKnowledgeBase, attachKnowledge }
+}
 
 export async function attachKnowledgeCommand(args: string[]): Promise<void> {
   const [skillArg, sourceDir] = args.filter(a => !a.startsWith('--'))
@@ -22,7 +28,7 @@ export async function attachKnowledgeCommand(args: string[]): Promise<void> {
     process.exit(1)
   }
 
-  // Validate category/slug format — reject paths with more than 2 segments
+  // Validate category/slug format
   const parts = skillArg.split('/')
   if (parts.length > 2) {
     process.stderr.write(pc.red(`Invalid skill path: "${skillArg}". Expected <category>/<slug> or <slug>.\n`))
@@ -62,6 +68,7 @@ export async function attachKnowledgeCommand(args: string[]): Promise<void> {
   spinner.start('Chunking files and generating embeddings...')
 
   try {
+    const { createKnowledgeBase, attachKnowledge } = await getRagModules()
     const kbId = createKnowledgeBase(slug, resolvedDir, config.provider)
     const { chunksAdded } = await attachKnowledge(kbId, resolvedDir, client)
     spinner.stop(`Done — ${chunksAdded} chunk${chunksAdded !== 1 ? 's' : ''} embedded`)
