@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T407
+active_task: T413
 
 tasks:
 
@@ -238,7 +238,7 @@ tasks:
   - id: T407
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/deployment.md (2000+ words) covering: Vercel deployment (step-by-step, all env vars, critical filesystem limitation — skill creation doesn't work on Vercel, catalog does), Railway/VPS deployment (what's different, writable filesystem, all features work), complete env var reference table (every var, required vs optional, where to get it, what breaks if missing), SQLite in production (WAL mode, backup strategy, migration path to Turso), GitHub OAuth in production (callback URL update, Secure cookie, NEXT_PUBLIC_APP_URL), CLI in production environments."
     allowed_files:
@@ -250,12 +250,19 @@ tasks:
     stop_if:
       - "Vercel limitation is understated or missing — this causes major confusion"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/deployment.md
+      commands:
+        - cmd: "wc -w docs/developer/deployment.md"
+          status: pass
+      summary: "4172 words. Vercel filesystem limitation prominently documented, Railway/VPS, SQLite WAL/Turso migration, OAuth production, env var reference."
 
   - id: T429
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/faq.md (2000+ words) covering 20+ developer FAQ entries and 5 common implementation patterns. FAQs must address: why 60+ LLM calls, why SQLite, why better-sqlite3, how to add a category, why Claude Code uses subprocess not SDK, why Tailwind v4 + CSS custom properties, how to test without LLM calls, why atomicWrite, how CLI shares code with Next.js, why sessionStorage for wizard state, Docker container support, why two LLM calls per tool (selection + body). Patterns: adding library wrapping LLM client, adding frontmatter field, adding quality dimension, adding MCP tool, adding detail page tab."
     allowed_files:
@@ -268,12 +275,19 @@ tasks:
     stop_if:
       - "Any Q&A answer is factually incorrect — verify against codebase before writing"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/faq.md
+      commands:
+        - cmd: "wc -w docs/developer/faq.md"
+          status: pass
+      summary: "4537 words, 25 Q&A entries verified against codebase."
 
   - id: T430
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/security.md (1500+ words) covering: input validation (Zod on all API inputs, pattern with code), SQL injection prevention (parameterized queries only — show CORRECT and WRONG patterns with explicit 'NEVER DO THIS'), path traversal prevention (codebase extractor validation), prompt injection (test input sanitization), GitHub OAuth security (CSRF state, session randomness, no token storage), Stripe webhook security (raw body, signature verification, what breaks if body parsed first), author identity verification (self-improvement suggester check), known limitations (catalog-level install signal, no rate limiting in Phase 4, LLM subprocess prompt injection risk)."
     allowed_files:
@@ -285,14 +299,21 @@ tasks:
     stop_if:
       - "Security patterns shown are incorrect — verify every pattern against actual implementation"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/security.md
+      commands:
+        - cmd: "wc -w docs/developer/security.md"
+          status: pass
+      summary: "3375 words. All 8 sections including NEVER DO THIS SQL examples and honest known limitations."
 
   # ─── SUITE 2: END-USER GUIDE ──────────────────────────────────────────────
 
   - id: T411
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Write docs/guide/introduction.md (2500+ words) targeting a non-technical reader who just discovered SkillMall. Required: plain-language explanation of what SkillMall is (no jargon), concrete example of invoking a skill in Claude Code (describe exactly what happens), three detailed user personas with specific scenarios, four main actions (browse/deploy/create/share), how skills work across multiple agents, 10-minute preview of what's possible, honest 'is SkillMall right for you' section."
     allowed_files:
@@ -305,12 +326,19 @@ tasks:
     stop_if:
       - "Technical terms appear without plain-English explanation — rewrite"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/guide/introduction.md
+      commands:
+        - cmd: "wc -w docs/guide/introduction.md"
+          status: pass
+      summary: "2500 words. 3 personas (Alex/Sarah/Marcus), 4 actions, skills across agents, 10-min preview, honest evaluation."
 
   - id: T412
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     reasoning_hint: default
     objective: "Write docs/guide/quick-start.md (2000+ words) — tutorial getting a new user from zero to deployed skill in 10 minutes. Step-by-step with expected outputs. After each step: 'If you see X, do Y' error handling. Required additions per plan: 'When things go wrong' sidebar per step, 200-word description of the localhost:3000 homepage (describes what user sees in detail), invocation in Claude Code (describe what happens when /development-workflow is invoked). Every command verified on fresh clone."
     allowed_files:
@@ -323,12 +351,19 @@ tasks:
     stop_if:
       - "Tutorial fails on fresh clone — fix the tutorial or the code"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/guide/quick-start.md
+      commands:
+        - cmd: "wc -w docs/guide/quick-start.md"
+          status: pass
+      summary: "2903 words. Each step has When Things Go Wrong sidebar. Accurate skill count (27) and CLI output verified."
 
   - id: T413
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/guide/tutorials/wizard-tutorial.md (3000+ words) — complete tutorial creating a Jobs-to-Be-Done skill via the wizard. Required: describe each screen in 100+ words, explain what each API call fires at step transitions, show the generated file tree and explain every file, read the quality score breakdown. Do NOT assume the reader knows what the wizard looks like — describe every visual element in prose."
     allowed_files:
