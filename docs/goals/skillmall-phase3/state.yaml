@@ -1,0 +1,320 @@
+# GoalBuddy v2 state.yaml — SkillMall Phase 3
+
+version: 2
+
+goal:
+  title: "SkillMall Phase 3 — Advanced Capabilities"
+  slug: skillmall-phase3
+  kind: existing_plan
+  tranche: "Build chains (React Flow canvas), RAG (SQLite-VSS), self-improvement loop (feedback + LLM suggestions + approval gate), marketplace (Stripe + code-gated launch conditions). T201-T205 start immediately. T206/T207 marketplace visible only when checkMarketplaceReady() passes."
+  status: active
+  intake:
+    original_request: "Build SkillMall Phase 3 from docs/superpowers/plans/PHASE-3-PLAN.md"
+    interpreted_outcome: "Chains, RAG, self-improvement loop, and marketplace (code-gated) all built and working. Marketplace hidden behind runtime gate until launch conditions met — gate enforces itself, not us."
+    input_shape: existing_plan
+    audience: "James Sizemore — project owner"
+    authority: approved
+    proof_type: demo
+    completion_proof: "Chain created via canvas, RAG embeds and retrieves, feedback triggers suggestions, approval gate prevents auto-writes, marketplace gate returns correct ready:false, all Phase 3 docs >= 500 words"
+    likely_misfire: "Blocking T201-T205 on marketplace launch conditions. Building marketplace without the code gate. Implementing Stripe before checkMarketplaceReady() is wired up."
+    blind_spots_considered:
+      - "sqlite-vss is a native extension — may require node-gyp, same as better-sqlite3; test loadExtension() before writing any RAG code"
+      - "React Flow requires client-side only — ChainCanvas must be 'use client' and dynamically imported to avoid SSR issues"
+      - "Stripe webhook requires raw body (bodyParser: false) — this is easy to get wrong and breaks signature verification silently"
+      - "Claude Code CLI does not support embeddings — users need SKILL_MALL_EMBEDDING_PROVIDER separate from main provider for RAG"
+      - "Self-improvement applier writes to disk — must verify author identity before applying any suggestion (session.github_login === skill.author)"
+      - "Marketplace launch conditions are code-enforced, not honor-system — checkMarketplaceReady() gates the entire marketplace UI and API"
+    existing_plan_facts:
+      - "Full plan: docs/superpowers/plans/PHASE-3-PLAN.md — 58KB, all implementation embedded"
+      - "React Flow canvas: ChainCanvas.tsx + ChainEdgeConfig.tsx — full component code in plan"
+      - "chain.json format: name, slug, steps[{order, skillSlug, usesOutput, passesAs, namedVariable, instructions}]"
+      - "RAG: better-sqlite3 + sqlite-vss extension loaded via db.loadExtension(). Per-provider embedding: openai uses text-embedding-3-small, ollama uses nomic-embed-text, claude-code not supported"
+      - "Self-improvement: skill_feedback table (satisfaction 1-5, body 200 chars), improvement_suggestions table (status: pending/approved/rejected), applier uses LLM to generate edit + bumps version"
+      - "Author verification: ALWAYS check session.github_login === skill.author before applying any suggestion"
+      - "Marketplace gate: checkMarketplaceReady() checks 4 conditions: catalog>=200, community>=500, ratings>=3months, skillsWithTests>=50"
+      - "Stripe: STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET in .env.local. Webhook MUST use arrayBuffer + Buffer.from for raw body. MUST add export const config = {api: {bodyParser: false}}"
+      - "Phase 3 SQLite migration: db/migrations/002_phase3.sql — skill_feedback, improvement_suggestions, knowledge_bases, knowledge_chunks, purchases, skill_tiers tables"
+      - "Development workflow: 16 steps per task. Security check mandatory for every Phase 3 task."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: bundled_not_installed
+  worker: bundled_not_installed
+  judge: bundled_not_installed
+
+visual_board:
+  selected: local
+  local:
+    status: starting
+    url: null
+    command: "npx goalbuddy board /Users/jamesdsizemore/Developer/skill-mall/docs/goals/skillmall-phase3"
+  github_projects:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy extend github-projects"
+    missing: []
+
+active_task: T201
+
+tasks:
+
+  # ─── FOUNDATION — SQLite Phase 3 migration ────────────────────────────────
+
+  - id: T201
+    type: worker
+    assignee: Worker
+    status: active
+    reasoning_hint: default
+    objective: "Install reactflow, stripe, @stripe/stripe-js. Attempt to install sqlite-vss (stop and report if loadExtension fails). Write db/migrations/002_phase3.sql with all 6 Phase 3 tables. Apply migration. Add STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET to .env.local template."
+    allowed_files:
+      - db/migrations/002_phase3.sql
+      - package.json
+      - .env.local
+      - lib/db/types.ts
+      - lib/marketplace/gate.ts
+    verify:
+      - "npm install reactflow stripe @stripe/stripe-js exits 0"
+      - "npm run db:migrate exits 0 and creates all 6 new tables"
+      - "npm run build exits 0"
+      - "npx tsc --noEmit exits 0"
+      - "node -e \"const db = require('better-sqlite3')('./data/skillmall.db'); console.log(db.prepare('SELECT name FROM sqlite_master WHERE type=table').all().map(r=>r.name).join(','))\" shows all Phase 3 tables"
+    stop_if:
+      - "sqlite-vss loadExtension() throws — report the error and Node.js version before continuing; RAG (T203) will be blocked until resolved but T201-T202 and T204-T207 can proceed"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── SKILL CHAIN BUILDER ──────────────────────────────────────────────────
+
+  - id: T202
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Build the Skill Chain Builder: React Flow canvas at /skills/chains/new (ChainCanvas.tsx + ChainEdgeConfig.tsx from plan), lib/chains.ts (buildChainDirectory), POST /api/create-chain, GET /api/chains, GET /api/chains/[slug]. Chain SKILL.md validates against AgentSkills spec."
+    allowed_files:
+      - app/skills/chains/new/page.tsx
+      - components/skill-mall/chains/ChainCanvas.tsx
+      - components/skill-mall/chains/ChainEdgeConfig.tsx
+      - lib/chains.ts
+      - lib/__tests__/chains.test.ts
+      - app/api/chains/route.ts
+      - app/api/chains/[slug]/route.ts
+      - app/api/create-chain/route.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/chains all pass"
+      - "buildChainDirectory with 2 steps produces SKILL.md with chain: true frontmatter (test)"
+      - "validateSkillDirectory on chain SKILL.md returns valid: true (test)"
+      - "GET /api/chains returns array (smoke test)"
+      - "/skills/chains/new renders React Flow canvas (smoke test — no SSR error)"
+    stop_if:
+      - "React Flow causes SSR error — add dynamic import with ssr: false before continuing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── RAG-ENHANCED SKILLS ─────────────────────────────────────────────────
+
+  - id: T203
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement RAG knowledge attachment: lib/rag/embeddings.ts (generateEmbedding for openai/ollama/gemini — claude-code not supported), lib/rag/chunker.ts (chunkText 512 tokens, extractText), lib/rag/knowledge-base.ts (createKnowledgeBase, attachKnowledge, retrieveChunks via VSS), CLI attach-knowledge command, POST /api/retrieve route."
+    allowed_files:
+      - lib/rag/embeddings.ts
+      - lib/rag/chunker.ts
+      - lib/rag/knowledge-base.ts
+      - lib/__tests__/rag.test.ts
+      - app/api/retrieve/route.ts
+      - cli/src/commands/attach-knowledge.ts
+      - cli/src/index.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/rag all pass (mocked embeddings)"
+      - "chunkText with 1000-word text produces chunks ~380 words each (test)"
+      - "generateEmbedding with claude-code provider throws with helpful error (test)"
+      - "cd cli && npm run build exits 0"
+    stop_if:
+      - "sqlite-vss loadExtension() fails — block T203 with receipt explaining the error; do not attempt workaround; report"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── SELF-IMPROVEMENT LOOP ───────────────────────────────────────────────
+
+  - id: T204
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement feedback collection: lib/self-improvement/feedback.ts (createFeedback, getFeedbackCount, getRecentFeedback), POST /api/feedback route (auth required), feedback form on skill detail page (satisfaction 1-5 + 200-char text, opt-in, never auto-prompted), trigger analysis at 10+ submissions."
+    allowed_files:
+      - lib/self-improvement/feedback.ts
+      - lib/__tests__/feedback.test.ts
+      - app/api/feedback/route.ts
+      - app/skills/[category]/[slug]/page.tsx
+      - components/skill-mall/improvements/FeedbackForm.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/feedback all pass"
+      - "POST /api/feedback without session cookie -> 401"
+      - "POST /api/feedback with body > 200 chars -> 400"
+      - "Feedback form renders on skill detail page (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T205
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement self-improvement suggestion generation and approval: lib/self-improvement/analyzer.ts (analyzeFeedback LLM call), lib/self-improvement/applier.ts (applySuggestion — LLM edit + version bump), POST/GET /api/improvements routes, suggestion review UI at /skills/[category]/[slug]/improvements. CRITICAL: verify session.github_login === skill.author before applying any suggestion."
+    allowed_files:
+      - lib/self-improvement/analyzer.ts
+      - lib/self-improvement/applier.ts
+      - lib/__tests__/self-improvement.test.ts
+      - app/api/improvements/[skillSlug]/route.ts
+      - app/api/improvements/[id]/approve/route.ts
+      - app/api/improvements/[id]/reject/route.ts
+      - app/skills/[category]/[slug]/improvements/page.tsx
+      - components/skill-mall/improvements/SuggestionCard.tsx
+      - components/skill-mall/improvements/SuggestionList.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/self-improvement all pass"
+      - "Approving suggestion as non-author returns 403 (test)"
+      - "bumpVersion('1.2.3', 'patch') returns '1.2.4' (test)"
+      - "applySuggestion writes file and bumps version (mocked LLM test)"
+      - "No automatic writes ever happen without author approval (test)"
+    stop_if:
+      - "applySuggestion does not verify author identity — fix before continuing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── MARKETPLACE ─────────────────────────────────────────────────────────
+
+  - id: T206
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement marketplace gate and tier system: lib/marketplace/gate.ts (checkMarketplaceReady — 4 conditions, returns ready:false with current counts until all met), skill_tiers table queries, GET /api/marketplace/status route, marketplace UI visible ONLY when checkMarketplaceReady() returns ready:true, TierBadge component, PremiumTeaser page for locked premium skills."
+    allowed_files:
+      - lib/marketplace/gate.ts
+      - lib/marketplace/entitlement.ts
+      - lib/__tests__/marketplace.test.ts
+      - app/api/marketplace/status/route.ts
+      - app/api/marketplace/entitlement/route.ts
+      - components/skill-mall/marketplace/TierBadge.tsx
+      - components/skill-mall/marketplace/PremiumTeaser.tsx
+      - app/skills/[category]/[slug]/page.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/marketplace all pass"
+      - "checkMarketplaceReady() returns ready: false with current counts when conditions not met (test)"
+      - "checkMarketplaceReady() returns ready: true only when ALL 4 conditions pass (test)"
+      - "GET /api/marketplace/status returns correct ready: false with condition breakdown (smoke test)"
+      - "Marketplace UI does not render when ready: false (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T207
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Stripe payment integration: lib/marketplace/payments.ts (createCheckoutSession, handleWebhook with signature verification), POST /api/marketplace/checkout, POST /api/webhooks/stripe (bodyParser: false, MUST verify Stripe-Signature header), GET /api/marketplace/entitlement. Stripe test mode only — live mode gated on marketplace launch conditions."
+    allowed_files:
+      - lib/marketplace/payments.ts
+      - app/api/marketplace/checkout/route.ts
+      - app/api/webhooks/stripe/route.ts
+      - app/api/marketplace/entitlement/route.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "POST /api/webhooks/stripe with invalid Stripe-Signature -> 400 (never processes payload)"
+      - "POST /api/marketplace/checkout returns checkoutUrl string (smoke test with Stripe test key)"
+      - "Webhook with valid signature stores purchase in SQLite (test with Stripe CLI stripe listen)"
+    stop_if:
+      - "STRIPE_SECRET_KEY not in .env.local — add it before continuing"
+      - "export const config = {api: {bodyParser: false}} missing from webhook route — add it before any other code"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── DOCUMENTATION ────────────────────────────────────────────────────────
+
+  - id: T208
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write all 5 Phase 3 documentation files, each >= 500 words: docs/user/skill-chains.md (canvas walkthrough, chain.json format, chain SKILL.md spec), docs/user/rag-enhanced-skills.md (provider embedding support matrix, attach-knowledge CLI, /api/retrieve usage), docs/user/self-improvement-loop.md (feedback submission, suggestion generation, approval workflow), docs/user/marketplace.md (3 tiers, revenue split, launch conditions, Stripe test mode), docs/reference/chain-format.md (chain SKILL.md frontmatter + chain.json spec)."
+    allowed_files:
+      - docs/user/skill-chains.md
+      - docs/user/rag-enhanced-skills.md
+      - docs/user/self-improvement-loop.md
+      - docs/user/marketplace.md
+      - docs/reference/chain-format.md
+    verify:
+      - "All 5 files exist"
+      - "wc -w docs/user/skill-chains.md >= 500 each file"
+      - "docs/reference/chain-format.md contains chain.json schema example"
+    stop_if:
+      - "A doc describes an interface that does not match implementation — fix the discrepancy before closing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── COMPLETION AUDIT ────────────────────────────────────────────────────
+
+  - id: T209
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit whether Phase 3 is complete: T201-T208 all done, build passing, tests passing, TypeScript clean, chains create valid SKILL.md, RAG embeds and retrieves, self-improvement approval gate works, marketplace gate enforces itself, docs complete."
+    inputs:
+      - "All T201-T208 receipts"
+      - "npm run build output"
+      - "npm test output"
+      - "npx tsc --noEmit output"
+      - "GET /api/marketplace/status output"
+      - "Word counts on all 5 T208 doc files"
+    constraints:
+      - "Do not mark complete if any Worker task is queued or active"
+      - "Do not mark complete if marketplace UI renders when checkMarketplaceReady() returns false"
+      - "Do not mark complete if any Phase 3 doc is < 500 words"
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "If not_complete: exact list of what is missing"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
