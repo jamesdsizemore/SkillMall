@@ -7,14 +7,24 @@ type Props = {
   skill: Skill;
   index?: number;
   qualityScore?: number;
+  searchQuery?: string;
 };
 
-export function SkillCard({ skill, index = 0, qualityScore }: Props) {
+export function SkillCard({ skill, index = 0, qualityScore, searchQuery }: Props) {
   const fillPercent = qualityScore ?? 0;
+
+  const handleClick = () => {
+    if (searchQuery) {
+      // Fire-and-forget search click-through event via MCP analytics side-channel
+      const url = `/api/mcp?event=search_click&query=${encodeURIComponent(searchQuery)}&slug=${encodeURIComponent(skill.slug)}`;
+      fetch(url).catch(() => undefined);
+    }
+  };
 
   return (
     <Link
       href={`/skills/${skill.category}/${skill.slug}`}
+      onClick={handleClick}
       className="group block border border-sm-border bg-sm-surface transition-colors hover:border-sm-display"
       style={{
         animationDelay: `${index * 60}ms`,

@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T265
+active_task: T266
 
 tasks:
 
@@ -509,7 +509,7 @@ tasks:
   - id: T265
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Add missing MCP tools: get_prompts(category, slug) returns prompt files list; deploy_skill(slug, agent, scope) calls deployToAgents() and returns per-agent status. Add these to the tools array in /api/mcp and the handleTool() switch. Also add search click-through tracking to lib/analytics.ts (logSearchClickEvent) and wire it when a skill card in search results is clicked."
     allowed_files:
@@ -526,12 +526,24 @@ tasks:
       - "POST /api/mcp with deploy_skill tool calls detection and returns status (smoke test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - app/api/mcp/route.ts
+        - lib/analytics.ts
+        - components/skill-mall/skill-card.tsx
+        - app/page.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+      summary: "MCP route now has 5 tools: search_skills, get_skill, list_categories, get_prompts, deploy_skill. get_prompts returns prompt file list from resources/prompts/. deploy_skill checks filesystem writability before attempting (returns clear 503-style error if read-only), calls deployToAgents(), returns per-agent status. Analytics: logSearchClickEvent() in analytics.ts. MCP GET endpoint handles search_click event via query params as analytics side-channel. SkillCard passes searchQuery and fires click beacon. page.tsx passes q search param."
 
   - id: T266
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Add missing Trending views and analytics tracking. Add Community Favorites view (top skills by fork count — requires tracking forks in install_events or a separate fork_events table). Add High Quality view (quality score > 90 AND effectiveness score > 4.5). Add fork count tracking to forkSkill() in lib/forking.ts. Add Forked X times count display on skill detail page sidebar."
     allowed_files:

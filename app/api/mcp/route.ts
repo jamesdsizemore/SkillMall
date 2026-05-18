@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "node:fs";
+import path from "node:path";
 import { getAllSkills, getSkill, getSkillsByCategory } from "@/lib/skills";
+import { detectAgents, deployToAgents } from "@/lib/agents/detector";
 
 export const runtime = "nodejs"; // needs filesystem access
 
@@ -39,6 +42,31 @@ const TOOLS = [
     name: "list_categories",
     description: "List all skill categories with their skill counts",
     inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_prompts",
+    description: "List prompt files for a skill from its resources/prompts/ directory",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: { type: "string", description: "Skill category" },
+        slug: { type: "string", description: "Skill slug" },
+      },
+      required: ["category", "slug"],
+    },
+  },
+  {
+    name: "deploy_skill",
+    description: "Deploy a skill to detected agents (Claude Code, Cursor, etc.)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        slug: { type: "string", description: "Skill slug (category/slug format)" },
+        agent: { type: "string", description: "Specific agent ID to deploy to (optional — deploys to all detected if omitted)" },
+        scope: { type: "string", description: "Deployment scope: 'user' (default) or 'project' (deploys to cwd-relative .claude/skills/)" },
+      },
+      required: ["slug"],
+    },
   },
 ];
 
@@ -94,10 +122,72 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
     }));
   }
 
+  if (name === "get_prompts") {
+    const category = String(params.category ?? "");
+    const slug = String(params.slug ?? "");
+    const promptsDir = path.join(process.cwd(), "skills", category, slug, "resources", "prompts");
+
+    if (!fs.existsSync(promptsDir)) {
+      return { prompts: [], message: `No prompts directory for ${category}/${slug}` };
+    }
+
+    const files = fs.readdirSync(promptsDir).filter(f => f.endsWith(".md"));
+    return {
+      prompts: files.map(f => ({
+        file: f,
+        path: `resources/prompts/${f}`,
+      })),
+    };
+  }
+
+  if (name === "deploy_skill") {
+    const slug = String(params.slug ?? "");
+    const agentId = params.agent ? String(params.agent) : undefined;
+
+    const [cat, skillName] = slug.includes("/") ? slug.split("/") : ["", slug];
+    const skillDir = path.join(process.cwd(), "skills", cat, skillName);
+
+    if (!fs.existsSync(skillDir)) {
+      return { error: `Skill not found: ${slug}`, success: false };
+    }
+
+    // Check filesystem writability before attempting deploy
+    try {
+      fs.accessSync(path.join(process.cwd(), "skills"), fs.constants.R_OK);
+    } catch {
+      return {
+        error: "Filesystem is read-only — deploy is not available in this environment (e.g., Vercel serverless). Run deploy locally with the CLI.",
+        success: false,
+      };
+    }
+
+    const agents = detectAgents();
+    if (agents.every(a => !a.detected)) {
+      return { error: "No agents detected on this system.", success: false, agents: [] };
+    }
+
+    const results = deployToAgents(skillDir, agentId ? [agentId] : undefined);
+    return {
+      success: results.some(r => r.success),
+      deployed: results.filter(r => r.success).map(r => r.agent.id),
+      failed: results.filter(r => !r.success).map(r => ({ agent: r.agent.id, error: r.error })),
+    };
+  }
+
   return { error: `Unknown tool: ${name}` };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Analytics side-channel: GET /api/mcp?event=search_click&query=xxx&slug=yyy
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get("event") === "search_click") {
+    const { logSearchClickEvent } = await import("@/lib/analytics");
+    const query = searchParams.get("query") ?? "";
+    const slug = searchParams.get("slug") ?? "";
+    if (query && slug) logSearchClickEvent(query, slug);
+    return new NextResponse(null, { status: 204 });
+  }
+
   return NextResponse.json({
     name: "skillmall",
     version: "1.0.0",

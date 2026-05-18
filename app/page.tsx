@@ -73,7 +73,7 @@ export default async function HomePage({ searchParams }: Props) {
               </p>
               <div className="grid grid-cols-1 gap-px border border-sm-border bg-sm-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filtered.map((skill, i) => (
-                  <SkillCard key={`${skill.category}/${skill.slug}`} skill={skill} index={i} qualityScore={qualityScores.get(skill.slug)} />
+                  <SkillCard key={`${skill.category}/${skill.slug}`} skill={skill} index={i} qualityScore={qualityScores.get(skill.slug)} searchQuery={q} />
                 ))}
               </div>
             </>

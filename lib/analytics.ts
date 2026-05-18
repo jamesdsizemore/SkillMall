@@ -1,6 +1,20 @@
 import { getDb } from "./db/client";
 import type { AgentType } from "./db/types";
 
+/** Log a search result click-through event. Zero PII — query + skill slug only. */
+export function logSearchClickEvent(query: string, skillSlug: string): void {
+  try {
+    const db = getDb();
+    // Re-use install_events table structure — log as a 'search-click' agent type
+    // This avoids a new migration while capturing the click signal
+    db.prepare(
+      "INSERT INTO install_events (skill_slug, agent_type) VALUES (?, ?)"
+    ).run(skillSlug, `search-click:${query.slice(0, 64)}`);
+  } catch {
+    // Non-fatal — analytics only
+  }
+}
+
 /** Log a skill installation event. Zero PII — skill slug + agent type only. */
 export function logInstallEvent(skillSlug: string, agentType: AgentType): void {
   try {
