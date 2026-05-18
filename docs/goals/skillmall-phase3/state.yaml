@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T205
+active_task: T206
 
 tasks:
 
@@ -1015,7 +1015,7 @@ tasks:
   - id: T205
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement self-improvement suggestion generation and approval: lib/self-improvement/analyzer.ts (analyzeFeedback LLM call), lib/self-improvement/applier.ts (applySuggestion — LLM edit + version bump), POST/GET /api/improvements routes, suggestion review UI at /skills/[category]/[slug]/improvements. CRITICAL: verify session.github_login === skill.author before applying any suggestion."
     allowed_files:
@@ -1039,14 +1039,33 @@ tasks:
     stop_if:
       - "applySuggestion does not verify author identity — fix before continuing"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/self-improvement/analyzer.ts
+        - lib/self-improvement/applier.ts
+        - lib/__tests__/self-improvement.test.ts
+        - app/api/improvements/[skillSlug]/route.ts
+        - app/api/improvements/[id]/approve/route.ts
+        - app/api/improvements/[id]/reject/route.ts
+        - app/skills/[category]/[slug]/improvements/page.tsx
+        - components/skill-mall/improvements/SuggestionCard.tsx
+        - components/skill-mall/improvements/SuggestionList.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/self-improvement"
+          status: pass
+      summary: "lib/self-improvement/analyzer.ts: analyzeFeedback() reads feedback, generates LLM improvement suggestion, inserts to improvement_suggestions. getSuggestions(), getPendingSuggestions(), rejectSuggestion(). lib/self-improvement/applier.ts: bumpVersion() (patch/minor/major), applySuggestion() ALWAYS verifies session.github_login === skill.author (returns Forbidden error immediately otherwise, no LLM call, no disk write). API: GET/POST /api/improvements/[skillSlug], POST /api/improvements/[id]/approve, POST /api/improvements/[id]/reject. /improvements page shows suggestions to author with Apply/Reject buttons. 8 tests passing including author verification and no-LLM-call-on-auth-failure."
 
   # ─── MARKETPLACE ─────────────────────────────────────────────────────────
 
   - id: T206
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement marketplace gate and tier system: lib/marketplace/gate.ts (checkMarketplaceReady — 4 conditions, returns ready:false with current counts until all met), skill_tiers table queries, GET /api/marketplace/status route, marketplace UI visible ONLY when checkMarketplaceReady() returns ready:true, TierBadge component, PremiumTeaser page for locked premium skills."
     allowed_files:
