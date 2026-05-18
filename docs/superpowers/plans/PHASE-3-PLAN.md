@@ -47,7 +47,7 @@ These files are modified by multiple tasks. They MUST be modified sequentially i
 | File | Tasks (in order) |
 |---|---|
 | `cli/src/index.ts` | T262 → T261 → T264 → T273 → T267 → T265 → T268 |
-| `components/skill-mall/skill-detail/SkillTabs.tsx` | T256 → T263/T261 (merged) → T252 |
+| `components/skill-mall/skill-detail/SkillTabs.tsx` | T252 (Budget tab) → T256 (locale) → T261 (Prompts + framework override) |
 | `app/skills/[category]/[slug]/page.tsx` | T261 → T266 → T271 → T256 |
 | `lib/analytics.ts` | T265 → T266 → T274 |
 | `.github/workflows/validate-skills.yml` | T255 → T268 |
