@@ -1,0 +1,24 @@
+{
+  "domain": "Content Strategy Planning",
+  "category": "writing",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username for the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: target-audience]",
+      "description": "Primary audience persona, e.g. 'senior software engineers at companies with 50-500 employees who are evaluating observability tools'"
+    },
+    {
+      "marker": "[FILL-IN: content-goal]",
+      "description": "Primary business goal for content, stated as a measurable outcome, e.g. 'generate 200 inbound demo requests per month from organic search'"
+    },
+    {
+      "marker": "[FILL-IN: publishing-cadence]",
+      "description": "Your publishing schedule, e.g. '2 long-form posts per month, 3 short posts per month, 1 case study per quarter'"
+    }
+  ],
+  "sourceReference": "https://contentmarketinginstitute.com/what-is-content-marketing/"
+}

@@ -1,0 +1,20 @@
+{
+  "domain": "Product Requirements Document (PRD) Writing",
+  "category": "business",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username for the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: success-metrics]",
+      "description": "The specific metrics you will use to measure success, e.g. '30-day retention rate ≥40%, NPS ≥50, activation rate ≥60%'"
+    },
+    {
+      "marker": "[FILL-IN: launch-date]",
+      "description": "Target launch date and any hard constraints, e.g. 'Q3 2025, must ship before annual conference'"
+    }
+  ],
+  "sourceReference": "https://www.svpg.com/product-vs-feature-teams/"
+}

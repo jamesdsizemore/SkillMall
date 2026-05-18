@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T251
+active_task: T252
 
 tasks:
 
@@ -93,7 +93,7 @@ tasks:
   - id: T251
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Create 20 Domain Starter Templates in skills/_starters/<domain>/. Each is 80% complete with real content and [fill-in] markers for domain-specific content. Implement CLI: npx skill-mall new --from-template <slug> <new-name> (copies to skills/<category>/<new-name>/). Add starter-config.json with domain, category, fill-in field descriptions."
     allowed_files:
@@ -111,12 +111,29 @@ tasks:
       - "A starter SKILL.md description is a placeholder or generic — every starter must have real, domain-specific content with only the user-specific fields marked [fill-in]"
       - "Content cannot be verified against a source — each starter README.md must cite the authoritative reference (e.g., 'Based on the Conventional Commits specification at conventionalcommits.org'). No citations = stop."
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - "skills/_starters/"
+        - "cli/src/commands/new.ts"
+        - "cli/src/index.ts"
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "bash scripts/validate-skill.sh skills/_starters/code-review"
+          status: pass
+        - cmd: "node cli/dist/index.js new --from-template code-review test-cr-del"
+          status: pass
+        - cmd: "ls skills/_starters/ | wc -l (shows 20)"
+          status: pass
+      summary: "Created 20 domain starter templates across development, writing, productivity, business, and research categories. Each has SKILL.md with real domain methodology, README.md with source citation, 2 blank artifact templates, and starter-config.json. Added --from-template flag to CLI: reads starter-config.json, copies to skills/<category>/<new-name>/, updates name field, removes starter-config.json, prints fill-in markers and source URL."
 
   - id: T252
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement Agent Budget Analyzer: lib/budget-analyzer.ts (per-agent budget simulation — at 10/20/30/50 installed skills, show what the agent reads, whether trigger phrase is preserved, and specific rewrite suggestions that fit all load levels). CLI: npx skill-mall budget-check <slug> --agent claude-code --installed 25. UI: Budget Analysis tab on skill detail page."
     allowed_files:

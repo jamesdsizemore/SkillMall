@@ -1,0 +1,20 @@
+{
+  "domain": "Pull Request Description Writer",
+  "category": "development",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: pr-template-url]",
+      "description": "URL to your team's PR template (e.g., https://github.com/your-org/repo/blob/main/.github/PULL_REQUEST_TEMPLATE.md)"
+    },
+    {
+      "marker": "[FILL-IN: review-checklist-items]",
+      "description": "Your team's standard PR checklist items (e.g., 'Tests added', 'Docs updated', 'Security reviewed')"
+    }
+  ],
+  "sourceReference": "https://www.conventionalcommits.org/en/v1.0.0/"
+}

@@ -1,0 +1,20 @@
+{
+  "domain": "User Story Mapping (Jeff Patton Method)",
+  "category": "productivity",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: persona-names]",
+      "description": "Your product's primary user personas (e.g., 'Admin, End User, Support Agent')"
+    },
+    {
+      "marker": "[FILL-IN: release-names]",
+      "description": "Your release naming convention (e.g., 'Walking Skeleton, v1.0, v1.1' or 'MVP, Phase 2, Phase 3')"
+    }
+  ],
+  "sourceReference": "https://jpattonassociates.com/user-story-mapping/"
+}

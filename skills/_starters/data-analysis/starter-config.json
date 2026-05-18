@@ -1,0 +1,20 @@
+{
+  "domain": "Tidy Data Analysis Workflow (Wickham 2014)",
+  "category": "research",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username for the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: data-source]",
+      "description": "Where your data lives, e.g. 'PostgreSQL production replica', 'Snowflake analytics.prod schema', or 'CSV exports from Amplitude'"
+    },
+    {
+      "marker": "[FILL-IN: analysis-tool]",
+      "description": "Your team's primary analysis tool, e.g. 'Python + pandas', 'R + tidyverse', 'SQL + dbt + Metabase', or 'Jupyter notebooks'"
+    }
+  ],
+  "sourceReference": "https://vita.had.co.nz/papers/tidy-data.html"
+}

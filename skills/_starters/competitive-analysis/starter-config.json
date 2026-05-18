@@ -1,0 +1,20 @@
+{
+  "domain": "Competitive Analysis (Porter's Five Forces)",
+  "category": "business",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: industry-name]",
+      "description": "The industry being analyzed (e.g., 'B2B SaaS developer tools', 'Consumer food delivery')"
+    },
+    {
+      "marker": "[FILL-IN: time-horizon]",
+      "description": "Analysis time horizon (e.g., 'Current state as of Q2 2026' or '3-year forward look')"
+    }
+  ],
+  "sourceReference": "https://hbsp.harvard.edu/product/9380-PDF-ENG"
+}

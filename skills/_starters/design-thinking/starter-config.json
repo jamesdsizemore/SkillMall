@@ -1,0 +1,20 @@
+{
+  "domain": "Design Thinking (Stanford d.school 5-Stage Process)",
+  "category": "research",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username for the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: problem-domain]",
+      "description": "The problem space you're applying design thinking to, e.g. 'reducing customer churn in the first 30 days' or 'improving developer onboarding'"
+    },
+    {
+      "marker": "[FILL-IN: research-participants]",
+      "description": "Who to recruit for user research and how many, e.g. '5-8 users who churned in the past 90 days' or '3-5 new hires from each onboarding cohort'"
+    }
+  ],
+  "sourceReference": "https://dschool.stanford.edu/resources"
+}

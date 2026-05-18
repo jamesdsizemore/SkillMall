@@ -1,0 +1,45 @@
+# Conventional Commit Template
+# Format: <type>[optional scope]: <description>
+# Types: feat | fix | docs | style | refactor | perf | test | chore | ci
+# Breaking change: add ! after type or BREAKING CHANGE: in footer
+
+<type>(<scope>): <description under 72 chars, imperative mood, no period>
+
+# Body (optional) — explain WHY, not WHAT. Wrap at 72 chars.
+# Leave blank line between subject and body.
+
+[body]
+
+# Footer (optional)
+# Breaking change:   BREAKING CHANGE: <what broke and migration path>
+# Close issue:       Closes #123
+# Co-author:         Co-authored-by: Name <email@example.com>
+
+[footer]
+
+# Examples:
+#
+# feat(auth): add OAuth2 login with Google and GitHub providers
+#
+# Replaces the custom SSO integration that required manual key rotation.
+# OAuth2 tokens auto-refresh, reducing the "session expired" error rate.
+#
+# Closes #412
+#
+# ---
+#
+# fix(api): return 404 instead of 500 for unknown resource IDs
+#
+# The /api/skills/:id endpoint was calling res.json() after a thrown
+# error in the database layer, causing an unhandled rejection logged
+# as a 500. Now catches NotFoundError and returns 404 explicitly.
+#
+# Closes #389
+#
+# ---
+#
+# feat!: remove support for Node.js 16
+#
+# BREAKING CHANGE: Node.js 16 reached end-of-life 2023-09-11.
+# Minimum supported version is now Node.js 18.
+# Update your .nvmrc or .tool-versions to node 18 or later.

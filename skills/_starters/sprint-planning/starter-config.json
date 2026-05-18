@@ -1,0 +1,24 @@
+{
+  "domain": "Agile Sprint Planning (Scrum)",
+  "category": "productivity",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: sprint-length]",
+      "description": "Your sprint duration (e.g., '2 weeks (10 working days)')"
+    },
+    {
+      "marker": "[FILL-IN: team-velocity]",
+      "description": "Your team's average velocity (e.g., '32 story points per 2-week sprint')"
+    },
+    {
+      "marker": "[FILL-IN: definition-of-done]",
+      "description": "Your team's Definition of Done (e.g., 'Code reviewed, tests passing, deployed to staging, PO accepted')"
+    }
+  ],
+  "sourceReference": "https://www.scrum.org/resources/what-is-sprint-planning"
+}

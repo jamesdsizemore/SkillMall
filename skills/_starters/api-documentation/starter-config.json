@@ -1,0 +1,20 @@
+{
+  "domain": "REST API Documentation",
+  "category": "writing",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: api-base-url]",
+      "description": "Your API's base URL (e.g., 'https://api.yourproduct.com/v1')"
+    },
+    {
+      "marker": "[FILL-IN: auth-method]",
+      "description": "Your API's authentication method (e.g., 'Bearer token in Authorization header')"
+    }
+  ],
+  "sourceReference": "https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-design"
+}

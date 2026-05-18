@@ -1,0 +1,20 @@
+{
+  "domain": "Code Review for Pull Requests",
+  "category": "development",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: severity-labels]",
+      "description": "Your team's comment severity labels (e.g., 'nit: blocker: suggestion:' or 'P1: P2: P3:')"
+    },
+    {
+      "marker": "[FILL-IN: team-review-criteria]",
+      "description": "Your team's specific review standards (e.g., 'functions must be < 30 lines', 'no magic numbers outside constants files')"
+    }
+  ],
+  "sourceReference": "https://google.github.io/eng-practices/review/"
+}

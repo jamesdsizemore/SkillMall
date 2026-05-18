@@ -1,0 +1,20 @@
+{
+  "domain": "Technical Documentation (Divio System)",
+  "category": "writing",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: product-name]",
+      "description": "The product or system being documented (e.g., 'SkillMall CLI', 'Internal API Gateway')"
+    },
+    {
+      "marker": "[FILL-IN: primary-audience]",
+      "description": "Who reads this documentation (e.g., 'developers integrating the REST API', 'DevOps engineers deploying on Kubernetes')"
+    }
+  ],
+  "sourceReference": "https://docs.divio.com/documentation-system/"
+}

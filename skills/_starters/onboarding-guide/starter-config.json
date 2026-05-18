@@ -1,0 +1,24 @@
+{
+  "domain": "Team Onboarding Guide Creation",
+  "category": "writing",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username for the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: team-name]",
+      "description": "The name of the team this guide is for, e.g. 'Platform Engineering' or 'Growth'"
+    },
+    {
+      "marker": "[FILL-IN: tools-list]",
+      "description": "List of tools new team members need access to, in setup order, e.g. 'GitHub org, Slack, Linear, Figma, AWS console'"
+    },
+    {
+      "marker": "[FILL-IN: first-task]",
+      "description": "A concrete, real task completable by end of week one, e.g. 'Merge a PR that fixes a documentation typo in the API reference'"
+    }
+  ],
+  "sourceReference": "https://basecamp.com/shapeup"
+}

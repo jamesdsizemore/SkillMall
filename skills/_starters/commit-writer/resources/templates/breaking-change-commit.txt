@@ -1,0 +1,41 @@
+# Breaking Change Commit Template
+# Use when: removing/renaming public API, CLI flags, config keys, DB columns,
+# or any interface consumed by other code or users.
+
+<type>!(<scope>): <brief description of the breaking change>
+
+# Body: describe the motivation for the breaking change.
+# This is not optional for breaking changes — explain why the break is necessary.
+
+<motivation and context>
+
+# Migration guide: what users/callers need to change
+Before:
+  <old usage or code>
+
+After:
+  <new usage or code>
+
+BREAKING CHANGE: <precise description of what broke and the migration path>
+
+# Optionally link related issues, PRs, or deprecation notices:
+# Closes #<issue>
+# See-also: #<deprecation-PR>
+
+# Examples:
+#
+# feat!(cli): rename --format flag to --output-format
+#
+# --format conflicted with the --format flag in several piped tools (jq, etc.)
+# causing silent flag shadowing. --output-format is unambiguous.
+#
+# Before:
+#   npx skill-mall list --format json
+#
+# After:
+#   npx skill-mall list --output-format json
+#
+# BREAKING CHANGE: the --format CLI flag is removed. Use --output-format.
+# A deprecation warning was added in v0.4.0 (see PR #201).
+#
+# Closes #278

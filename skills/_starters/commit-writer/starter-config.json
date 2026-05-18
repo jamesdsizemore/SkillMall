@@ -1,0 +1,20 @@
+{
+  "domain": "Conventional Commit Message Writer",
+  "category": "development",
+  "targetAgents": ["claude-code", "cursor", "github-copilot"],
+  "fillInFields": [
+    {
+      "marker": "[FILL-IN: github-username]",
+      "description": "Your GitHub username — sets the author field in SKILL.md frontmatter"
+    },
+    {
+      "marker": "[FILL-IN: allowed-types]",
+      "description": "Your team's allowed commit types (e.g., 'feat, fix, docs, chore' — list only what your team uses)"
+    },
+    {
+      "marker": "[FILL-IN: scope-examples]",
+      "description": "Scope names used in your codebase (e.g., 'auth, api, cli, dashboard' for a monorepo)"
+    }
+  ],
+  "sourceReference": "https://www.conventionalcommits.org/en/v1.0.0/"
+}

@@ -28,6 +28,7 @@ ${pc.bold("Commands:")}
   ${pc.cyan("find")} <query>                     Search skills.sh for related skills
   ${pc.cyan("deploy")} <category/name>           Copy a skill to ~/.claude/skills/
   ${pc.cyan("new")} <category> <name>            Scaffold a new skill from template
+  ${pc.cyan("new")} --from-template <slug> <name> Scaffold from a domain starter in skills/_starters/
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
