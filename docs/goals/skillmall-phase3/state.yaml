@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T262
+active_task: T264
 
 tasks:
 
@@ -421,7 +421,7 @@ tasks:
   - id: T262
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement npx skill-mall optimize-prompt CLI command. Accepts file path or --stdin. Calls the same optimizePrompt() from lib/prompt-optimizer.ts. Prints 4-dimension audit to terminal. Writes optimized version to <filename>-optimized.md and diff to <filename>.diff."
     allowed_files:
@@ -434,7 +434,21 @@ tasks:
       - "echo 'This prompt helps you...' | npx skill-mall optimize-prompt --stdin prints audit results"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - cli/src/commands/optimize-prompt.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: "cd cli && npm run type-check"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "node cli/dist/index.js optimize-prompt --help"
+          status: pass
+        - cmd: "echo 'prompt text' | node cli/dist/index.js optimize-prompt --stdin"
+          status: pass
+      summary: "optimize-prompt command: accepts file path or --stdin, calls optimizePrompt() from lib/prompt-optimizer.ts, prints 4-dimension audit (token efficiency, intent completeness, output clarity, trigger sharpness) with color-coded scores. File mode writes <name>-optimized.md and <name>.diff. Stdin mode prints optimized prompt to stdout."
 
   - id: T263
     type: worker
@@ -464,7 +478,7 @@ tasks:
   - id: T264
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement npm Package Publisher: npx skill-mall publish <skill> --registry npm. Auto-generates package.json from SKILL.md metadata (@skill-mall/<slug>, version synced to metadata.version). Pre-publish: validates metadata.version matches any existing npm package version. Runs npm publish with --access public. Post-publish: writes metadata.npm_package to SKILL.md frontmatter."
     allowed_files:
