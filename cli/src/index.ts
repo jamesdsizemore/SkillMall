@@ -15,6 +15,7 @@ import { publishCommand } from "./commands/publish.js";
 import { budgetCheckCommand } from "./commands/budget-check.js";
 import { extractCommand } from "./commands/extract.js";
 import { testSkillCommand } from "./commands/test-skill.js";
+import { regenPromptCommand } from "./commands/regen-prompt.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -35,6 +36,7 @@ ${pc.bold("Commands:")}
   ${pc.cyan("budget-check")} <cat/slug>          Simulate description visibility at N chars (--chars-available)
   ${pc.cyan("extract")} <dir> --output <slug>    Extract skill patterns from a codebase directory
   ${pc.cyan("test")} <category/slug>             Run test suite for a skill (tests/<slug>/*.json)
+  ${pc.cyan("regen-prompt")} <cat/slug> <file>  Regenerate a prompt file with a new reasoning framework
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
@@ -117,6 +119,10 @@ async function main(): Promise<void> {
 
     case "test":
       await testSkillCommand(rest);
+      break;
+
+    case "regen-prompt":
+      await regenPromptCommand(rest);
       break;
 
     case "--help":

@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T261
+active_task: T262
 
 tasks:
 
@@ -377,7 +377,7 @@ tasks:
   - id: T261
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement User Framework Override: each prompt card on skill detail page shows the framework as a clickable badge; clicking opens a dropdown (default: artifact-type-appropriate frameworks; Advanced toggle: full 40+); selecting triggers POST /api/regen-prompt which regenerates the prompt body with the new framework, updates frontmatter framework field, preserves original_framework. CLI: npx skill-mall regen-prompt <skill> <prompt-file> --framework 'Tree of Thoughts'."
     allowed_files:
@@ -398,12 +398,30 @@ tasks:
       - "Implementation requires ResearchTool data (artifactType, inputs, outputs, artifactStructure) that is not stored after pipeline completion — add lib/build-metadata.ts and resources/build-metadata.json to this task's allowed_files before proceeding"
       - "Regeneration uses only the framework name without the full tool structure — the regenerated prompt will be incorrect. Stop and surface this architectural gap."
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - app/api/regen-prompt/route.ts
+        - components/skill-mall/skill-detail/PromptCard.tsx
+        - components/skill-mall/skill-detail/FrameworkPicker.tsx
+        - components/skill-mall/skill-detail/SkillTabs.tsx
+        - cli/src/commands/regen-prompt.ts
+        - cli/src/index.ts
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "node cli/dist/index.js regen-prompt (prints usage)"
+          status: pass
+      summary: "Prompt files already embed full tool JSON — no build-metadata.json needed. GET /api/regen-prompt lists prompt files. POST /api/regen-prompt reads tool structure from prompt body JSON, calls LLM with new framework, updates framework field, preserves original_framework. PromptCard: clickable framework badge, FrameworkPicker dropdown (6 default + 40+ advanced). PromptsPanel in SkillTabs fetches and groups prompts by type. PROMPTS tab added to SkillTabs. CLI regen-prompt command reads from prompt file, regenerates, writes back."
 
   - id: T262
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement npx skill-mall optimize-prompt CLI command. Accepts file path or --stdin. Calls the same optimizePrompt() from lib/prompt-optimizer.ts. Prints 4-dimension audit to terminal. Writes optimized version to <filename>-optimized.md and diff to <filename>.diff."
     allowed_files:

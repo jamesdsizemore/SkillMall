@@ -3,8 +3,9 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/skills";
+import { PromptCard } from "./PromptCard";
 
-const TABS = ["OVERVIEW", "SKILL.MD", "HISTORY", "TRIGGER ANALYSIS", "BUDGET ANALYSIS"] as const;
+const TABS = ["OVERVIEW", "SKILL.MD", "PROMPTS", "HISTORY", "TRIGGER ANALYSIS", "BUDGET ANALYSIS"] as const;
 type Tab = typeof TABS[number];
 
 type Props = {
@@ -78,6 +79,10 @@ export function SkillTabs({ skill, readme, availableLocales = [] }: Props) {
 
         {active === "HISTORY" && (
           <HistoryPanel skillPath={skill.path} />
+        )}
+
+        {active === "PROMPTS" && (
+          <PromptsPanel category={skill.category} slug={skill.slug} />
         )}
 
         {active === "TRIGGER ANALYSIS" && (
@@ -192,6 +197,78 @@ function TriggerPanel({ category, slug }: { category: string; slug: string }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function PromptsPanel({ category, slug }: { category: string; slug: string }) {
+  const [prompts, setPrompts] = React.useState<Array<{
+    file: string; name: string; framework: string; originalFramework: string;
+    type: string; complexity: string; whenToUse: string; produces: string[];
+  }> | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetch(`/api/regen-prompt?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}`)
+      .then(r => r.json())
+      .then(d => setPrompts(d.prompts ?? []))
+      .catch(() => setPrompts([]))
+      .finally(() => setLoading(false));
+  }, [category, slug]);
+
+  if (loading) {
+    return (
+      <p className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+        [ LOADING... ]
+      </p>
+    );
+  }
+
+  if (!prompts || prompts.length === 0) {
+    return (
+      <p className="text-sm text-sm-secondary">No prompt files found for this skill.</p>
+    );
+  }
+
+  // Group by use-case type
+  const groups: Record<string, typeof prompts> = {};
+  for (const p of prompts) {
+    const key = p.type ?? 'other';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  }
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-sm-secondary">
+        Click a framework badge to regenerate the prompt with a different reasoning approach.
+        Original framework is always preserved.
+      </p>
+      {Object.entries(groups).map(([type, typePrompts]) => (
+        <div key={type}>
+          <p
+            className="mb-3 text-[9px] tracking-widest text-sm-disabled"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            [ {type.toUpperCase()} ]
+          </p>
+          <div className="space-y-2">
+            {typePrompts.map(p => (
+              <PromptCard
+                key={p.file}
+                {...p}
+                category={category}
+                slug={slug}
+                onFrameworkChange={(newFw) => {
+                  setPrompts(prev => prev?.map(pp =>
+                    pp.file === p.file ? { ...pp, framework: newFw } : pp
+                  ) ?? null);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
