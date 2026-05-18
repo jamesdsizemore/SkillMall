@@ -6,7 +6,7 @@ goal:
   title: "SkillMall Phase 3 — Advanced Capabilities"
   slug: skillmall-phase3
   kind: existing_plan
-  tranche: "Build 6 missed Phase 1/2 features (T251-T256: domain starters, budget analyzer, codebase extractor, dependency graph, skill testing framework, multilingual) + Phase 3 features (chains, RAG, self-improvement, marketplace). T251-T256 run before Phase 3 chains/RAG."
+  tranche: "Build all missed Phase 1/2 features (T251-T256, T261-T268, T271-T275) then Phase 3 features (T201-T209: chains, RAG, self-improvement, marketplace). 28 total tasks."
   status: active
   intake:
     original_request: "Build SkillMall Phase 3 from docs/superpowers/plans/PHASE-3-PLAN.md"
@@ -382,6 +382,98 @@ tasks:
     verify:
       - "python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))" exits 0"
       - "action.yml documents trigger_accuracy_threshold and budget_warn_at_installed inputs"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── SPEC FEATURES MISSED FROM PHASE 1/2 (round 3 — final) ─────────────
+
+  - id: T271
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Display skills.sh badge on skill detail page when metadata.skills_sh_id is set in SKILL.md frontmatter. In Phase 1 (Decision 5): show badge if skills_sh_id already exists in frontmatter. Post-publish (Phase 2): show live install count fetched from skills.sh API. Badge appears on skill detail sidebar."
+    allowed_files:
+      - lib/skills.ts
+      - app/skills/[category]/[slug]/page.tsx
+      - components/skill-mall/skill-detail/SkillsShBadge.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "Skill with metadata.skills_sh_id in frontmatter shows badge on detail page (smoke test)"
+      - "Skill without metadata.skills_sh_id shows no badge (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T272
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add CI README status badge to the GitHub Actions workflow. After validate-skills.yml runs, write a badge showing validation status of the most recently merged skill change. Use shields.io endpoint or GitHub Actions badge format. Update README.md to show the badge."
+    allowed_files:
+      - .github/workflows/validate-skills.yml
+      - README.md
+    verify:
+      - "python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))" exits 0"
+      - "README.md contains a badge link pointing to the workflow status"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T273
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement npx skill-mall mcp-server CLI command that starts the MCP server on port 3001 for local development. The server serves the same /api/mcp logic but as a standalone HTTP server (not Next.js). Users add it to their MCP config as http://localhost:3001."
+    allowed_files:
+      - cli/src/commands/mcp-server.ts
+      - cli/src/index.ts
+    verify:
+      - "cd cli && npm run type-check exits 0"
+      - "cd cli && npm run build exits 0"
+      - "npx skill-mall mcp-server --help prints usage"
+      - "npx skill-mall mcp-server starts HTTP server on port 3001 (manual smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T274
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add review score trend (30-day moving average) to contributor dashboard. lib/analytics.ts: add getEffectivenessTrend(skillSlug) that returns 30 data points (daily average over past 30 days). Render as a mini segmented bar chart on the dashboard skill card alongside install counts."
+    allowed_files:
+      - lib/analytics.ts
+      - lib/__tests__/analytics.test.ts
+      - app/dashboard/page.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "getEffectivenessTrend returns array of 30 objects with date and averageScore (test)"
+      - "Dashboard renders trend for authenticated author (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T275
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add one-click copy button and 'skills using this framework' navigation to /prompt-library. Each framework card gets a copy button that copies the framework pattern to clipboard. Each framework card shows a count of skills in the catalog that use this framework in their prompts frontmatter, with a link to filter the catalog to those skills."
+    allowed_files:
+      - app/prompt-library/page.tsx
+      - lib/skills.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "/prompt-library renders copy buttons on framework cards (smoke test)"
+      - "Skills using framework count is shown per card (smoke test — may be 0)"
     stop_if:
       - "Need files outside allowed_files"
     receipt: null
