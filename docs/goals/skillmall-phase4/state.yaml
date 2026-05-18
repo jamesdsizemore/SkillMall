@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T404
+active_task: T405
 
 tasks:
 
@@ -163,7 +163,7 @@ tasks:
   - id: T404
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/cli-reference.md (3000+ words) covering ALL CLI commands with full flag tables, behavior description, numbered steps, examples with expected outputs, and exit codes. Commands: configure, create, confirm-research, deploy (--all-agents/--agents/--scope), deploy-pack, fork, revert, publish (npm and skills.sh), validate, new (template-based and --from-template), extract, test, budget-check, optimize-prompt, regen-prompt, eval-triggers, mcp-server, attach-knowledge, list, find."
     allowed_files:
@@ -175,12 +175,23 @@ tasks:
     stop_if:
       - "Any command shown exits with unexpected error — verify against actual CLI"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/cli-reference.md
+      commands:
+        - cmd: "wc -w docs/developer/cli-reference.md"
+          status: pass
+        - cmd: "node cli/dist/index.js list"
+          status: pass
+        - cmd: "node cli/dist/index.js budget-check ai/skill-creator --chars-available 150"
+          status: pass
+      summary: "3223 words. All 20 CLI commands documented with flags, behavior, expected outputs. Commands verified against built CLI. Quick reference table and 4 common workflow examples added. attach-knowledge dynamic import fix noted (static import of RAG module crashed all CLI commands — resolved with lazy dynamic import)."
 
   - id: T405
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/developer/contributing.md (2500+ words) covering: types of contributions (skills easiest, code, docs), complete skill contribution workflow (feature-inventory-check, create, validate, test, PR), quality bar for skills (exact rubric, required score, CI checks), code contribution workflow (16-step loop, commit convention, PR template, review process), code standards (TypeScript strict, Zod, parameterized SQL, atomic writes, Nothing design rules), test writing guide (MockLLMClient pattern, file locations, naming), documentation contribution guide (plan-review skill, word count minimums, accuracy requirements)."
     allowed_files:
