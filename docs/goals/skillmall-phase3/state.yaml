@@ -75,7 +75,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T201
+active_task: T251
 
 tasks:
 
@@ -86,7 +86,7 @@ tasks:
   - id: T251
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Create 20 Domain Starter Templates in skills/_starters/<domain>/. Each is 80% complete with real content and [fill-in] markers for domain-specific content. Implement CLI: npx skill-mall new --from-template <slug> <new-name> (copies to skills/<category>/<new-name>/). Add starter-config.json with domain, category, fill-in field descriptions."
     allowed_files:
@@ -478,12 +478,51 @@ tasks:
       - "Need files outside allowed_files"
     receipt: null
 
+  # ─── MISSED FEATURES COMPLETION AUDIT — gates all Phase 3 features ────────
+  # T280 must pass before T201 (SQLite migration) and all Phase 3 features activate.
+  # No Phase 3 feature (chains, RAG, self-improvement, marketplace) starts until
+  # every missed Phase 1/2 feature is verified complete.
+
+  - id: T280
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit whether all missed Phase 1/2 features (T251-T275) are complete. Verify each feature is actually functional — not just that task receipts exist. npm run build passes, npm test passes, npx tsc --noEmit clean. Every feature listed in the spec for Phase 1 and Phase 2 must be present and working before Phase 3 features begin."
+    inputs:
+      - "All T251-T275 receipts"
+      - "npm run build output"
+      - "npm test output"
+      - "npx tsc --noEmit output"
+      - "Manual smoke test: /skills/<category>/<slug> shows PROMPTS tab with prompt cards"
+      - "Manual smoke test: /skills/<category>/<slug> shows framework badge with override dropdown"
+      - "Manual smoke test: /prompt-library shows copy buttons and skill-usage counts"
+      - "Manual smoke test: /trending shows Community Favorites and High Quality sections"
+      - "Manual smoke test: /graph renders skill dependency network"
+      - "CLI smoke test: npx skill-mall budget-check, optimize-prompt, regen-prompt, mcp-server all print usage"
+      - "CLI smoke test: npx skill-mall deploy --scope project deploys to cwd-relative dir"
+      - "CLI smoke test: npx skill-mall publish --registry npm runs pre-publish checks"
+      - "Spec cross-reference: every Phase 1 and Phase 2 feature in docs/superpowers/specs/2026-05-17-skillmall-feature-expansion-design.md has a corresponding passing implementation"
+    constraints:
+      - "Do not approve if any T251-T275 task is queued or active"
+      - "Do not approve if npm run build exits nonzero"
+      - "Do not approve if npm test exits nonzero"
+      - "Do not approve if npx tsc --noEmit exits nonzero"
+      - "Do not approve if any Phase 1/2 spec feature is missing or non-functional — read the spec, check the code"
+      - "Do not approve based only on task receipts — verify functionality directly"
+      - "Do not activate any T201-T209 Phase 3 task until this audit passes"
+    expected_output:
+      - "approved | rejected"
+      - "If rejected: exact list of failing items with file or command that demonstrates the failure"
+      - "If approved: written confirmation that T201 (Phase 3 foundation) may activate"
+    receipt: null
+
   # ─── FOUNDATION — SQLite Phase 3 migration ────────────────────────────────
 
   - id: T201
     type: worker
     assignee: Worker
-    status: active
+    status: queued
     reasoning_hint: default
     objective: "Install reactflow, stripe, @stripe/stripe-js. Attempt to install sqlite-vss (stop and report if loadExtension fails). Write db/migrations/002_phase3.sql with all 6 Phase 3 tables. Apply migration. Add STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET to .env.local template."
     allowed_files:
@@ -697,7 +736,7 @@ tasks:
     assignee: Judge
     status: queued
     reasoning_hint: high
-    objective: "Audit whether Phase 3 is complete: T201-T208 all done, build passing, tests passing, TypeScript clean, chains create valid SKILL.md, RAG embeds and retrieves, self-improvement approval gate works, marketplace gate enforces itself, docs complete."
+    objective: "Audit whether Phase 3 is complete: ALL tasks T251-T275 and T201-T208 done, build passing, tests passing, TypeScript clean, every spec feature present and functional, chains create valid SKILL.md, RAG embeds and retrieves, self-improvement approval gate works, marketplace gate enforces itself, docs complete."
     inputs:
       - "All T201-T208 receipts"
       - "npm run build output"
@@ -706,9 +745,11 @@ tasks:
       - "GET /api/marketplace/status output"
       - "Word counts on all 5 T208 doc files"
     constraints:
-      - "Do not mark complete if any Worker task is queued or active"
+      - "Do not mark complete if any Worker task T251-T275 or T201-T208 is queued or active"
+      - "Do not mark complete if T280 (missed features audit) did not pass"
       - "Do not mark complete if marketplace UI renders when checkMarketplaceReady() returns false"
       - "Do not mark complete if any Phase 3 doc is < 500 words"
+      - "Do not mark complete without re-running the feature-inventory-check skill against the spec one final time"
     expected_output:
       - "complete | not_complete"
       - "full_outcome_complete: true | false"
