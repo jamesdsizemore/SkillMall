@@ -1,0 +1,18 @@
+{
+  "name": "Documentation Suite",
+  "slug": "documentation-suite",
+  "description": "Skills for creating and maintaining technical documentation. Install in any order.",
+  "author": "skill-mall-core",
+  "skills": [
+    {
+      "slug": "ai/skill-creator",
+      "order": 1,
+      "note": "Generate skills for any documentation methodology or framework"
+    },
+    {
+      "slug": "productivity/development-workflow",
+      "order": 2,
+      "note": "Step 14 of the workflow covers documentation updates"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Full-Stack Developer Kit",
+  "slug": "full-stack-developer-kit",
+  "description": "Essential skills for full-stack development workflows. Install in listed order.",
+  "author": "skill-mall-core",
+  "skills": [
+    {
+      "slug": "ai/skill-creator",
+      "order": 1,
+      "note": "Install first — creates new skills for the other tools you use"
+    },
+    {
+      "slug": "productivity/development-workflow",
+      "order": 2,
+      "note": "Enforces 16-step quality loop on every implementation task"
+    },
+    {
+      "slug": "productivity/phased-implementation-plan",
+      "order": 3,
+      "note": "Creates comprehensive GoalBuddy-ready phased plans"
+    }
+  ]
+}

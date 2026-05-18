@@ -8,6 +8,7 @@ import { validateCommand } from "./commands/validate.js";
 import { createCommand } from "./commands/create.js";
 import { configureCommand } from "./commands/configure.js";
 import { confirmResearchCommand } from "./commands/confirm-research.js";
+import { deployPackCommand } from "./commands/deploy-pack.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -78,6 +79,10 @@ async function main(): Promise<void> {
 
     case "confirm-research":
       await confirmResearchCommand(rest);
+      break;
+
+    case "deploy-pack":
+      await deployPackCommand(rest);
       break;
 
     case "--help":

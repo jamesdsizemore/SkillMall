@@ -1,0 +1,18 @@
+{
+  "name": "Strategic Business Pack",
+  "slug": "strategic-business-pack",
+  "description": "Skills for strategic planning and business analysis. Install in any order.",
+  "author": "skill-mall-core",
+  "skills": [
+    {
+      "slug": "ai/skill-creator",
+      "order": 1,
+      "note": "Create domain-specific skills from authoritative sources"
+    },
+    {
+      "slug": "productivity/phased-implementation-plan",
+      "order": 2,
+      "note": "Build execution plans from strategy documents"
+    }
+  ]
+}
