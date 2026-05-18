@@ -125,6 +125,18 @@ Edit the files directly. Bump `version` in the SKILL.md frontmatter following se
 - `minor` — new sections, improved instructions, added resources
 - `major` — changed behavior, new output format, breaking changes
 
+## Contributing Generated Skills
+
+Skills created by the SkillMall pipeline can be submitted as PRs. Before submitting:
+
+1. Run `npx skill-mall validate skills/<category>/<slug>` — 0 errors required
+2. Check the quality score on the skill detail page at `localhost:3000/skills/<category>/<slug>` — target 70+
+3. Review the generated SKILL.md description — must start with an imperative verb and be ≤ 150 chars
+4. Test at least one generated prompt in an actual agent session
+5. If the research result was unverified (no URLs provided), add `metadata.linked-skills` pointing to the authoritative skill or provide source URLs before submitting
+
+**The CI Action** (`skill-mall/validate-action@v1`) runs automatically on PRs touching `skills/`. Fix any errors it reports before requesting review.
+
 ## Code of Conduct
 
 Be direct. Be specific. Do not submit skills you have not tested. Do not pad skill names with vague superlatives.

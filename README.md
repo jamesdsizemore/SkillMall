@@ -1,51 +1,114 @@
 # SkillMall
 
-An open-source catalog of Claude Code skills. Searchable, categorized, and ready to deploy.
+An open-source catalog and generation platform for AI agent skills. Create production-quality skills from any URL or description using a research-first pipeline. Works with Claude Code, Cursor, Codex, Gemini CLI, and any AgentSkills-compatible agent.
 
-## What is a skill?
-
-A Claude Code skill is a structured Markdown file that directs Claude's behavior for a specific task. When invoked in Claude Code, the skill content is loaded into context and Claude follows its instructions. Skills ship with scripts, templates, and samples to produce consistent, repeatable output.
-
-## Browse the catalog
+## Pipeline Overview
 
 ```
+Input (topic + URLs)
+    │
+    ▼
+Research Engine ──── fetches URLs, extracts tools with LLM
+    │
+    ├──────────────────────────┐
+    ▼                          ▼
+Skill Builder            Prompt Engine
+(SKILL.md, templates,    (framework selection,
+ samples, scripts)        prompt generation)
+    │                          │
+    └──────────────────────────┘
+                  │ merged
+                  ▼
+         Validation → Write to skills/
+```
+
+## Quick Start — Create a Skill
+
+**Step 1: Configure your LLM provider**
+
+```bash
+# Claude Code CLI (no API key needed — uses existing auth)
+npx skill-mall configure --provider claude-code
+
+# Or OpenAI
+npx skill-mall configure --provider openai --key sk-...
+
+# Or via web UI at http://localhost:3000/settings/providers
+```
+
+**Step 2: Create**
+
+```bash
+# Research-first (recommended)
+npx skill-mall create "blue ocean strategy" \
+  --urls https://blueoceanstrategy.com/tools/ \
+  --category business
+
+# Review the extracted tools
+cat skill-builder-output/blue-ocean-strategy/research-result.json
+
+# Build and write the skill
+npx skill-mall confirm-research blue-ocean-strategy
+```
+
+**Or use the browser wizard:**
+
+```bash
+npm run dev
+# Open http://localhost:3000/skills/create
+```
+
+## Browse and Deploy
+
+```bash
+npm run dev
+# Open http://localhost:3000 to search the catalog
+
+# Deploy a skill to Claude Code
+npx skill-mall deploy business/blue-ocean-strategy
+```
+
+## Setup
+
+```bash
+git clone https://github.com/jamesdsizemore/SkillMall
+cd SkillMall
+npm install
+npm run prepare
 npm run dev
 ```
 
-Open `http://localhost:3000` to search and browse all skills locally.
+## Documentation
 
-## Deploy a skill
+- [Configuring Providers](docs/user/configuring-providers.md)
+- [Using the Wizard](docs/user/using-the-wizard.md)
+- [Using the CLI](docs/user/using-the-cli.md)
+- [Pipeline Architecture](docs/reference/pipeline-architecture.md)
+- [Provider Catalog](docs/reference/provider-catalog.md)
+- [ResearchResult Schema](docs/reference/research-result-schema.md)
+- [Prompt File Format](docs/reference/prompt-file-format.md)
+- [Quality Score Rubric](docs/reference/quality-score-rubric.md)
+- [API Routes](docs/reference/api-routes.md)
 
-Find a skill in the catalog, then copy it to your Claude Code skills directory:
+## Skill Structure
 
-```bash
-cp -r skills/<category>/<skill-name> ~/.claude/skills/
+Every skill follows this layout:
+
 ```
-
-Invoke it in Claude Code:
-
+skills/<category>/<skill-name>/
+├── SKILL.md              # Instructions the agent receives on invoke (required)
+├── README.md             # Human overview (required)
+├── scripts/              # Shell scripts
+└── resources/
+    ├── templates/        # Blank artifact templates
+    ├── samples/          # Completed example outputs
+    └── prompts/          # Framework-selected, self-contained prompts
 ```
-/<skill-name>
-```
-
-## Add a skill
-
-```bash
-# Scaffold
-bash scripts/new-skill.sh <category> <skill-name>
-
-# Fill in SKILL.md, README.md, and optional resources
-# Then commit — AGENTS.md regenerates automatically
-git add skills/<category>/<skill-name>
-git commit -m "feat: add <skill-name>"
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide and quality bar.
 
 ## Categories
 
 | Category | Description |
-|----------|-------------|
+|---|---|
 | `development` | Coding, debugging, testing, refactoring |
 | `design` | UI/UX, design systems, visual assets |
 | `writing` | Documentation, PRDs, content, communication |
@@ -55,29 +118,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide and quality bar.
 | `ai` | Prompt engineering, agent design, ML workflows |
 | `business` | Strategy, operations, stakeholder communication |
 
-## Skill structure
+## Contributing
 
-Every skill follows this layout:
-
-```
-skills/<category>/<skill-name>/
-├── SKILL.md              # Instructions Claude receives on invoke (required)
-├── README.md             # Human overview — what it produces, when to use it (required)
-├── scripts/              # Shell scripts that augment the skill workflow
-└── resources/
-    ├── templates/        # Reusable output templates
-    └── samples/          # Completed example outputs
-```
-
-## Setup
-
-```bash
-git clone https://github.com/jamesdsizemore/SkillMall
-cd SkillMall
-npm install
-npm run prepare  # installs Husky pre-commit hook
-npm run dev
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

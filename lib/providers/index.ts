@@ -14,6 +14,7 @@ export { ConfigError } from './types'
 export type { LLMClient, ProviderConfig, ProviderID, CompletionOptions } from './types'
 
 /** Create an LLMClient for the given provider config. */
+/** Create an LLMClient for the given provider configuration. */
 export function createLLMClient(config: ProviderConfig): LLMClient {
   switch (config.provider) {
     case 'openai':
@@ -36,6 +37,11 @@ export function createLLMClient(config: ProviderConfig): LLMClient {
 /**
  * Resolve provider config from environment variables or ~/.skill-mall/config.json.
  * Resolution order: env vars → ~/.skill-mall/config.json
+ * Throws ConfigError if no provider is configured.
+ */
+/**
+ * Resolve provider config from env vars or ~/.skill-mall/config.json.
+ * Resolution order: SKILL_MALL_PROVIDER env var → config file.
  * Throws ConfigError if no provider is configured.
  */
 export function resolveProviderConfig(): ProviderConfig {
