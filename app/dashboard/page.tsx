@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/github";
-import { getInstallsByAgentType, getInstallCount } from "@/lib/analytics";
+import { getInstallsByAgentType, getInstallCount, getEffectivenessTrend } from "@/lib/analytics";
 import { getAllSkills } from "@/lib/skills";
 
 export default async function DashboardPage() {
@@ -53,6 +53,7 @@ export default async function DashboardPage() {
             {mySkills.map((skill) => {
               const total = getInstallCount(skill.slug);
               const byAgent = getInstallsByAgentType(skill.slug);
+              const trend = getEffectivenessTrend(skill.slug);
 
               return (
                 <div key={skill.slug} className="border border-sm-border bg-sm-surface p-4">
@@ -99,6 +100,39 @@ export default async function DashboardPage() {
                       [ NO INSTALLS RECORDED YET ]
                     </p>
                   )}
+
+                  {/* Effectiveness trend — 30-day bar chart */}
+                  <div className="mt-3 border-t border-sm-border pt-3">
+                    <p
+                      className="mb-2 text-[9px] tracking-widest text-sm-disabled"
+                      style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                    >
+                      [ EFFECTIVENESS TREND — 30 DAYS ]
+                    </p>
+                    <div className="flex items-end gap-px h-8">
+                      {trend.map((point) => {
+                        const score = point.averageScore;
+                        const heightPct = score != null ? Math.round((score / 5) * 100) : 0;
+                        const color = score == null
+                          ? 'bg-sm-border'
+                          : score >= 4 ? 'bg-green-500'
+                          : score >= 3 ? 'bg-yellow-500'
+                          : 'bg-red-500';
+                        return (
+                          <div
+                            key={point.date}
+                            className={`flex-1 ${color} opacity-80`}
+                            style={{ height: `${Math.max(heightPct, score != null ? 8 : 4)}%` }}
+                            title={`${point.date}: ${score != null ? score.toFixed(1) + '★' : 'no reviews'}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between mt-1 text-[8px] text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                      <span>-29d</span>
+                      <span>today</span>
+                    </div>
+                  </div>
                 </div>
               );
             })}

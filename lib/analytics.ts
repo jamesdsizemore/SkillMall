@@ -169,6 +169,47 @@ export function getHighQualitySkills(
   }
 }
 
+export interface EffectivenessTrendPoint {
+  date: string        // ISO date string YYYY-MM-DD
+  averageScore: number | null  // null when no reviews that day
+}
+
+/**
+ * Get 30-day effectiveness trend for a skill.
+ * Returns one data point per day for the past 30 days.
+ * Each point is the daily average of review effectiveness scores.
+ */
+export function getEffectivenessTrend(skillSlug: string): EffectivenessTrendPoint[] {
+  const db = getDb()
+  const points: EffectivenessTrendPoint[] = []
+
+  for (let daysAgo = 29; daysAgo >= 0; daysAgo--) {
+    const date = new Date()
+    date.setDate(date.getDate() - daysAgo)
+    const dateStr = date.toISOString().slice(0, 10) // YYYY-MM-DD
+
+    try {
+      const row = db
+        .prepare(
+          `SELECT AVG(effectiveness) as avg_score
+           FROM reviews
+           WHERE skill_slug = ?
+             AND date(created_at) = ?`
+        )
+        .get(skillSlug, dateStr) as { avg_score: number | null } | undefined
+
+      points.push({
+        date: dateStr,
+        averageScore: row?.avg_score != null ? Math.round(row.avg_score * 10) / 10 : null,
+      })
+    } catch {
+      points.push({ date: dateStr, averageScore: null })
+    }
+  }
+
+  return points
+}
+
 /** Get install counts per agent type for a specific skill (contributor view). */
 export function getInstallsByAgentType(skillSlug: string): Record<string, number> {
   const db = getDb();

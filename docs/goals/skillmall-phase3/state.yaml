@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T274
+active_task: T275
 
 tasks:
 
@@ -732,7 +732,7 @@ tasks:
   - id: T274
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Add review score trend (30-day moving average) to contributor dashboard. lib/analytics.ts: add getEffectivenessTrend(skillSlug) that returns 30 data points (daily average over past 30 days). Render as a mini segmented bar chart on the dashboard skill card alongside install counts."
     allowed_files:
@@ -746,12 +746,25 @@ tasks:
       - "Dashboard renders trend for authenticated author (smoke test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/analytics.ts
+        - lib/__tests__/analytics.test.ts
+        - app/dashboard/page.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/analytics"
+          status: pass
+      summary: "getEffectivenessTrend(skillSlug) returns 30 EffectivenessTrendPoint objects {date: YYYY-MM-DD, averageScore: number|null} in chronological order. Queries reviews table for daily averages. dashboard/page.tsx: mini segmented bar chart (30 segments, height proportional to 0-5 score, green>=4 yellow>=3 red<3 grey=null). 6 tests passing."
 
   - id: T275
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Add one-click copy button and 'skills using this framework' navigation to /prompt-library. Each framework card gets a copy button that copies the framework pattern to clipboard. Each framework card shows a count of skills in the catalog that use this framework in their prompts frontmatter, with a link to filter the catalog to those skills."
     allowed_files:
