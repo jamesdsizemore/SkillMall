@@ -38,6 +38,13 @@ goal:
       - "MISSED FROM PHASE 1 spec: Agent Budget Analyzer, Domain Starter Templates"
       - "MISSED FROM PHASE 2 spec: Codebase-to-Skill Extractor, Skill Dependency Graph, Skill Testing Framework, Multilingual Support"
       - "T251-T256 are these missed features — they run before Phase 3 chains/RAG/marketplace"
+      - "FILE CONFLICT ORDERING: cli/src/index.ts is modified by 8 tasks — always in this order: T262, T261, T264, T273, T267, T265, T268. Never in parallel."
+      - "FILE CONFLICT ORDERING: SkillTabs.tsx is modified by 5 tasks — T263 and T261 both add a PROMPTS tab and MUST be merged into a single task before execution"
+      - "FILE CONFLICT ORDERING: app/skills/[category]/[slug]/page.tsx is modified by 8 tasks — sequential only"
+      - "FILE CONFLICT ORDERING: lib/analytics.ts is modified by T265, T266, T274 — sequential only"
+      - "BUDGET ANALYZER: implement as user-configurable --chars-available N, not agent-specific hardcoded values. Agent-specific values are undocumented and will be hallucinated."
+      - "REGEN-PROMPT: requires ResearchTool data stored in resources/build-metadata.json — add that storage to the pipeline (lib/pipeline.ts) and add build-metadata to T261 allowed_files"
+      - "T257 is MISSING from board: write test suites for all 20 domain starters (tests/<slug>/*.json). Without this task, Phase 3 marketplace gate (skillsWithTests >= 50) can never be met."
       - "Skill Testing Framework (T255) is required for Phase 3 marketplace gate (>=50 skills with test coverage)"
 
 rules:
@@ -102,6 +109,7 @@ tasks:
       - "bash scripts/validate-skill.sh skills/_starters/code-review exits 0 (starters must be valid)"
     stop_if:
       - "A starter SKILL.md description is a placeholder or generic — every starter must have real, domain-specific content with only the user-specific fields marked [fill-in]"
+      - "Content cannot be verified against a source — each starter README.md must cite the authoritative reference (e.g., 'Based on the Conventional Commits specification at conventionalcommits.org'). No citations = stop."
       - "Need files outside allowed_files"
     receipt: null
 
@@ -126,7 +134,8 @@ tasks:
       - "Trigger phrase preservation check works: 'Apply Blue Ocean' in first 80 chars -> preserved at all levels (test)"
       - "npx skill-mall budget-check ai/skill-creator --agent claude-code --installed 25 prints budget analysis"
     stop_if:
-      - "Budget simulation uses invented/hardcoded per-agent token budgets without documentation of how values were derived — derive from actual agent behavior or document the assumption clearly"
+      - "Budget simulation uses invented/hardcoded per-agent token budgets without documentation — STOP and implement as a configurable simulation instead: let the user supply --chars-available <N> rather than assuming per-agent values. Document this decision in the task receipt."
+      - "Per-agent budget values are hardcoded without a cited source — the safest implementation is agent-agnostic: show what fits in N characters, let user specify N. Do not invent agent-specific numbers."
       - "Need files outside allowed_files"
     receipt: null
 
@@ -141,6 +150,7 @@ tasks:
       - cli/src/index.ts
       - lib/codebase-extractor.ts
       - lib/__tests__/codebase-extractor.test.ts
+      - lib/research-engine.ts
     verify:
       - "npx tsc --noEmit exits 0"
       - "cd cli && npm run build exits 0"
@@ -149,6 +159,7 @@ tasks:
       - "Extracted ResearchResult has researchUnverified: true (no URLs provided)"
     stop_if:
       - "Extractor reads files outside the specified directory (path traversal) — validate all paths stay within the target directory"
+      - "Extractor duplicates LLM extraction logic from research-engine.ts instead of reusing it — add a runResearchEngineFromText(text, topic, client) overload to research-engine.ts and call it"
       - "Need files outside allowed_files"
     receipt: null
 
@@ -157,7 +168,7 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Implement Skill Dependency Graph at /graph: force-directed graph visualization using React (no external graph library — use SVG with D3-style force simulation or simple canvas). Nodes are skills, edges are linked-skills connections. Node color maps to category. Hub skills (many connections) highlighted. Orphan skills (zero connections) shown with distinct border. Click node navigates to skill detail."
+    objective: "Implement Skill Dependency Graph at /graph: force-directed graph visualization. Use reactflow (already installed for T202) as the graph library — do NOT implement a physics simulation from scratch. Nodes are skills, edges are linked-skills connections. Nodes are skills, edges are linked-skills connections. Node color maps to category. Hub skills (many connections) highlighted. Orphan skills (zero connections) shown with distinct border. Click node navigates to skill detail."
     allowed_files:
       - app/graph/page.tsx
       - components/skill-mall/graph/DependencyGraph.tsx
@@ -192,9 +203,10 @@ tasks:
       - "cd cli && npm run build exits 0"
       - "npm test lib/__tests__/skill-tester all pass (mocked LLM)"
       - "npx skill-mall test ai/skill-creator runs test suite and reports results (requires tests/skill-creator/ to exist)"
-      - "npm run db:migrate exits 0 (test framework uses same SQLite)"
+      - "npm run db:migrate exits 0 (only 001_initial.sql exists at this point — do NOT reference Phase 3 tables in T255 implementation)"
     stop_if:
       - "Test framework calls LLM with skill content that could contain prompt injection from the test input field — sanitize test input before passing to evaluator"
+      - "DO NOT attempt to write 50 test suites in this task — that is T257. T255 only builds the framework + one example test suite for skill-creator."
       - "Need files outside allowed_files"
     receipt: null
 
@@ -221,6 +233,24 @@ tasks:
       - "Need files outside allowed_files"
     receipt: null
 
+  - id: T257
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write test suite JSON files for all 20 Domain Starter Templates plus the 4 existing catalog skills (skill-creator, development-workflow, phased-implementation-plan, wrong-slug). Each skill needs at least 3 test cases in tests/<slug>/*.json format: {id, description, input, required[], forbidden[]}. This is required for the Phase 3 marketplace gate (skillsWithTests >= 50 — we need 24 skills with tests minimum)."
+    allowed_files:
+      - tests/
+    verify:
+      - "find tests/ -name '*.json' | wc -l shows >= 72 test files (24 skills x 3 tests each)"
+      - "npx skill-mall test skill-creator runs without error (requires T255 built first)"
+      - "Each test JSON file is valid JSON and has id, description, input, required, forbidden fields"
+    stop_if:
+      - "Test input fields contain prompt injection attempts — sanitize before saving"
+      - "Test cases are generic and don't validate the specific skill's domain output — each test must be meaningful for its domain"
+      - "Need files outside allowed_files"
+    receipt: null
+
   # ─── SPEC FEATURES MISSED FROM PHASE 1 (round 2) ────────────────────────
 
   - id: T261
@@ -242,8 +272,10 @@ tasks:
       - "cd cli && npm run build exits 0"
       - "POST /api/regen-prompt returns updated prompt with new framework in frontmatter"
       - "original_framework field is never overwritten (test)"
-      - "npx skill-mall regen-prompt ai/skill-creator resources/prompts/tool-example.md --framework 'Chain of Thought' updates the file"
+      - "npx skill-mall regen-prompt business/wrong-slug resources/prompts/tool-strategy-canvas.md --framework 'Chain of Thought' updates the file (wrong-slug is the only skill with actual prompt files)"
     stop_if:
+      - "Implementation requires ResearchTool data (artifactType, inputs, outputs, artifactStructure) that is not stored after pipeline completion — add lib/build-metadata.ts and resources/build-metadata.json to this task's allowed_files before proceeding"
+      - "Regeneration uses only the framework name without the full tool structure — the regenerated prompt will be incorrect. Stop and surface this architectural gap."
       - "Need files outside allowed_files"
     receipt: null
 
@@ -297,10 +329,14 @@ tasks:
     allowed_files:
       - cli/src/commands/publish.ts
       - lib/publish/npm.ts
+    stop_if:
+      - "npm publish runs without an explicit --publish flag guard — default mode must always be --dry-run. Actual publishing requires explicit opt-in."
+      - "Need files outside allowed_files"
     verify:
       - "cd cli && npm run build exits 0"
       - "npx skill-mall publish ai/skill-creator --registry npm --dry-run prints generated package.json without publishing"
       - "Version mismatch between metadata.version and existing npm package exits 1 with specific message"
+      - "--dry-run flag exists and is the DEFAULT behavior. Actual publish only happens with --publish flag. Never publish without explicit --publish flag."
     stop_if:
       - "Need files outside allowed_files"
     receipt: null
@@ -320,6 +356,7 @@ tasks:
       - "npx tsc --noEmit exits 0"
       - "npm run build exits 0"
       - "GET /api/mcp shows 5 tools in the tools array"
+      - "deploy_skill tool returns a clear error when filesystem is read-only (not a 500) (test with mocked fs.accessSync)"
       - "POST /api/mcp with get_prompts tool returns prompt file list (smoke test)"
       - "POST /api/mcp with deploy_skill tool calls detection and returns status (smoke test)"
     stop_if:
@@ -383,6 +420,7 @@ tasks:
       - "python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))" exits 0"
       - "action.yml documents trigger_accuracy_threshold and budget_warn_at_installed inputs"
     stop_if:
+      - "eval-triggers step runs in CI without SKILL_MALL_PROVIDER and SKILL_MALL_API_KEY secrets configured — the step must be OPTIONAL and skip with a warning when secrets are not present, never fail the build"
       - "Need files outside allowed_files"
     receipt: null
 
@@ -393,7 +431,7 @@ tasks:
     assignee: Worker
     status: queued
     reasoning_hint: default
-    objective: "Display skills.sh badge on skill detail page when metadata.skills_sh_id is set in SKILL.md frontmatter. In Phase 1 (Decision 5): show badge if skills_sh_id already exists in frontmatter. Post-publish (Phase 2): show live install count fetched from skills.sh API. Badge appears on skill detail sidebar."
+    objective: "Display skills.sh badge on skill detail page when metadata.skills_sh_id is set in SKILL.md frontmatter. Show the slug as a static badge linking to https://skills.sh/skills/<id>. DO NOT attempt to fetch live install counts — the skills.sh API is not publicly documented. Badge appears on skill detail sidebar."
     allowed_files:
       - lib/skills.ts
       - app/skills/[category]/[slug]/page.tsx
@@ -403,6 +441,9 @@ tasks:
       - "npm run build exits 0"
       - "Skill with metadata.skills_sh_id in frontmatter shows badge on detail page (smoke test)"
       - "Skill without metadata.skills_sh_id shows no badge (smoke test)"
+    stop_if:
+      - "Implementation fetches live data from skills.sh API — that API is not documented. Static badge only."
+      - "Need files outside allowed_files"
     stop_if:
       - "Need files outside allowed_files"
     receipt: null
@@ -437,6 +478,9 @@ tasks:
       - "cd cli && npm run build exits 0"
       - "npx skill-mall mcp-server --help prints usage"
       - "npx skill-mall mcp-server starts HTTP server on port 3001 (manual smoke test)"
+    stop_if:
+      - "Server imports from @/lib/skills which in turn imports Next.js modules — rewrite catalog reading as a pure Node.js file reader without Next.js dependencies"
+      - "Need files outside allowed_files"
     stop_if:
       - "Need files outside allowed_files"
     receipt: null
