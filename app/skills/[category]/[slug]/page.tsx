@@ -1,9 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getSkill, getSkillReadme, getAllSkills } from "@/lib/skills";
 import { computeQualityScore } from "@/lib/quality-score";
+import { getSession } from "@/lib/auth/github";
+import { getReviews, getEffectivenessScore, getReviewCount } from "@/lib/reviews";
+import { getInstallCount } from "@/lib/analytics";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
 import { ForkButton } from "@/components/skill-mall/fork-button";
+import { ReviewForm } from "@/components/skill-mall/reviews/ReviewForm";
+import { ReviewFeed } from "@/components/skill-mall/reviews/ReviewFeed";
+import { EffectivenessPanel } from "@/components/skill-mall/reviews/EffectivenessPanel";
 
 type Props = {
   params: Promise<{ category: string; slug: string }>;
@@ -23,6 +30,15 @@ export default async function SkillPage({ params }: Props) {
   const allSkills = getAllSkills();
   const allSlugs = new Set(allSkills.map((s) => s.slug));
   const score = computeQualityScore(skill, allSlugs).total;
+
+  // Auth and reviews
+  const cookieStore = await cookies();
+  const token = cookieStore.get("sm_session")?.value;
+  const session = token ? getSession(token) : null;
+  const reviews = getReviews(skill.slug);
+  const effectivenessScore = getEffectivenessScore(skill.slug);
+  const reviewCount = getReviewCount(skill.slug);
+  const installCount = getInstallCount(skill.slug);
 
   return (
     <div className="bg-sm-bg">
@@ -179,10 +195,62 @@ export default async function SkillPage({ params }: Props) {
               </p>
               <ForkButton category={skill.category} slug={skill.slug} />
             </div>
+
+            <div>
+              <p
+                className="mb-3 text-[9px] tracking-widest text-sm-secondary"
+                style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+              >
+                [ COMMUNITY ]
+              </p>
+              <EffectivenessPanel
+                effectivenessScore={effectivenessScore}
+                installCount={installCount}
+                reviewCount={reviewCount}
+              />
+            </div>
+          </div>
+
+          {/* Reviews section below main content */}
+          <div className="mt-8">
+            <p
+              className="mb-4 text-[9px] tracking-widest text-sm-secondary"
+              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+            >
+              [ REVIEWS ]
+            </p>
+            <ReviewFormWrapper
+              skillSlug={skill.slug}
+              isAuthenticated={!!session}
+            />
+            {reviews.length > 0 && (
+              <div className="mt-6">
+                <ReviewFeed reviews={reviews} />
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function ReviewFormWrapper({
+  skillSlug,
+  isAuthenticated,
+}: {
+  skillSlug: string;
+  isAuthenticated: boolean;
+}) {
+  "use client";
+  // This wrapper allows the server page to pass isAuthenticated down
+  // The actual form handles submission client-side
+  return (
+    <ReviewForm
+      skillSlug={skillSlug}
+      isAuthenticated={isAuthenticated}
+      onSubmitted={() => window.location.reload()}
+    />
   );
 }
 
