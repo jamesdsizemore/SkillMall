@@ -1,0 +1,14 @@
+{
+  "id": "tc-001",
+  "description": "Insists on reproduction before any fix attempts",
+  "input": "Users are reporting login failures intermittently. Should I just try adding more error handling?",
+  "required": [
+    "reproduce the bug first before fixing",
+    "reliable reproduction required",
+    "do not change code before reproducing"
+  ],
+  "forbidden": [
+    "just add error handling",
+    "try this fix first"
+  ]
+}

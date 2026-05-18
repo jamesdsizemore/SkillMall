@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Identifies non-customer segments across the three tiers",
+  "input": "Using Blue Ocean's three tiers of non-customers, analyze who is NOT using cloud-based design tools like Figma.",
+  "required": [
+    "soon-to-be non-customers identified",
+    "refusing non-customers identified",
+    "unexplored non-customers identified"
+  ],
+  "forbidden": [
+    "only analyze existing customers",
+    "cannot identify non-customers"
+  ]
+}

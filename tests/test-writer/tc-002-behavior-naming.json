@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Names tests by behavior and condition not method name",
+  "input": "Write test names for a login() function that should reject invalid passwords and accept valid ones.",
+  "required": [
+    "test name describes behavior not method: returns 401 or rejects",
+    "condition in test name: when password is invalid",
+    "positive case: when credentials are valid"
+  ],
+  "forbidden": [
+    "test login()",
+    "tests login function"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Documents errors with API-specific meaning not just HTTP status codes",
+  "input": "How should I document the error responses for an API that returns 400 when the skill name is too long and 409 when a skill with that slug already exists?",
+  "required": [
+    "400 error: specific reason - name too long or character limit",
+    "409 error: specific reason - slug already exists or conflict",
+    "error response shape documented"
+  ],
+  "forbidden": [
+    "400 means bad request",
+    "409 means conflict"
+  ]
+}

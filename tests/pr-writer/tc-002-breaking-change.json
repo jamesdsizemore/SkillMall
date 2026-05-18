@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Clearly marks breaking changes and includes migration path",
+  "input": "Write a PR description for removing the deprecated --format flag from the CLI. Users should use --output-format instead.",
+  "required": [
+    "BREAKING CHANGE clearly marked",
+    "migration path: --output-format replacement",
+    "before and after usage examples"
+  ],
+  "forbidden": [
+    "no migration needed",
+    "backward compatible"
+  ]
+}

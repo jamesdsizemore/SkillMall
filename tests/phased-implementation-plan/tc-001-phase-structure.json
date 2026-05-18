@@ -1,0 +1,14 @@
+{
+  "id": "tc-001",
+  "description": "Produces a plan with distinct phases and task cards",
+  "input": "Create a phased implementation plan for adding a real-time notification system to a Next.js app.",
+  "required": [
+    "multiple phases or phase breakdown",
+    "task cards or individual tasks within phases",
+    "verification or acceptance criteria"
+  ],
+  "forbidden": [
+    "single monolithic implementation",
+    "I cannot create a plan"
+  ]
+}

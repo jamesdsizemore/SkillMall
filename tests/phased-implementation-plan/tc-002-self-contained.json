@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Embeds implementation details inline rather than referencing external docs",
+  "input": "Create a phase plan for building a skill testing framework.",
+  "required": [
+    "TypeScript types or code examples embedded",
+    "specific file paths mentioned",
+    "verify steps included in tasks"
+  ],
+  "forbidden": [
+    "see external documentation",
+    "refer to another document for details"
+  ]
+}

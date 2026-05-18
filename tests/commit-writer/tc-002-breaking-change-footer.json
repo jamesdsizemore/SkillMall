@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Includes BREAKING CHANGE footer for breaking changes",
+  "input": "Write a commit for removing the user_name column from the users table and replacing it with separate first_name and last_name columns.",
+  "required": [
+    "BREAKING CHANGE in footer or ! after type",
+    "migration information in body or footer",
+    "first_name and last_name mentioned"
+  ],
+  "forbidden": [
+    "non-breaking",
+    "backward compatible"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Assigns correct status and explains the status lifecycle",
+  "input": "Our team decided to adopt GraphQL last year but we're now moving back to REST. How do we handle the old ADR?",
+  "required": [
+    "old ADR status changed to Superseded",
+    "new ADR created that supersedes old one",
+    "Proposed -> Accepted -> Superseded lifecycle explained"
+  ],
+  "forbidden": [
+    "delete the old ADR",
+    "edit the old ADR in place"
+  ]
+}

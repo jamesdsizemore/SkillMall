@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Produces a test using Arrange/Act/Assert pattern with blank-line separation",
+  "input": "Write a unit test for a function that calculates a 10% discount on prices above $100.",
+  "required": [
+    "Arrange section with test setup",
+    "Act section calling the function",
+    "Assert section verifying the result",
+    "test for price above $100 threshold"
+  ],
+  "forbidden": [
+    "test implementation internals",
+    "no assertions"
+  ]
+}

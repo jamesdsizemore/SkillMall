@@ -1,0 +1,12 @@
+{
+  "id": "tc-003",
+  "description": "Covers all spec features without silently omitting any",
+  "input": "I have a spec with these features: user login, user signup, password reset, session management, OAuth. Create a phase plan.",
+  "required": [
+    "all five features addressed: login, signup, password reset, session, OAuth"
+  ],
+  "forbidden": [
+    "omit OAuth",
+    "skip password reset"
+  ]
+}

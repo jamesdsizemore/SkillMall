@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Produces a blameless postmortem focused on systems not people",
+  "input": "Write a postmortem for a database outage caused by a developer who ran a migration without a lock timeout, taking the site down for 47 minutes.",
+  "required": [
+    "systemic cause identified: missing lock timeout policy or process",
+    "no individual blamed by name",
+    "action item to prevent recurrence at system level"
+  ],
+  "forbidden": [
+    "the developer caused the outage",
+    "fire the engineer",
+    "human error is the root cause"
+  ]
+}

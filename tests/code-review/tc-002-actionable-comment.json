@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Writes an actionable review comment with what, why, and suggested fix",
+  "input": "Write a review comment for: const data = await fetch('/api/users').then(r => r.json()) — there is no error handling.",
+  "required": [
+    "what is wrong described",
+    "why it matters explained",
+    "specific fix suggested with try/catch or .catch()"
+  ],
+  "forbidden": [
+    "this is fine",
+    "optional change"
+  ]
+}

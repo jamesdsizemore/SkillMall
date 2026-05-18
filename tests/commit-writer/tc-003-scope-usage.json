@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Uses appropriate scope when the change is scoped to a subsystem",
+  "input": "Write a commit for fixing a bug in the authentication service where expired tokens were not being rejected.",
+  "required": [
+    "fix type",
+    "scope like auth or authentication in parentheses",
+    "description mentions token expiry or rejection"
+  ],
+  "forbidden": [
+    "feat type for a bug fix",
+    "missing scope"
+  ]
+}

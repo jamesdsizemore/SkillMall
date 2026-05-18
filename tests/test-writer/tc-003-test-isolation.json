@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Enforces test isolation with no shared mutable state",
+  "input": "My tests share a database connection and a user array that gets modified across tests. What's wrong and how do I fix it?",
+  "required": [
+    "shared mutable state is the problem",
+    "reset state before or after each test",
+    "beforeEach or afterEach for cleanup"
+  ],
+  "forbidden": [
+    "shared state is fine",
+    "order tests carefully instead"
+  ]
+}

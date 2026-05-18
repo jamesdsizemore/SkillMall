@@ -1,0 +1,14 @@
+{
+  "id": "tc-001",
+  "description": "Produces a PR description with both WHAT changed and WHY",
+  "input": "Write a PR description: I refactored the authentication middleware to use JWT instead of session cookies because cookies were causing issues with our mobile API clients.",
+  "required": [
+    "what changed: JWT instead of session cookies",
+    "why: mobile API clients or API compatibility",
+    "how to test section"
+  ],
+  "forbidden": [
+    "updates the code",
+    "makes changes"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Reviews a PR for correctness issues with specific feedback",
+  "input": "Review this code: function getUser(id) { return db.query('SELECT * FROM users WHERE id = ' + id) }",
+  "required": [
+    "SQL injection vulnerability identified",
+    "parameterized query or prepared statement recommended",
+    "specific line or function referenced"
+  ],
+  "forbidden": [
+    "looks good",
+    "no issues found",
+    "cannot review"
+  ]
+}

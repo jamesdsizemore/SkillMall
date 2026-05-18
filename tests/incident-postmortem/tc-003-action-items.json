@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Generates action items with owners, due dates, and priorities",
+  "input": "Our monitoring failed to alert us during a 3-hour database outage. What action items should the postmortem produce?",
+  "required": [
+    "action items with owner assigned",
+    "due dates or timeline",
+    "monitoring improvement action item"
+  ],
+  "forbidden": [
+    "investigate further",
+    "no specific actions"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "tc-001",
+  "description": "Documents an endpoint with all required fields: method, auth, request, response, errors, example",
+  "input": "Document the POST /api/skills endpoint that creates a new skill. Requires Bearer token. Body: name (string, required), description (string, required), category (string). Returns 201 with the created skill or 400 if name exceeds 64 chars.",
+  "required": [
+    "HTTP method POST and path /api/skills",
+    "authentication: Bearer token",
+    "request body fields documented",
+    "201 and 400 response codes documented",
+    "curl example included"
+  ],
+  "forbidden": [
+    "authentication is optional",
+    "no example provided"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Forms and tests hypotheses one at a time",
+  "input": "My API returns 500 errors randomly. I think it might be the database connection, the cache layer, or maybe a race condition. How do I debug this?",
+  "required": [
+    "test one hypothesis at a time",
+    "form a specific hypothesis before testing",
+    "record what each test revealed"
+  ],
+  "forbidden": [
+    "change all three at once",
+    "guess randomly"
+  ]
+}

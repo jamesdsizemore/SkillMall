@@ -1,0 +1,13 @@
+{
+  "id": "tc-003",
+  "description": "Includes code review as a mandatory checkpoint in the workflow",
+  "input": "Walk me through implementing a new user authentication middleware.",
+  "required": [
+    "code review mentioned as a step",
+    "security check or security consideration"
+  ],
+  "forbidden": [
+    "skip review",
+    "review is optional"
+  ]
+}

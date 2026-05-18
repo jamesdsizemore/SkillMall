@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Correctly identifies when a decision warrants an ADR vs when it does not",
+  "input": "Should I write an ADR for: (a) choosing a sorting algorithm for a list component, (b) adopting a microservices architecture, (c) picking a tab width of 2 spaces?",
+  "required": [
+    "microservices architecture warrants an ADR",
+    "sorting algorithm does not need an ADR",
+    "tab width does not need an ADR"
+  ],
+  "forbidden": [
+    "all three need ADRs",
+    "none of them need ADRs"
+  ]
+}

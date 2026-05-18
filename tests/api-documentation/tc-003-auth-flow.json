@@ -1,0 +1,15 @@
+{
+  "id": "tc-003",
+  "description": "Documents authentication flow with step-by-step curl examples",
+  "input": "Document the authentication flow for our API: POST /auth/login with email and password returns a JWT token. The token must be sent as Bearer in subsequent requests.",
+  "required": [
+    "step 1: POST /auth/login with credentials",
+    "step 2: extract token from response",
+    "step 3: use token in Authorization header",
+    "curl examples for both steps"
+  ],
+  "forbidden": [
+    "just use the token",
+    "no curl examples"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "tc-001",
+  "description": "Produces a commit message in Conventional Commits 1.0.0 format",
+  "input": "Write a commit message: I added a new endpoint POST /api/skills that creates a new skill in the database.",
+  "required": [
+    "feat type prefix",
+    "description in imperative mood",
+    "colon after type"
+  ],
+  "forbidden": [
+    "Added new endpoint",
+    "This commit adds"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Produces a Strategy Canvas with competing factors and differentiated value curve",
+  "input": "Create a Strategy Canvas for a developer tools company entering the observability market against Datadog and Grafana.",
+  "required": [
+    "competing factors listed",
+    "differentiation from competitors described",
+    "value curve or scoring for at least two competitors"
+  ],
+  "forbidden": [
+    "compete on all the same factors as Datadog",
+    "cannot create a strategy canvas"
+  ]
+}

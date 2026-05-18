@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Distinguishes how-to guides from tutorials in structure and tone",
+  "input": "What's the difference between a tutorial and a how-to guide? Give me an example of each for deploying a Next.js app.",
+  "required": [
+    "tutorial: beginner, step-by-step, no prior knowledge assumed",
+    "how-to: assumes competence, goal-oriented, skips the why",
+    "concrete example of each"
+  ],
+  "forbidden": [
+    "they are the same thing",
+    "both are just documentation"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Applies the 16-step development loop to a feature implementation task",
+  "input": "I need to add a new API endpoint that returns the top 5 trending skills by install count.",
+  "required": [
+    "mentions TypeScript or type safety",
+    "mentions testing or tests",
+    "mentions code review step",
+    "sequential steps or numbered list"
+  ],
+  "forbidden": [
+    "I cannot help with this",
+    "skip testing"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Produces an ERRC grid with Eliminate, Reduce, Raise, Create factors",
+  "input": "Apply Blue Ocean Strategy to a B2B project management SaaS competing with Jira, Asana, and Linear.",
+  "required": [
+    "Eliminate section with specific factors",
+    "Reduce section with specific factors",
+    "Raise section with specific factors",
+    "Create section with new factors"
+  ],
+  "forbidden": [
+    "I cannot analyze this market",
+    "generic advice without specific factors"
+  ]
+}

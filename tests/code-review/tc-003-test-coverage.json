@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Checks that new behavior has corresponding tests",
+  "input": "This PR adds a new calculateDiscount() function with 3 pricing tiers but has no tests. How should I review this?",
+  "required": [
+    "tests required for new behavior",
+    "edge cases for pricing tiers mentioned",
+    "blocker or must-fix severity"
+  ],
+  "forbidden": [
+    "tests are optional",
+    "approve without tests"
+  ]
+}

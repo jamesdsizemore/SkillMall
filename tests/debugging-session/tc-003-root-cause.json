@@ -1,0 +1,14 @@
+{
+  "id": "tc-003",
+  "description": "Distinguishes root cause from symptom and fixes the root cause",
+  "input": "I found the bug: our API is slow because of N+1 queries. Should I add caching to fix the slowness?",
+  "required": [
+    "root cause is the N+1 query pattern",
+    "fix the N+1 queries not just add caching",
+    "caching masks symptom rather than fixing cause"
+  ],
+  "forbidden": [
+    "just add caching",
+    "caching is sufficient"
+  ]
+}

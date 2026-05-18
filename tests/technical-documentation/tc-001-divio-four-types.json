@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Correctly classifies documentation requests into the four Divio types",
+  "input": "I need to write docs for our authentication system. Users need to: (a) learn how JWT works, (b) configure OAuth, (c) look up token expiry values, (d) understand why we chose stateless auth.",
+  "required": [
+    "learn JWT = tutorial",
+    "configure OAuth = how-to guide",
+    "look up token expiry = reference",
+    "understand why = explanation"
+  ],
+  "forbidden": [
+    "all of these are the same type",
+    "just write a README"
+  ]
+}

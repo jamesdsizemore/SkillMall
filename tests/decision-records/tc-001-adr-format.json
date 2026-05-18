@@ -1,0 +1,14 @@
+{
+  "id": "tc-001",
+  "description": "Produces an ADR in Nygard format with Context, Decision, and Consequences",
+  "input": "We decided to use PostgreSQL instead of MongoDB for our user data because we need ACID transactions for financial records.",
+  "required": [
+    "Context section explaining the situation",
+    "Decision section in active voice",
+    "Consequences section with tradeoffs"
+  ],
+  "forbidden": [
+    "MongoDB is better",
+    "no tradeoffs mentioned"
+  ]
+}

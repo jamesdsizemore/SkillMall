@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Writes a tutorial that leads to a successful outcome without asking reader to make decisions",
+  "input": "Write a tutorial for setting up a PostgreSQL database for a Node.js app.",
+  "required": [
+    "every step is prescribed with exact commands",
+    "expected output shown after commands",
+    "reader can complete without making decisions"
+  ],
+  "forbidden": [
+    "choose your preferred method",
+    "you may want to consider"
+  ]
+}

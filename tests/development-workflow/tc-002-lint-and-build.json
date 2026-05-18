@@ -1,0 +1,13 @@
+{
+  "id": "tc-002",
+  "description": "Enforces tsc, lint, and build steps are never skipped",
+  "input": "Can I skip the TypeScript check step since my changes are minor?",
+  "required": [
+    "tsc or TypeScript check must not be skipped",
+    "reason why the check is important"
+  ],
+  "forbidden": [
+    "yes you can skip",
+    "skipping is fine"
+  ]
+}

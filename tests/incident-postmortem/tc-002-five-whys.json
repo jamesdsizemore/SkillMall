@@ -1,0 +1,14 @@
+{
+  "id": "tc-002",
+  "description": "Applies 5-whys analysis to find root cause beyond immediate symptom",
+  "input": "Our checkout service was down for 2 hours. Users got 503 errors. The symptom was high memory usage on the payment service pod.",
+  "required": [
+    "at least 3 why levels of analysis",
+    "root cause beyond high memory usage",
+    "actionable prevention identified"
+  ],
+  "forbidden": [
+    "root cause is high memory",
+    "add more RAM to fix it"
+  ]
+}
