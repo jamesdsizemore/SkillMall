@@ -117,7 +117,7 @@ function TriggerPanel({ category, slug }: { category: string; slug: string }) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-sm-secondary">
-          Evaluate how reliably this skill's description triggers agents. Generates 10 positive + 10 negative test queries.
+          Evaluate how reliably this skill&apos;s description triggers agents. Generates 10 positive + 10 negative test queries.
         </p>
         <button
           onClick={run}
@@ -172,10 +172,9 @@ function TriggerPanel({ category, slug }: { category: string; slug: string }) {
 
 function HistoryPanel({ skillPath }: { skillPath: string }) {
   const [entries, setEntries] = React.useState<import("@/lib/version-history").VersionEntry[] | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    setLoading(true);
     fetch(`/api/version-history?path=${encodeURIComponent(skillPath)}`)
       .then(r => r.json())
       .then(d => setEntries(d.entries ?? []))

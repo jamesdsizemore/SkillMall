@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Space_Mono } from "next/font/google";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { getSession } from "@/lib/auth/github";
+import { AuthButton } from "@/components/skill-mall/auth-button";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -27,11 +30,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("sm_session")?.value;
+  const session = token ? getSession(token) : null;
+
   return (
     <html
       lang="en"
@@ -94,6 +101,7 @@ export default function RootLayout({
                 </svg>
                 <span className="hidden sm:block">GitHub</span>
               </a>
+              <AuthButton session={session} />
             </nav>
           </div>
         </header>
