@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T201
+active_task: T204
 
 tasks:
 
@@ -889,7 +889,7 @@ tasks:
         - cmd: "npx tsc --noEmit"
           status: pass
         - cmd: "node -e verify tables"
-          status: "pass — all 6 tables present: skill_feedback, improvement_suggestions, knowledge_bases, knowledge_chunks, purchases, skill_tiers"
+          status: pass
       summary: "reactflow already installed (T254). Installed stripe + @stripe/stripe-js. sqlite-vss BLOCKED on Node v22.20.0 — loadExtension fails (shared library not present). T203 (RAG) is blocked; T201-T202 and T204-T207 proceed. Migration 002_phase3.sql creates all 6 Phase 3 tables. .env.local: Stripe placeholder vars added. lib/db/types.ts: all Phase 3 interfaces. lib/marketplace/gate.ts: checkMarketplaceReady() enforces 4 launch conditions at runtime."
 
   # ─── SKILL CHAIN BUILDER ──────────────────────────────────────────────────
@@ -897,11 +897,12 @@ tasks:
   - id: T202
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Build the Skill Chain Builder: React Flow canvas at /skills/chains/new (ChainCanvas.tsx + ChainEdgeConfig.tsx from plan), lib/chains.ts (buildChainDirectory), POST /api/create-chain, GET /api/chains, GET /api/chains/[slug]. Chain SKILL.md validates against AgentSkills spec."
     allowed_files:
       - app/skills/chains/new/page.tsx
+      - app/skills/chains/new/ChainClient.tsx
       - components/skill-mall/chains/ChainCanvas.tsx
       - components/skill-mall/chains/ChainEdgeConfig.tsx
       - lib/chains.ts
@@ -920,14 +921,33 @@ tasks:
     stop_if:
       - "React Flow causes SSR error — add dynamic import with ssr: false before continuing"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/chains.ts
+        - lib/__tests__/chains.test.ts
+        - components/skill-mall/chains/ChainCanvas.tsx
+        - components/skill-mall/chains/ChainEdgeConfig.tsx
+        - app/skills/chains/new/page.tsx
+        - app/skills/chains/new/ChainClient.tsx
+        - app/api/chains/route.ts
+        - app/api/chains/[slug]/route.ts
+        - app/api/create-chain/route.ts
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/chains"
+          status: pass
+      summary: "lib/chains.ts: Chain/ChainStep types, buildChainDirectory() produces SKILL.md (chain:true frontmatter, chain_steps YAML), chain.json, README.md. buildChainSkillDirectory() wraps as InMemorySkillDirectory. validateChain() delegates to validateSkillDirectory. listChains() and getChain() for API routes. ChainCanvas.tsx: ReactFlow canvas with skill sidebar, edge connections, chain name input, BUILD CHAIN button posting to /api/create-chain. ChainEdgeConfig.tsx: passesAs selector, namedVariable, instructions. page.tsx: Server Component fetching skills, ChainClient.tsx: 'use client' wrapper with ssr:false dynamic import to avoid SSR error. /api/create-chain: validates chain, writes via atomicWrite. 8 tests passing."
 
   # ─── RAG-ENHANCED SKILLS ─────────────────────────────────────────────────
 
   - id: T203
     type: worker
     assignee: Worker
-    status: queued
+    status: blocked
     reasoning_hint: default
     objective: "Implement RAG knowledge attachment: lib/rag/embeddings.ts (generateEmbedding for openai/ollama/gemini — claude-code not supported), lib/rag/chunker.ts (chunkText 512 tokens, extractText), lib/rag/knowledge-base.ts (createKnowledgeBase, attachKnowledge, retrieveChunks via VSS), CLI attach-knowledge command, POST /api/retrieve route."
     allowed_files:
@@ -948,14 +968,16 @@ tasks:
     stop_if:
       - "sqlite-vss loadExtension() fails — block T203 with receipt explaining the error; do not attempt workaround; report"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: blocked
+      reason: "sqlite-vss loadExtension() fails on Node v22.20.0. Error: dlopen(sqlite-vss.dylib, 0x000A): no such file — sqlite-vss shared library is not installed. The stop_if condition says to block T203 without workaround. RAG will require installing sqlite-vss via a native package or precompiled binary for the running Node version before this task can proceed."
 
   # ─── SELF-IMPROVEMENT LOOP ───────────────────────────────────────────────
 
   - id: T204
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement feedback collection: lib/self-improvement/feedback.ts (createFeedback, getFeedbackCount, getRecentFeedback), POST /api/feedback route (auth required), feedback form on skill detail page (satisfaction 1-5 + 200-char text, opt-in, never auto-prompted), trigger analysis at 10+ submissions."
     allowed_files:
