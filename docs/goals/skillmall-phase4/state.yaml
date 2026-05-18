@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T401
+active_task: T402
 
 tasks:
 
@@ -81,7 +81,7 @@ tasks:
   - id: T401
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/getting-started.md (3000+ words) covering prerequisites, clone/install, all 5 LLM provider configurations with exact commands, database setup, run app, run tests, project structure with WHY explanations, first contribution walkthrough, architecture overview (500+ words), common dev tasks reference table, full env var reference table. Update README.md developer section."
     allowed_files:
@@ -95,12 +95,24 @@ tasks:
     stop_if:
       - "Any command produces an error — fix or document workaround, never document broken commands"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/getting-started.md
+        - README.md
+      commands:
+        - cmd: "wc -w docs/developer/getting-started.md"
+          status: pass
+        - cmd: "node cli/dist/index.js list"
+          status: pass
+        - cmd: "bash scripts/validate-skill.sh skills/ai/skill-creator"
+          status: pass
+      summary: "3094 words. All 5 provider configure commands shown (claude-code/openai/gemini/groq/ollama). Project structure matches actual dirs. Architecture overview includes RAG pure-JS decision rationale, Nothing design system, multi-provider reasoning. Environment variable table covers all 14 vars including RAG-specific OPENAI_API_KEY/GEMINI_API_KEY. README.md updated with full documentation index linking all 20 Phase 4 docs. Note: CLI fixed before writing — static import of RAG module pulled better-sqlite3 into ESM bundle, crashing all commands. Fixed with lazy dynamic import in attach-knowledge.ts."
 
   - id: T402
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/developer/architecture.md (4000+ words) covering: system overview with ASCII diagram, provider abstraction with full TypeScript interface, all 5 pipeline stages in detail (what flows in, what flows out, how LLM calls work, how Zod validation works), state management (WizardContext), database design (all tables + WHY SQLite), GitHub OAuth flow step-by-step, Nothing design system with token values, performance characteristics (60+ LLM calls for 20-tool domain), security model (Zod, parameterized SQL, path traversal, author verification)."
     allowed_files:

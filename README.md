@@ -70,27 +70,54 @@ npm run dev
 npx skill-mall deploy business/blue-ocean-strategy
 ```
 
-## Setup
+## Developer Setup
 
 ```bash
 git clone https://github.com/jamesdsizemore/SkillMall
 cd SkillMall
 npm install
-npm run prepare
+cd cli && npm install && cd ..
+npm run db:migrate
 npm run dev
 ```
 
+**Requirements:** Node.js 20+, npm 10+
+
+**Full developer documentation:** [docs/developer/getting-started.md](docs/developer/getting-started.md)
+
+Topics covered: all 5 LLM provider configurations, GitHub OAuth setup, database management, project structure with explanations, architecture overview (pipeline, RAG with pure-JS cosine similarity, Nothing design system), test suite guide, complete environment variable reference.
+
 ## Documentation
 
-- [Configuring Providers](docs/user/configuring-providers.md)
-- [Using the Wizard](docs/user/using-the-wizard.md)
-- [Using the CLI](docs/user/using-the-cli.md)
-- [Pipeline Architecture](docs/reference/pipeline-architecture.md)
-- [Provider Catalog](docs/reference/provider-catalog.md)
-- [ResearchResult Schema](docs/reference/research-result-schema.md)
-- [Prompt File Format](docs/reference/prompt-file-format.md)
-- [Quality Score Rubric](docs/reference/quality-score-rubric.md)
-- [API Routes](docs/reference/api-routes.md)
+### Developer
+- [Getting Started](docs/developer/getting-started.md) — clone, configure, run, first contribution
+- [Architecture](docs/developer/architecture.md) — internal system design, provider abstraction, database
+- [API Reference](docs/developer/api-reference.md) — all API routes with schemas and curl examples
+- [CLI Reference](docs/developer/cli-reference.md) — all CLI commands with flags and expected outputs
+- [Contributing](docs/developer/contributing.md) — skill contribution workflow, code standards, PR process
+- [Extending SkillMall](docs/developer/extending.md) — adding providers, commands, routes, quality dimensions
+- [Deployment](docs/developer/deployment.md) — Vercel, Railway, VPS, env vars, SQLite in production
+- [FAQ](docs/developer/faq.md) — why SQLite, why multi-provider, how to add a category, and more
+- [Security](docs/developer/security.md) — input validation, SQL injection prevention, auth security
+
+### User Guide
+- [Introduction](docs/guide/introduction.md) — what SkillMall is, key concepts, user personas
+- [Quick Start](docs/guide/quick-start.md) — zero to deployed skill in 10 minutes
+- [Wizard Tutorial](docs/guide/tutorials/wizard-tutorial.md) — creating a skill via the web wizard
+- [CLI Tutorial](docs/guide/tutorials/cli-tutorial.md) — creating a skill via the command line
+- [Customizing Skills](docs/guide/tutorials/customizing-skills.md) — forking and personalizing skills
+- [Understanding Quality Scores](docs/guide/understanding-quality.md) — the 5-dimension rubric
+- [Using Collections](docs/guide/using-collections.md) — starter packs and custom collections
+- [Prompt Optimization](docs/guide/prompt-optimization.md) — framework library, optimizer, overrides
+- [Troubleshooting](docs/guide/troubleshooting.md) — 25+ specific problems with step-by-step fixes
+- [Glossary](docs/guide/glossary.md) — 40+ defined terms
+
+### Marketing
+- [Landing Page Copy](docs/marketing/landing-page-copy.md)
+- [Value Proposition](docs/marketing/value-proposition.md)
+- [Use Cases](docs/marketing/use-cases.md)
+- [Comparison Guide](docs/marketing/comparison.md)
+- [Press Kit](docs/marketing/press-kit.md)
 
 ## Skill Structure
 
@@ -122,7 +149,7 @@ skills/<category>/<skill-name>/
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [docs/developer/contributing.md](docs/developer/contributing.md) for the full contribution guide including skill quality standards, code conventions, and the 16-step development loop.
 
 ## License
 
