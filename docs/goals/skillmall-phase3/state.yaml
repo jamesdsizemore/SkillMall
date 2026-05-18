@@ -854,7 +854,7 @@ tasks:
   - id: T201
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Install reactflow, stripe, @stripe/stripe-js. Attempt to install sqlite-vss (stop and report if loadExtension fails). Write db/migrations/002_phase3.sql with all 6 Phase 3 tables. Apply migration. Add STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET to .env.local template."
     allowed_files:
@@ -872,14 +872,32 @@ tasks:
     stop_if:
       - "sqlite-vss loadExtension() throws — report the error and Node.js version before continuing; RAG (T203) will be blocked until resolved but T201-T202 and T204-T207 can proceed"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - db/migrations/002_phase3.sql
+        - package.json
+        - lib/db/types.ts
+        - lib/marketplace/gate.ts
+      commands:
+        - cmd: "npm install stripe @stripe/stripe-js"
+          status: pass
+        - cmd: "npm run db:migrate"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "node -e verify tables"
+          status: "pass — all 6 tables present: skill_feedback, improvement_suggestions, knowledge_bases, knowledge_chunks, purchases, skill_tiers"
+      summary: "reactflow already installed (T254). Installed stripe + @stripe/stripe-js. sqlite-vss BLOCKED on Node v22.20.0 — loadExtension fails (shared library not present). T203 (RAG) is blocked; T201-T202 and T204-T207 proceed. Migration 002_phase3.sql creates all 6 Phase 3 tables. .env.local: Stripe placeholder vars added. lib/db/types.ts: all Phase 3 interfaces. lib/marketplace/gate.ts: checkMarketplaceReady() enforces 4 launch conditions at runtime."
 
   # ─── SKILL CHAIN BUILDER ──────────────────────────────────────────────────
 
   - id: T202
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Build the Skill Chain Builder: React Flow canvas at /skills/chains/new (ChainCanvas.tsx + ChainEdgeConfig.tsx from plan), lib/chains.ts (buildChainDirectory), POST /api/create-chain, GET /api/chains, GET /api/chains/[slug]. Chain SKILL.md validates against AgentSkills spec."
     allowed_files:
