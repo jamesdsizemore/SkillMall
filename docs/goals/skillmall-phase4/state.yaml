@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T403
+active_task: T404
 
 tasks:
 
@@ -137,7 +137,7 @@ tasks:
   - id: T403
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/api-reference.md (5000+ words) covering ALL 23 API routes: auth routes (login/callback/logout), provider routes, pipeline routes (research/confirm-research/create-skill), tool routes (optimize-prompt/regen-prompt/eval-triggers/budget-check/fork-skill/version-history), community routes (reviews/feedback/improvements), MCP route, analytics route, marketplace routes (Phase 3), Stripe webhook. Each route: method, path, auth requirement, complete request/response schema tables, all error codes with exact error string values, working curl example."
     allowed_files:
@@ -151,12 +151,19 @@ tasks:
       - "Any curl example returns unexpected response — fix the doc or flag the bug"
       - "A route in app/api/ is not documented — add it"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/api-reference.md
+      commands:
+        - cmd: "wc -w docs/developer/api-reference.md"
+          status: pass
+      summary: "5074 words. All 29 API routes documented (actual count: 29, not 23 as stated in objective). Full route index table. Each route has method, auth, request/response schema, error codes, curl example. Stripe webhook raw body requirement explicitly documented. Detailed schema reference for ResearchResult, Skill files, Chain, PromptAudit, TriggerEvalResult, BudgetCheckResult, MarketplaceReadiness. Serverless compatibility table (create-skill/fork-skill/regen-prompt NOT compatible with Vercel). Common patterns: Zod validation, auth check, author authorization, error logging policy, marketplace gate."
 
   - id: T404
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/developer/cli-reference.md (3000+ words) covering ALL CLI commands with full flag tables, behavior description, numbered steps, examples with expected outputs, and exit codes. Commands: configure, create, confirm-research, deploy (--all-agents/--agents/--scope), deploy-pack, fork, revert, publish (npm and skills.sh), validate, new (template-based and --from-template), extract, test, budget-check, optimize-prompt, regen-prompt, eval-triggers, mcp-server, attach-knowledge, list, find."
     allowed_files:
