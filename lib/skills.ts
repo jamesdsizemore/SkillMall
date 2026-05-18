@@ -20,6 +20,7 @@ export type Skill = {
   hasScripts: boolean;
   hasTemplates: boolean;
   hasSamples: boolean;
+  skills_sh_id?: string | null;
 };
 
 export type Category = {
@@ -103,6 +104,7 @@ function parseSkill(filePath: string): Skill | null {
       hasScripts,
       hasTemplates,
       hasSamples,
+      skills_sh_id: meta["skills_sh_id"] ? String(meta["skills_sh_id"]) : null,
     };
   } catch {
     return null;

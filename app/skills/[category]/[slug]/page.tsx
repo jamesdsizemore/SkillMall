@@ -8,6 +8,7 @@ import { getReviews, getEffectivenessScore, getReviewCount } from "@/lib/reviews
 import { getInstallCount, getForkCount } from "@/lib/analytics";
 import { getAvailableLocales } from "@/lib/i18n";
 import nodePath from "node:path";
+import { SkillsShBadge } from "@/components/skill-mall/skill-detail/SkillsShBadge";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
 import { ForkButton } from "@/components/skill-mall/fork-button";
 import { ReviewForm } from "@/components/skill-mall/reviews/ReviewForm";
@@ -154,6 +155,18 @@ export default async function SkillPage({ params }: Props) {
                     {skill.hasTemplates && <span>[ TEMPLATES ]</span>}
                     {skill.hasSamples && <span>[ SAMPLES ]</span>}
                   </div>
+                </div>
+              )}
+
+              {skill.skills_sh_id && (
+                <div className="mt-3 border-t border-sm-border pt-3">
+                  <p
+                    className="mb-2 text-[9px] tracking-widest text-sm-disabled"
+                    style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                  >
+                    [ PUBLISHED ON ]
+                  </p>
+                  <SkillsShBadge skillsShId={skill.skills_sh_id} />
                 </div>
               )}
 

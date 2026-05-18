@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T271
+active_task: T272
 
 tasks:
 
@@ -645,7 +645,7 @@ tasks:
   - id: T271
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Display skills.sh badge on skill detail page when metadata.skills_sh_id is set in SKILL.md frontmatter. Show the slug as a static badge linking to https://skills.sh/skills/<id>. DO NOT attempt to fetch live install counts — the skills.sh API is not publicly documented. Badge appears on skill detail sidebar."
     allowed_files:
@@ -660,14 +660,23 @@ tasks:
     stop_if:
       - "Implementation fetches live data from skills.sh API — that API is not documented. Static badge only."
       - "Need files outside allowed_files"
-    stop_if:
-      - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/skills.ts
+        - app/skills/[category]/[slug]/page.tsx
+        - components/skill-mall/skill-detail/SkillsShBadge.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+      summary: "lib/skills.ts: skills_sh_id?: string | null field added to Skill type (optional to not break existing tests), parsed from metadata.skills_sh_id frontmatter field. SkillsShBadge.tsx: static badge linking to https://skills.sh/skills/<id> — no API calls. page.tsx: shows badge in sidebar when skill.skills_sh_id is set, hides when not set."
 
   - id: T272
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Add CI README status badge to the GitHub Actions workflow. After validate-skills.yml runs, write a badge showing validation status of the most recently merged skill change. Use shields.io endpoint or GitHub Actions badge format. Update README.md to show the badge."
     allowed_files:
