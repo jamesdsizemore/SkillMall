@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getSkill, getSkillReadme, getAllSkills } from "@/lib/skills";
 import { computeQualityScore } from "@/lib/quality-score";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
+import { ForkButton } from "@/components/skill-mall/fork-button";
 
 type Props = {
   params: Promise<{ category: string; slug: string }>;
@@ -167,6 +168,16 @@ export default async function SkillPage({ params }: Props) {
                 [ DEPLOY ]
               </p>
               <DeployButton skillPath={skill.path} />
+            </div>
+
+            <div>
+              <p
+                className="mb-3 text-[9px] tracking-widest text-sm-secondary"
+                style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+              >
+                [ FORK ]
+              </p>
+              <ForkButton category={skill.category} slug={skill.slug} />
             </div>
           </div>
         </div>

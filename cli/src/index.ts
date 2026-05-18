@@ -9,6 +9,7 @@ import { createCommand } from "./commands/create.js";
 import { configureCommand } from "./commands/configure.js";
 import { confirmResearchCommand } from "./commands/confirm-research.js";
 import { deployPackCommand } from "./commands/deploy-pack.js";
+import { forkCommand } from "./commands/fork.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -83,6 +84,10 @@ async function main(): Promise<void> {
 
     case "deploy-pack":
       await deployPackCommand(rest);
+      break;
+
+    case "fork":
+      await forkCommand(rest);
       break;
 
     case "--help":
