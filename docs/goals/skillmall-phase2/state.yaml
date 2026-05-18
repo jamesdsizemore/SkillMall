@@ -1,0 +1,429 @@
+# GoalBuddy v2 state.yaml — SkillMall Phase 2
+
+version: 2
+
+goal:
+  title: "SkillMall Phase 2 — Community and Ecosystem"
+  slug: skillmall-phase2
+  kind: existing_plan
+  tranche: "Build SkillMall Phase 2: SQLite backend + GitHub OAuth → ratings/reviews → collections, forking, multi-agent deploy, MCP server, trending, trigger evaluator, version history → documentation → completion audit. T101 (SQLite) first; T102 (OAuth) blocked until GitHub app credentials provisioned."
+  status: active
+  intake:
+    original_request: "Build SkillMall Phase 2 from docs/superpowers/plans/PHASE-2-PLAN.md"
+    interpreted_outcome: "A community-enabled SkillMall where users can rate skills, deploy collections, fork skills with lineage, publish to skills.sh, deploy to all agents at once, query the catalog via MCP, and see trending analytics — all on SQLite with GitHub OAuth"
+    input_shape: existing_plan
+    audience: "James Sizemore — project owner"
+    authority: approved
+    proof_type: demo
+    completion_proof: "npm run build + npm test pass, db:migrate clean, GitHub OAuth round-trip works, review submission works, deploy-pack works, MCP search_skills works, trending renders, all 6 docs >= 500 words, James approves at T114"
+    likely_misfire: "Building community features before T101+T102 are stable. Starting T102 before GitHub OAuth app is registered. Introducing Supabase or pgvector."
+    blind_spots_considered:
+      - "T102 is hard-blocked until GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are provisioned — T101 can start immediately, T102 cannot"
+      - "better-sqlite3 is a native Node.js module — may require node-gyp on fresh installs; test on CI before assuming it works"
+      - "Skills.sh OAuth endpoint must be verified publicly documented before T107 proceeds — may need to stub"
+      - "SQLite WAL mode requires the database file to be on a local filesystem — Vercel's read-only filesystem means db writes fail in production; Phase 2 is local-first by design"
+      - "Security check mandatory on every Phase 2 Worker task — all tasks touch auth, DB writes, or user data"
+    existing_plan_facts:
+      - "Full plan: docs/superpowers/plans/PHASE-2-PLAN.md — 64KB, all implementation embedded"
+      - "Backend: SQLite via better-sqlite3 — no Supabase, no Prisma, no pgvector"
+      - "DB file: data/skillmall.db (gitignored)"
+      - "Migrations: db/migrations/ (SQL only, committed)"
+      - "Runner: npm run db:migrate (node scripts/migrate.js)"
+      - "Sessions table: id TEXT PK, github_id, github_login, scopes, created_at, expires_at"
+      - "Install events table: zero PII — skill_slug + agent_type + installed_at only"
+      - "Reviews: UNIQUE(skill_slug, reviewer_github_id) — one review per skill per user"
+      - "GitHub OAuth: manual implementation (no next-auth) — state CSRF check required"
+      - "Session cookie: sm_session, httpOnly, Secure in prod, SameSite=Strict, 7-day maxAge"
+      - "Generic review detection: isGenericReview() checks against GENERIC_PHRASES list"
+      - "Effectiveness score: quality-weighted average (specific reviews 2x weight)"
+      - "MCP server: GET /api/mcp returns tool list, POST /api/mcp handles tools/list and tools/call"
+      - "Multi-agent: 7 primary agents in registry (full 54 can be added incrementally)"
+      - "Agent detection: filesystem check for ~/.claude/skills, ~/.cursor/skills, etc."
+      - "Install event logged on every successful skill deploy"
+      - "Development workflow: 16 steps per task — Steps 6 (tsc), 7 (lint), 8 (build), 9/11 (reviews) never skipped"
+      - "Security check mandatory on EVERY Phase 2 Worker task"
+      - "Parameterized queries only — no string concatenation in SQL"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: bundled_not_installed
+  worker: bundled_not_installed
+  judge: bundled_not_installed
+
+visual_board:
+  selected: local
+  local:
+    status: starting
+    url: null
+    command: "npx goalbuddy board /Users/jamesdsizemore/Developer/skill-mall/docs/goals/skillmall-phase2"
+  github_projects:
+    status: not_requested
+    url: null
+    command: "npx goalbuddy extend github-projects"
+    missing: []
+
+active_task: T101
+
+tasks:
+
+  # ─── FOUNDATION — T101 first, T102 blocked on credentials ─────────────────
+
+  - id: T101
+    type: worker
+    assignee: Worker
+    status: active
+    reasoning_hint: default
+    objective: "Install better-sqlite3, write db/migrations/001_initial.sql (sessions + install_events + reviews tables), write scripts/migrate.js runner, write lib/db/client.ts with WAL-mode singleton, write lib/db/types.ts, add npm run db:migrate script, add data/skillmall.db to .gitignore."
+    allowed_files:
+      - db/migrations/001_initial.sql
+      - scripts/migrate.js
+      - lib/db/client.ts
+      - lib/db/types.ts
+      - package.json
+      - .gitignore
+      - lib/__tests__/db.test.ts
+    verify:
+      - "npm install better-sqlite3 @types/better-sqlite3 succeeds"
+      - "npm run db:migrate exits 0 on first run — creates data/skillmall.db"
+      - "npm run db:migrate exits 0 on second run — idempotent"
+      - "npx tsc --noEmit exits 0"
+      - "npm run build succeeds"
+      - "node -e \"require('better-sqlite3')\" exits 0 (native module loads)"
+    stop_if:
+      - "better-sqlite3 fails to install — check Node.js version and node-gyp availability before continuing"
+      - "npm run build fails due to server-only import in a client component — add export const dynamic = 'force-dynamic' or move to server component"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T102
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: default
+    objective: "Implement GitHub OAuth: lib/auth/github.ts (getGitHubAuthUrl, exchangeCodeForToken, fetchGitHubUser, createSession, getSession, deleteSession), lib/auth/middleware.ts (getCurrentSession, requireAuth), three API routes (GET /api/auth/login, GET /api/auth/callback/github, POST /api/auth/logout), Sign In button in app/layout.tsx."
+    allowed_files:
+      - lib/auth/github.ts
+      - lib/auth/middleware.ts
+      - app/api/auth/login/route.ts
+      - app/api/auth/callback/github/route.ts
+      - app/api/auth/logout/route.ts
+      - app/layout.tsx
+      - lib/__tests__/auth.test.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build succeeds"
+      - "OAuth round-trip: GET /api/auth/login → GitHub → callback → session in DB → sm_session cookie set (manual smoke test)"
+      - "Unauthenticated request to requireAuth() route → 401"
+      - "State mismatch in callback → 400 (not 500)"
+      - "POST /api/auth/logout → session deleted from DB, cookie cleared"
+    stop_if:
+      - "GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not in .env.local — do not proceed; add them first"
+      - "crypto.randomBytes not available in edge runtime — add export const runtime = 'nodejs' to affected routes"
+      - "Need files outside allowed_files"
+    receipt:
+      result: blocked
+      reason: "Blocked pending GitHub OAuth app credentials. Register app at github.com/settings/developers → set Homepage URL and Callback URL (http://localhost:3000/api/auth/callback/github) → copy Client ID and Client Secret → add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to .env.local. Also add NEXTAUTH_SECRET (any 32-char random string) and NEXT_PUBLIC_APP_URL=http://localhost:3000."
+
+  # ─── RATINGS AND REVIEWS ──────────────────────────────────────────────────
+
+  - id: T103
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement lib/reviews.ts (createReview, getReviews, getEffectivenessScore, getReviewCount, hasInstallSignal, isGenericReview), lib/analytics.ts (logInstallEvent, getInstallCount, getInstallVelocity7d, getTrending7d, getInstallsByAgentType, getRising), POST /api/reviews and GET /api/reviews/[skillSlug]. Log install events in POST /api/create-skill."
+    allowed_files:
+      - lib/reviews.ts
+      - lib/analytics.ts
+      - lib/__tests__/reviews.test.ts
+      - lib/__tests__/analytics.test.ts
+      - app/api/reviews/route.ts
+      - app/api/reviews/[skillSlug]/route.ts
+      - app/api/create-skill/route.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm test lib/__tests__/reviews all pass"
+      - "npm test lib/__tests__/analytics all pass"
+      - "POST /api/reviews without session cookie → 401"
+      - "POST /api/reviews with body > 150 chars → 400"
+      - "POST /api/reviews with rating = 6 → 400"
+      - "Duplicate review (same skill + github_id) → 409"
+      - "npm run build succeeds"
+    stop_if:
+      - "Parameterized query not used for any SQL — fix before continuing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T104
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Add ratings UI to skill detail page: ReviewForm (star rating + 150-char body with live counter, sign-in prompt for unauthenticated users), ReviewFeed (specific reviews above fold, generic reviews below), EffectivenessPanel showing effectiveness score and install count as SEPARATE metrics — never combined."
+    allowed_files:
+      - app/skills/[category]/[slug]/page.tsx
+      - components/skill-mall/reviews/ReviewForm.tsx
+      - components/skill-mall/reviews/ReviewFeed.tsx
+      - components/skill-mall/reviews/EffectivenessPanel.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build succeeds"
+      - "Authenticated user sees ReviewForm, unauthenticated user sees sign-in prompt (smoke test)"
+      - "150-char limit enforced with live counter"
+      - "Effectiveness score and install count display independently — never as a single combined metric"
+      - "Generic reviews (is_generic=1) appear below specific reviews"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── NO-AUTH FEATURES — parallel with T102/T103, require Phase 1 only ─────
+
+  - id: T105
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement skill collections: lib/collections.ts (getAllCollections, getCollection, validateCollection), three starter collection.json files (full-stack-developer-kit, strategic-business-pack, documentation-suite using only skills that exist in catalog), cli/src/commands/deploy-pack.ts, register deploy-pack in cli/src/index.ts."
+    allowed_files:
+      - lib/collections.ts
+      - lib/__tests__/collections.test.ts
+      - collections/full-stack-developer-kit/collection.json
+      - collections/strategic-business-pack/collection.json
+      - collections/documentation-suite/collection.json
+      - cli/src/commands/deploy-pack.ts
+      - cli/src/index.ts
+    verify:
+      - "cd cli && npm run type-check exits 0"
+      - "cd cli && npm run build exits 0"
+      - "getAllCollections() returns 3 collections"
+      - "validateCollection with missing skill slug returns error array"
+      - "npx skill-mall deploy-pack full-stack-developer-kit --agent claude-code deploys all skills in order (smoke test)"
+    stop_if:
+      - "Collection references a skill slug that does not exist in skills/ — use only ai/skill-creator, productivity/development-workflow, productivity/phased-implementation-plan"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T106
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement skill forking: lib/forking.ts (forkSkill with forked_from + fork_chain frontmatter tracking), cli/src/commands/fork.ts, register fork in CLI, Fork button in skill detail page calling POST /api/fork-skill."
+    allowed_files:
+      - lib/forking.ts
+      - lib/__tests__/forking.test.ts
+      - cli/src/commands/fork.ts
+      - cli/src/index.ts
+      - app/skills/[category]/[slug]/page.tsx
+      - app/api/fork-skill/route.ts
+      - components/skill-mall/fork-button.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npx skill-mall fork ai/skill-creator my-custom-skill-creator creates skills/ai/my-custom-skill-creator/ with forked_from frontmatter"
+      - "Fork of a fork: fork_chain array contains full lineage"
+      - "Fork to existing directory → throws error, does not overwrite"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T107
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement npx skill-mall publish <slug> --registry skills.sh: pre-publish validation (quality score >= 70, description <= 1024, name matches dir, license present), skills.sh OAuth flow, post-publish frontmatter update with metadata.skills_sh_id and metadata.skills_sh_url."
+    allowed_files:
+      - cli/src/commands/publish.ts
+      - cli/src/index.ts
+      - lib/publish/skills-sh.ts
+    verify:
+      - "cd cli && npm run build exits 0"
+      - "Quality score < 70 → exits 1 with specific message"
+      - "Missing license field → exits 1 with specific message"
+      - "OAuth flow opens browser (manual smoke test)"
+    stop_if:
+      - "skills.sh OAuth endpoint is not publicly documented — stub the implementation with clear TODO, document what's missing, and stop"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T108
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement multi-agent deploy: lib/agents/registry.ts (7 primary agents), lib/agents/detector.ts (detectAgents, deployToAgents), update cli/src/commands/deploy.ts to support --all-agents and --agents flags, add 'Deploy to All Agents' option to deploy-button.tsx, log install events for each deployment."
+    allowed_files:
+      - lib/agents/registry.ts
+      - lib/agents/detector.ts
+      - lib/__tests__/agent-detection.test.ts
+      - cli/src/commands/deploy.ts
+      - cli/src/index.ts
+      - components/skill-mall/deploy-button.tsx
+    verify:
+      - "cd cli && npm run build exits 0"
+      - "npx tsc --noEmit exits 0"
+      - "detectAgents() returns detected: true for ~/.claude/skills if it exists (mocked fs test)"
+      - "npx skill-mall deploy ai/skill-creator --all-agents shows per-agent status table (manual smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T109
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement SkillMall MCP server at /api/mcp: GET returns tool list (search_skills, get_skill, list_categories), POST handles JSON-RPC 2.0 tools/list and tools/call methods. Add export const runtime = 'nodejs'. Create docs/user/mcp-server.md with config JSON snippet."
+    allowed_files:
+      - app/api/mcp/route.ts
+      - docs/user/mcp-server.md
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "curl -X GET http://localhost:3000/api/mcp returns JSON with tools array containing search_skills"
+      - "curl -X POST http://localhost:3000/api/mcp with tools/call search_skills returns matching skills"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T110
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Build /trending page (top 10 by 7-day install velocity using getTrending7d), /trending/rising page (skills with >50% velocity acceleration using getRising), /dashboard contributor page (authenticated; shows own skills' install counts per agent type using getInstallsByAgentType)."
+    allowed_files:
+      - app/trending/page.tsx
+      - app/dashboard/page.tsx
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "/trending renders (may be empty state with no install events)"
+      - "/dashboard redirects to sign-in if unauthenticated (smoke test)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T111
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Description Trigger Evaluator: lib/trigger-evaluator.ts (evaluateTriggers — generates 10 positive + 10 negative queries, evaluates each, returns accuracy rates), POST /api/eval-triggers, Trigger Analysis tab in SkillTabs, cli/src/commands/eval-triggers.ts."
+    allowed_files:
+      - lib/trigger-evaluator.ts
+      - lib/__tests__/trigger-evaluator.test.ts
+      - app/api/eval-triggers/route.ts
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - cli/src/commands/eval-triggers.ts
+      - cli/src/index.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "npm test lib/__tests__/trigger-evaluator all pass (mocked LLM)"
+      - "Generates exactly 10 positive + 10 negative queries (mocked)"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  - id: T112
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Implement Skill Version History: lib/version-history.ts (getVersionHistory reads git log, deriveSemanticDiff maps file changes to plain language), History tab in SkillTabs, cli/src/commands/revert.ts (creates revert branch from specified version)."
+    allowed_files:
+      - lib/version-history.ts
+      - lib/__tests__/version-history.test.ts
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - cli/src/commands/revert.ts
+      - cli/src/index.ts
+    verify:
+      - "npx tsc --noEmit exits 0"
+      - "npm run build exits 0"
+      - "getVersionHistory returns empty array gracefully when skill has no git history"
+      - "deriveSemanticDiff('SKILL.md') returns 'skill instructions updated'"
+    stop_if:
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── DOCUMENTATION ────────────────────────────────────────────────────────
+
+  - id: T113
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: default
+    objective: "Write all 6 Phase 2 documentation files, each >= 500 words, production quality. docs/user/mcp-server.md (MCP config JSON, all 3 tools with example curl calls), docs/reference/database-schema.md (full SQL schema, migration runner usage), docs/reference/collection-format.md (format spec, validation rules, CLI usage), docs/user/publishing-skills.md (pre-publish checks, OAuth flow, post-publish frontmatter), docs/user/multi-agent-deploy.md (all 7 agents in registry, --all-agents and --agents flag usage), docs/user/community-guide.md (rating requirements, effectiveness score computation, generic review handling)."
+    allowed_files:
+      - docs/user/mcp-server.md
+      - docs/reference/database-schema.md
+      - docs/reference/collection-format.md
+      - docs/user/publishing-skills.md
+      - docs/user/multi-agent-deploy.md
+      - docs/user/community-guide.md
+    verify:
+      - "All 6 files exist"
+      - "wc -w docs/reference/database-schema.md >= 500 each"
+      - "docs/reference/database-schema.md contains all 3 CREATE TABLE statements"
+      - "docs/user/mcp-server.md contains the MCP config JSON snippet"
+    stop_if:
+      - "A doc describes an interface that doesn't match the actual implementation — fix the discrepancy before closing"
+      - "Need files outside allowed_files"
+    receipt: null
+
+  # ─── COMPLETION AUDIT ────────────────────────────────────────────────────
+
+  - id: T114
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit whether Phase 2 is complete: all Worker tasks T101-T113 done with receipts, build passing, tests passing, TypeScript clean, db:migrate clean, OAuth round-trip verified, all 6 docs >= 500 words, no Phase 3 features present."
+    inputs:
+      - "All T101-T113 receipts"
+      - "npm run build output"
+      - "npm test output"
+      - "npx tsc --noEmit output"
+      - "npm run db:migrate output on fresh data/skillmall.db"
+      - "Manual OAuth smoke test result"
+      - "Word counts on all 6 T113 doc files"
+    constraints:
+      - "Do not mark complete if any Worker task T101-T113 is queued or active"
+      - "Do not mark complete if npm run build exits nonzero"
+      - "Do not mark complete if npm test exits nonzero"
+      - "Do not mark complete if db:migrate fails"
+      - "Do not mark complete if T102 receipt does not confirm OAuth round-trip tested"
+      - "Do not mark complete if any Phase 2 doc file is missing or < 500 words"
+      - "Do not mark complete if Phase 3 features (chains, RAG, marketplace) are present in codebase"
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "If not_complete: exact list of what is missing or failing"
+      - "If complete: confirmation Phase 3 may begin after launch conditions are verified"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
