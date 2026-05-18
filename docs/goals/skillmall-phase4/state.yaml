@@ -72,7 +72,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T406
+active_task: T407
 
 tasks:
 
@@ -214,7 +214,7 @@ tasks:
   - id: T406
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Write docs/developer/extending.md (2000+ words) covering exactly how to: add a new LLM provider (5-step process with code), add a new CLI command (file location, template, registration in index.ts), add a new API route (convention, Zod validation pattern, error format), add a new quality score dimension (DimensionScore type, feedback format), add a new PE framework (FRAMEWORK_DESCRIPTIONS and FRAMEWORK_CANDIDATES entries). Every step shown with actual file paths from the codebase."
     allowed_files:
@@ -226,12 +226,19 @@ tasks:
     stop_if:
       - "A referenced file path doesn't exist — check before writing"
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - docs/developer/extending.md
+      commands:
+        - cmd: "wc -w docs/developer/extending.md"
+          status: pass
+      summary: "2098 words. 5 extension types: LLM provider (5-step with full code including AbortSignal.timeout and error handling), CLI command (lazy import pattern for DB-heavy modules documented), API route (Zod validation template), quality dimension (DimensionScore structure), PE framework (FRAMEWORK_CANDIDATES + FRAMEWORK_DESCRIPTIONS). Testing section for each extension type. All file paths verified against codebase."
 
   - id: T407
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write docs/developer/deployment.md (2000+ words) covering: Vercel deployment (step-by-step, all env vars, critical filesystem limitation — skill creation doesn't work on Vercel, catalog does), Railway/VPS deployment (what's different, writable filesystem, all features work), complete env var reference table (every var, required vs optional, where to get it, what breaks if missing), SQLite in production (WAL mode, backup strategy, migration path to Turso), GitHub OAuth in production (callback URL update, Secure cookie, NEXT_PUBLIC_APP_URL), CLI in production environments."
     allowed_files:
