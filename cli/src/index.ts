@@ -6,6 +6,8 @@ import { deployCommand } from "./commands/deploy.js";
 import { newCommand } from "./commands/new.js";
 import { validateCommand } from "./commands/validate.js";
 import { createCommand } from "./commands/create.js";
+import { configureCommand } from "./commands/configure.js";
+import { confirmResearchCommand } from "./commands/confirm-research.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -23,16 +25,16 @@ ${pc.bold("Commands:")}
   ${pc.cyan("deploy")} <category/name>           Copy a skill to ~/.claude/skills/
   ${pc.cyan("new")} <category> <name>            Scaffold a new skill from template
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
-  ${pc.cyan("create")} "<description>"           Search + scaffold (the core feature)
+  ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
+  ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
+  ${pc.cyan("confirm-research")} <slug>          Build skill from research-result.json
 
 ${pc.bold("Examples:")}
   npx skill-mall list
-  npx skill-mall list --cat development
-  npx skill-mall find "commit messages"
-  npx skill-mall deploy ai/skill-creator
-  npx skill-mall new development my-new-skill
+  npx skill-mall configure --provider claude-code
+  npx skill-mall create "blue ocean strategy" --urls https://blueoceanstrategy.com/tools/
+  npx skill-mall confirm-research blue-ocean-strategy
   npx skill-mall validate
-  npx skill-mall create "write conventional commit messages"
 
 ${pc.bold("Character limits:")}
   name           max 64 chars  (lowercase letters/numbers/hyphens)
@@ -68,6 +70,14 @@ async function main(): Promise<void> {
 
     case "create":
       await createCommand(rest);
+      break;
+
+    case "configure":
+      await configureCommand(rest);
+      break;
+
+    case "confirm-research":
+      await confirmResearchCommand(rest);
       break;
 
     case "--help":

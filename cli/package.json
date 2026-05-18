@@ -8,14 +8,18 @@
   },
   "files": ["dist", "README.md"],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "tsup src/index.ts --format esm --dts --clean --no-splitting",
     "dev": "tsx src/index.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
+    "@google/generative-ai": "^0.24.1",
+    "cheerio": "^1.2.0",
     "gray-matter": "^4.0.3",
-    "picocolors": "^1.1.1"
+    "openai": "^6.38.0",
+    "picocolors": "^1.1.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20",
