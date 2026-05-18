@@ -1,83 +1,1454 @@
-# Phase 3 Plan — Advanced Capabilities
+# Phase 3 Plan — Advanced Capabilities (v2)
 
 **STOP. Read this entire document before touching a single file.**
 
-This document is self-contained. Every implementation decision is made here. Every TypeScript type, SQL schema, API contract, algorithm, and file structure is embedded directly. You do not need to read any other document to execute this plan. If something seems underspecified, re-read this document. If it is genuinely missing, stop and surface the gap — do not invent.
+This document replaces the original PHASE-3-PLAN.md. The original covered 9 tasks and missed 21. This version covers all 30 tasks on the Phase 3 board. Every implementation decision is made here. Every architectural choice, TypeScript type, SQL schema, algorithm, and file conflict ordering is embedded directly. Workers do not make architectural decisions — they follow this document.
 
 ---
 
-## Gate Into Phase 3
+## What This Phase Builds
 
-**All of the following must be true before any Phase 3 task activates. No exceptions.**
+Two categories of work in sequence:
 
-- Phase 2 completion audit (T114) returned `full_outcome_complete: true`
-- James confirms Phase 2 is stable in production (no critical bugs open)
-- At least 200 skills in the catalog
-- At least 500 community members (GitHub-authenticated accounts with at least one install event)
-- Ratings system has been operating for at least 3 months with consistent engagement
-- Skill Testing Framework (Phase 2 — see below) has test coverage on at least 50 skills
+**Category 1 — Missed Phase 1/2 Features (T251–T275 + T257):** Features that were in the original spec with Phase 1 or Phase 2 assignments but were omitted from those plans. T280 (Judge audit) gates all Category 2 work — nothing in Category 2 starts until T280 passes.
 
-**Do not scope, estimate, or plan detailed Worker task specs until these conditions are verified.** This plan contains the outcome statements, architecture decisions, and rough task breakdown only. Detailed `allowed_files`, `verify`, and `stop_if` blocks for each Worker task are written during the Phase 3 goal-prep session, informed by the actual state of Phase 2 at that time. The architecture and schemas below are decided now and must be used when the time comes.
+**Category 2 — Phase 3 Features (T201–T209):** Skill Chain Builder, RAG-Enhanced Skills, Self-Improvement Loop, Marketplace. These only activate after T280.
 
 ---
 
-## Goal
+## Architectural Decisions (pre-made — do not relitigate)
 
-Add the four advanced capabilities that require Phase 2 infrastructure: skill chains, RAG-enhanced skills, self-improvement via structured feedback, and the marketplace.
+These decisions were made after the original plan was reviewed and found to contain architectural problems. All decisions below override the original plan.
 
-## Outcome
+**Budget Analyzer:** Implement as user-configurable `--chars-available N` — NOT per-agent hardcoded values. Agent-specific budget numbers are undocumented and will be hallucinated. The feature value is in showing what the agent reads at N characters, not in guessing what N is per agent.
 
-1. **Skill Chain Builder:** users compose multi-skill workflows on a visual canvas; the output is a deployable wrapper skill in `skills/chains/<chain-name>/` that orchestrates the chain
-2. **RAG-Enhanced Skills:** users attach document knowledge bases to any skill via CLI; retrieval runs at agent invocation time using local SQLite vector storage (or embedded via the `vss0` extension)
-3. **Skill Self-Improvement Loop:** structured user feedback (after 10+ submissions) triggers LLM-generated improvement suggestions; author reviews and approves all suggestions before any change is applied
-4. **Skill Marketplace:** three-tier model (free, sponsored, premium); Stripe for payment processing; launch conditions enforced as code gates
+**Skill Dependency Graph:** Use `reactflow` (already installed for T202). Do NOT implement a custom force-directed physics simulation. Custom physics produces unstable results that look plausible but don't work well.
 
-## Completion Proof
+**regen-prompt (Framework Override):** To regenerate a prompt with a different framework, the original `ResearchTool` data is needed (`artifactType`, `artifactStructure`, `inputs`, `outputs`, `howUsed`). This data is NOT stored after the pipeline runs. **The pipeline must be updated to write `resources/build-metadata.json` to every generated skill.** regen-prompt reads from this file. The format is specified in "All Shared TypeScript Types" below.
 
-- Skill Chain Builder: create a chain from at least 2 connected skills via UI canvas; wrapper SKILL.md validates against AgentSkills spec; chain executes correctly in a real agent session
-- RAG: `npx skill-mall attach-knowledge business/blue-ocean-strategy ./company-docs/` embeds documents; queries retrieve relevant chunks; SKILL.md frontmatter updated with `rag_enabled: true`
-- Self-improvement: 10+ feedback items on a test skill trigger suggestion generation; author approval gate works (no automatic writes ever happen)
-- Marketplace: at least 1 premium skill listed and purchasable via Stripe test mode; launch conditions gated in code
-- All Phase 3 doc deliverables >= 500 words each
+**npm Package Publisher:** Default behavior is `--dry-run`. Actual publish only happens with explicit `--publish` flag. No code path publishes to npm without this flag.
 
-## Likely Misfire
+**MCP `deploy_skill` tool:** Must check filesystem writability before attempting. Returns a clear error (not 500) when filesystem is read-only (e.g., Vercel).
 
-Launching the Marketplace before the launch conditions are met in code. Building RAG before establishing the vector storage approach. Building self-improvement without verifying the Phase 2 feedback storage schema supports it.
+**CI trigger evaluator:** The eval-triggers CI step is OPTIONAL. When `SKILL_MALL_PROVIDER` and `SKILL_MALL_API_KEY` secrets are not present, the step skips with a warning. It never fails the build when secrets are absent.
 
-## Non-Goals for Phase 3
+**skills.sh badge:** Static only — link to `https://skills.sh/skills/<id>`. Do NOT fetch live install counts. The skills.sh API is not publicly documented.
 
-- Prompt ELO Tester (permanently deferred — requires stable test suite with > 5 test cases per skill for at least 50 skills before ELO rankings can be trusted)
-- Any feature not listed in the Phase 3 section of the feature spec
+**`npx skill-mall mcp-server`:** Must be implemented as a pure Node.js HTTP server with a standalone catalog reader. It must NOT import from Next.js modules (`next/font`, `next/headers`, etc.) which will crash outside the Next.js runtime.
+
+**T261 + T263 are one task:** Both add a PROMPTS tab to SkillTabs. They have been merged. T263 is the base implementation; T261 adds the framework override badge/dropdown to prompt cards within the same PROMPTS tab.
+
+---
+
+## File Conflict Ordering (strictly enforced)
+
+These files are modified by multiple tasks. They MUST be modified sequentially in this exact order. Two tasks that touch the same file CANNOT run in parallel.
+
+| File | Tasks (in order) |
+|---|---|
+| `cli/src/index.ts` | T262 → T261 → T264 → T273 → T267 → T265 → T268 |
+| `components/skill-mall/skill-detail/SkillTabs.tsx` | T256 → T263/T261 (merged) → T252 |
+| `app/skills/[category]/[slug]/page.tsx` | T263 → T266 → T271 → T256 |
+| `lib/analytics.ts` | T265 → T266 → T274 |
+| `cli/src/commands/publish.ts` | T264 (npm registry) extends existing skills.sh publish — same file |
 
 ---
 
 ## Development Workflow
 
-Same 16-step loop as Phases 1 and 2. Security check is mandatory for every Phase 3 Worker task — Phase 3 introduces Stripe payments, vector storage, and automated code generation paths.
+Every Worker task follows this 16-step loop. No exceptions.
+
+1. Read the task's Implementation section in this document completely
+2. Map dependencies — identify parallel vs serial work
+3. Establish TypeScript contracts before implementation
+4. Dispatch parallel subagents only when write scopes are provably disjoint
+5. Write Vitest tests before or alongside implementation
+6. `npx tsc --noEmit` — must exit 0 before proceeding
+7. `npm run lint` — must exit 0 before proceeding
+8. `npm run build` — must succeed before proceeding
+9. First code review
+10. Fix all issues from review
+11. Second code review
+12. Smoke test at `localhost:3000`
+13. Security check — mandatory for every Phase 3 task
+14. Update documentation for changed interfaces
+15. Final review against task acceptance criteria
+16. `git commit && git push`
 
 ---
 
-## Stack Additions for Phase 3
+## All Shared TypeScript Types
 
-| Addition | Package | Purpose |
-|---|---|---|
-| React Flow | `reactflow` | Visual canvas for Skill Chain Builder |
-| SQLite VSS | `sqlite-vss` or `@vlcn.io/crsqlite-wasm` | Vector similarity search for RAG (local) |
-| Stripe | `stripe` + `@stripe/stripe-js` | Marketplace payments |
-| Stripe CLI | local dev tool | Webhook testing in development |
+### Build Metadata (`lib/build-metadata.ts`)
 
-**Vector storage decision:** use SQLite-VSS (`sqlite-vss` extension for `better-sqlite3`) for local-first vector storage. This keeps everything in SQLite — no separate vector database. The VSS extension adds a virtual table for approximate nearest-neighbor search. For production deployments that need scale, the migration path is to Turso (LibSQL-compatible, supports VSS).
+This type must be stored as `resources/build-metadata.json` in every pipeline-generated skill. Required for `regen-prompt` (T261).
 
-**No pgvector.** The Phase 2 decision to use SQLite carries through Phase 3.
+```typescript
+export interface BuildMetadata {
+  topic: string
+  sources: string[]
+  researchUnverified?: boolean
+  tools: Array<{
+    name: string
+    slug: string                  // toSlug(name)
+    category: string
+    description: string
+    artifactType: 'matrix' | 'canvas' | 'grid' | 'list' | 'flowchart' | 'analysis'
+    artifactStructure: string     // the blank template — needed for prompt regeneration
+    inputs: string[]
+    outputs: string[]
+    howUsed: string
+    selectedFrameworks: string[]  // what the Prompt Engine chose
+  }>
+  generatedAt: string             // ISO 8601
+  pipelineVersion: string         // "1.0.0"
+}
+```
+
+**Where it's written:** Add to `lib/pipeline.ts` `atomicWrite` call — write `resources/build-metadata.json` alongside the skill files. Add to `InMemorySkillDirectory` files array.
+
+### Skill Tester Types (`lib/skill-tester.ts`)
+
+```typescript
+export interface TestCase {
+  id: string
+  description: string
+  input: string                   // the user message sent to the skill
+  required: string[]              // natural language assertions that must pass
+  forbidden: string[]             // assertions that must NOT be present in output
+}
+
+export interface TestResult {
+  id: string
+  description: string
+  passed: boolean
+  requiredResults: Array<{ assertion: string; passed: boolean }>
+  forbiddenResults: Array<{ assertion: string; triggered: boolean }>
+}
+
+export interface TestSuiteResult {
+  skillSlug: string
+  testCount: number
+  passCount: number
+  failCount: number
+  passRate: number
+  results: TestResult[]
+}
+```
+
+### Graph Types (`lib/graph.ts`)
+
+```typescript
+export interface GraphNode {
+  id: string                      // skill slug
+  label: string                   // skill name
+  category: string
+  connectionCount: number
+  isHub: boolean                  // > 3 connections
+  isOrphan: boolean               // 0 connections
+}
+
+export interface GraphEdge {
+  id: string
+  source: string                  // skill slug
+  target: string                  // linked skill slug
+}
+
+export interface SkillGraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export function computeGraph(skills: Skill[]): SkillGraph
+```
+
+### Fork Events (added to `lib/db/types.ts`)
+
+```typescript
+export interface ForkEvent {
+  id: number
+  source_slug: string
+  fork_slug: string
+  forked_at: string
+}
+```
+
+### Budget Analyzer Types (`lib/budget-analyzer.ts`)
+
+```typescript
+export interface BudgetCheckResult {
+  slug: string
+  charsAvailable: number          // user-specified N
+  descriptionLength: number
+  visible: boolean                // description fits in N chars
+  triggerPhrase: string | null    // first meaningful phrase in description
+  triggerPreserved: boolean       // trigger phrase visible within N chars
+  visibleText: string             // what the agent reads (first N chars)
+  truncatedText: string           // what gets cut off
+  rewriteSuggestions: string[]    // suggestions to improve fit
+}
+```
 
 ---
 
-## SQLite Schema Additions for Phase 3
+## All SQL Schemas (new migrations)
 
-### Migration: `db/migrations/002_phase3.sql`
+### `db/migrations/003_fork_events.sql`
 
 ```sql
--- Feedback for self-improvement loop
+CREATE TABLE IF NOT EXISTS fork_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_slug TEXT NOT NULL,
+  fork_slug TEXT NOT NULL,
+  forked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_fork_events_source ON fork_events(source_slug);
+```
+
+---
+
+## Category 1 Task Cards — Missed Phase 1/2 Features
+
+---
+
+### T251 — Domain Starter Templates
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Create 20 Domain Starter Templates in `skills/_starters/<domain>/` and implement `npx skill-mall new --from-template <slug> <new-name>` CLI.
+
+**Content requirement:** Every starter SKILL.md must have real, production-calibrated content derived from the named domain. Each starter README.md must cite the authoritative reference. Generic or placeholder content fails the stop_if check. The 20 domains:
+
+| Slug | Domain | Cite |
+|---|---|---|
+| `code-review` | Code review for PRs | github.com/google/eng-practices |
+| `pr-writer` | PR description writer | conventionalcommits.org |
+| `commit-writer` | Conventional commit messages | conventionalcommits.org |
+| `technical-documentation` | Technical documentation | docs.divio.com (Divio system) |
+| `debugging-session` | Structured debugging | kentcdodds.com/blog/fix-bugs |
+| `okr-framework` | OKR planning | whatmatters.com/faqs |
+| `blue-ocean-strategy` | Blue Ocean Strategy toolkit | blueoceanstrategy.com |
+| `design-thinking` | Design Thinking 5-stage | dschool.stanford.edu |
+| `user-story-mapping` | User Story Mapping | jpattonassociates.com |
+| `incident-postmortem` | Incident postmortem | sre.google/workbook/postmortem |
+| `api-documentation` | API documentation | docs.microsoft.com/api-guidelines |
+| `decision-records` | Architecture Decision Records | adr.github.io |
+| `test-writer` | Test case writing | martinfowler.com/testing |
+| `sprint-planning` | Agile sprint planning | scrum.org/resources |
+| `stakeholder-communication` | Stakeholder updates | pmbok.org |
+| `competitive-analysis` | Competitive analysis | harvard.edu/porter-five-forces |
+| `product-requirements` | PRD writing | svpg.com/assets |
+| `onboarding-guide` | Team onboarding guides | basecamp.com/books |
+| `data-analysis` | Data analysis workflow | tidy-data paper (Wickham 2014) |
+| `content-strategy` | Content strategy | contentmarketinginstitute.com |
+
+**Each starter directory structure:**
+```
+skills/_starters/<slug>/
+├── SKILL.md          # 80% complete with [FILL-IN: description] markers
+├── README.md         # Explains what [fill-in] markers expect; cites source
+├── resources/
+│   └── templates/   # At least 2 blank artifact templates per starter
+└── starter-config.json
+```
+
+**`starter-config.json` format:**
+```json
+{
+  "domain": "Code Review for Pull Requests",
+  "category": "development",
+  "targetAgents": ["claude-code", "cursor"],
+  "fillInFields": [
+    { "marker": "[FILL-IN: team-specific criteria]", "description": "Your team's specific review criteria (e.g., 'no magic numbers', 'all functions < 20 lines')" }
+  ],
+  "sourceReference": "https://google.github.io/eng-practices/review/"
+}
+```
+
+**CLI implementation:** `npx skill-mall new --from-template code-review my-code-review`:
+1. Read `skills/_starters/code-review/starter-config.json` to get category
+2. Copy entire directory to `skills/<category>/my-code-review/`
+3. Update SKILL.md `name:` field to `my-code-review`
+4. Print: each [fill-in] marker and its description so user knows what to complete
+
+**Allowed files:**
+```
+skills/_starters/
+cli/src/commands/new.ts
+cli/src/index.ts
+```
+
+**Verify:**
+- All 20 starter directories exist with SKILL.md, README.md, resources/templates/, starter-config.json
+- `bash scripts/validate-skill.sh skills/_starters/code-review` exits 0
+- `npx skill-mall new --from-template code-review my-cr` creates `skills/development/my-cr/` with SKILL.md name updated
+- Each README.md contains a URL to the authoritative source
+
+**Stop if:**
+- Any SKILL.md description is a placeholder or starts with "This skill helps" — real, imperative opening required
+- Any README.md lacks a citation URL — every starter must cite its source
+- Need files outside allowed_files
+
+---
+
+### T252 — Agent Budget Analyzer
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Implement Agent Budget Analyzer as a user-configurable simulation — NOT per-agent hardcoded values.
+
+**Implementation:** `lib/budget-analyzer.ts`
+
+```typescript
+export function analyzeDescription(
+  description: string,
+  charsAvailable: number,
+  triggerPhrase?: string
+): BudgetCheckResult {
+  const visible = description.length <= charsAvailable
+  const visibleText = description.slice(0, charsAvailable)
+  const truncatedText = description.slice(charsAvailable)
+  const trigger = triggerPhrase ?? extractTriggerPhrase(description)
+  const triggerPreserved = trigger ? visibleText.toLowerCase().includes(trigger.toLowerCase()) : true
+
+  const suggestions: string[] = []
+  if (!visible) {
+    suggestions.push(`Shorten by ${description.length - charsAvailable} characters`)
+    if (!triggerPreserved && trigger) {
+      suggestions.push(`Move "${trigger}" to the first ${Math.floor(charsAvailable * 0.3)} characters`)
+    }
+  }
+
+  return {
+    slug: '',
+    charsAvailable,
+    descriptionLength: description.length,
+    visible,
+    triggerPhrase: trigger,
+    triggerPreserved,
+    visibleText,
+    truncatedText,
+    rewriteSuggestions: suggestions,
+  }
+}
+
+function extractTriggerPhrase(description: string): string | null {
+  const match = description.match(/^[A-Z][a-z]+ [\w\s-]{2,30}/)
+  return match ? match[0].trim() : null
+}
+```
+
+**CLI:** `npx skill-mall budget-check <category/slug> --chars-available 200`
+
+```bash
+# Show at standard load levels
+npx skill-mall budget-check ai/skill-creator --chars-available 200
+
+# Output:
+# Budget analysis: skill-creator / 200 chars available
+#
+# Description (43 chars): FULLY VISIBLE
+# Trigger phrase: "Create new AI agent skills"
+# Trigger preserved: YES
+#
+# No rewrite needed.
+```
+
+The `--agent <agent>` flag is ACCEPTED (for CLI compatibility with the spec) but only used for display — it does NOT change the simulation. Print: `Note: budget is simulated at --chars-available. Set this to match your agent's actual budget.`
+
+**UI:** "Budget Analysis" tab on skill detail page. Input: chars-available slider (50–500, default 200). Output: BudgetCheckResult rendered inline.
+
+**Allowed files:**
+```
+lib/budget-analyzer.ts
+lib/__tests__/budget-analyzer.test.ts
+components/skill-mall/skill-detail/SkillTabs.tsx
+app/api/budget-check/route.ts
+cli/src/commands/budget-check.ts
+cli/src/index.ts
+```
+
+**Verify:**
+- `analyzeDescription("Apply Blue Ocean Strategy to identify...", 50)` returns `visible: false` (test)
+- Trigger phrase "Apply Blue Ocean" preserved when description fits, not preserved when truncated (test)
+- CLI prints budget analysis without making up per-agent numbers
+- `--agent claude-code` accepted but prints note about simulation
+
+**Stop if:**
+- Per-agent hardcoded budget values added without documented real-world source — implement as user-configurable only
+- Need files outside allowed_files
+
+---
+
+### T253 — Codebase-to-Skill Extractor
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** `npx skill-mall extract <dir> --output <slug> [--category cat] [--focus "pattern1,pattern2"]`
+
+**Implementation:** `lib/codebase-extractor.ts`
+
+```typescript
+import { runResearchEngineFromText } from './research-engine'
+import type { LLMClient } from './providers'
+
+export async function extractFromCodebase(
+  targetDir: string,
+  topic: string,
+  focus: string[],
+  client: LLMClient
+): Promise<ResearchResult> {
+  // Security: validate targetDir is within process.cwd()
+  const resolved = path.resolve(targetDir)
+  if (!resolved.startsWith(process.cwd())) {
+    throw new Error('Target directory must be within the project directory')
+  }
+
+  // Collect files
+  const files = collectFiles(resolved, ['.md', '.ts', '.js', '.py', '.txt'])
+  const content = files
+    .map(f => `// File: ${path.relative(resolved, f)}\n${fs.readFileSync(f, 'utf-8')}`)
+    .join('\n\n---\n\n')
+    .slice(0, 20_000)   // same combined cap as URL fetcher
+
+  // Focus filter in prompt
+  const focusClause = focus.length > 0
+    ? `Focus specifically on: ${focus.join(', ')}.`
+    : 'Extract all identifiable patterns.'
+
+  return runResearchEngineFromText(topic, content, client, focusClause)
+}
+```
+
+**Add to `lib/research-engine.ts`** (add `research-engine.ts` to allowed_files):
+
+```typescript
+export async function runResearchEngineFromText(
+  topic: string,
+  text: string,
+  client: LLMClient,
+  additionalInstruction = ''
+): Promise<ResearchResult> {
+  // Same extraction prompt as URL-based, but with inline text instead of fetched content
+  // Sets researchUnverified: true (no authoritative URL provided)
+  const prompt = buildExtractionPromptWithContent(topic, text, [])
+    + (additionalInstruction ? `\n\n${additionalInstruction}` : '')
+  const result = await extractWithRetry(prompt, client)
+  return { ...result, researchUnverified: true }
+}
+```
+
+**Allowed files:**
+```
+cli/src/commands/extract.ts
+cli/src/index.ts
+lib/codebase-extractor.ts
+lib/__tests__/codebase-extractor.test.ts
+lib/research-engine.ts
+```
+
+**Verify:**
+- `npx skill-mall extract ./lib --output our-lib-conventions` writes `skill-builder-output/our-lib-conventions/research-result.json`
+- Extracted ResearchResult has `researchUnverified: true`
+- Files outside `targetDir` are never read (path traversal test)
+- `--focus "error handling"` limits extraction scope
+
+**Stop if:**
+- Files outside specified directory are read — validate all paths
+- Extraction logic duplicated instead of calling `runResearchEngineFromText` — reuse the function
+- Need files outside allowed_files
+
+---
+
+### T254 — Skill Dependency Graph
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Force-directed graph at `/graph` using `reactflow`.
+
+**Implementation:** `lib/graph.ts`
+
+```typescript
+export function computeGraph(skills: Skill[]): SkillGraph {
+  const slugSet = new Set(skills.map(s => s.slug))
+  const connectionCounts = new Map<string, number>()
+
+  const edges: GraphEdge[] = []
+  for (const skill of skills) {
+    for (const linked of skill.linked_skills) {
+      if (slugSet.has(linked)) {
+        edges.push({ id: `${skill.slug}-${linked}`, source: skill.slug, target: linked })
+        connectionCounts.set(skill.slug, (connectionCounts.get(skill.slug) ?? 0) + 1)
+        connectionCounts.set(linked, (connectionCounts.get(linked) ?? 0) + 1)
+      }
+    }
+  }
+
+  const nodes: GraphNode[] = skills.map(s => {
+    const count = connectionCounts.get(s.slug) ?? 0
+    return {
+      id: s.slug,
+      label: s.name,
+      category: s.category,
+      connectionCount: count,
+      isHub: count > 3,
+      isOrphan: count === 0,
+    }
+  })
+
+  return { nodes, edges }
+}
+```
+
+**React Flow canvas:** The page at `app/graph/page.tsx` uses React Flow with `dagre` layout (install `@dagrejs/dagre` as a dependency — this is acceptable). Node colors map to category using the existing `tokens.light` from `lib/design-tokens.ts`. Hub nodes get a thicker border. Orphan nodes get a dashed border. Click navigates to `/skills/<category>/<slug>`.
+
+**Allowed files:**
+```
+app/graph/page.tsx
+components/skill-mall/graph/DependencyGraph.tsx
+lib/graph.ts
+lib/__tests__/graph.test.ts
+```
+
+**Verify:**
+- `computeGraph` with 3 skills where A links to B returns 1 edge, A has count 1, B has count 1 (test)
+- Skill with 4+ connections flagged as hub (test)
+- Skill with 0 connections flagged as orphan (test)
+- `/graph` renders without SSR error (smoke test — must be `'use client'` with dynamic import)
+
+**Stop if:**
+- Custom physics simulation implemented from scratch instead of using reactflow — use the installed library
+- Need files outside allowed_files
+
+---
+
+### T255 — Skill Testing Framework
+
+**Type:** Worker | **Depends on:** T201 is NOT required — T255 uses only the existing SQLite tables
+
+**Objective:** Test case runner for skill prompts.
+
+**Implementation:** `lib/skill-tester.ts`
+
+```typescript
+export async function runTestSuite(
+  skillSlug: string,
+  client: LLMClient
+): Promise<TestSuiteResult> {
+  const testDir = path.join(process.cwd(), 'tests', skillSlug)
+  if (!fs.existsSync(testDir)) {
+    return { skillSlug, testCount: 0, passCount: 0, failCount: 0, passRate: 0, results: [] }
+  }
+
+  const testFiles = fs.readdirSync(testDir).filter(f => f.endsWith('.json'))
+  const results: TestResult[] = []
+
+  for (const file of testFiles) {
+    const testCase: TestCase = JSON.parse(
+      fs.readFileSync(path.join(testDir, file), 'utf-8')
+    )
+
+    // Sanitize input to prevent prompt injection
+    const sanitizedInput = testCase.input
+      .replace(/```/g, "'''")
+      .replace(/\[INST\]/g, '')
+      .slice(0, 2000)
+
+    // Run the skill's comprehensive-analysis meta prompt with the test input
+    const evaluatorPrompt = `
+Given this user request: "${sanitizedInput}"
+
+Evaluate the following assertions about an ideal response:
+
+REQUIRED (must all be true):
+${testCase.required.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+FORBIDDEN (must all be false):
+${testCase.forbidden.map((f, i) => `${i + 1}. ${f}`).join('\n')}
+
+Return JSON:
+{
+  "required": [{"assertion": "...", "passed": true/false}],
+  "forbidden": [{"assertion": "...", "triggered": true/false}]
+}`
+
+    const raw = await client.complete(evaluatorPrompt, {
+      responseFormat: 'json_object',
+      temperature: 0.1,
+      maxTokens: 1000,
+      systemPrompt: 'You evaluate whether skill output assertions are satisfied. Return only valid JSON.',
+    })
+
+    const evalResult = JSON.parse(raw)
+    const passed = evalResult.required.every((r: { passed: boolean }) => r.passed) &&
+                   evalResult.forbidden.every((f: { triggered: boolean }) => !f.triggered)
+
+    results.push({
+      id: testCase.id,
+      description: testCase.description,
+      passed,
+      requiredResults: evalResult.required,
+      forbiddenResults: evalResult.forbidden,
+    })
+  }
+
+  const passCount = results.filter(r => r.passed).length
+  return {
+    skillSlug,
+    testCount: results.length,
+    passCount,
+    failCount: results.length - passCount,
+    passRate: results.length > 0 ? Math.round((passCount / results.length) * 100) : 0,
+    results,
+  }
+}
+```
+
+**This task scope:** Build the framework + write `tests/skill-creator/` with 3 test cases. Do NOT write 50 test suites — that is T257.
+
+**Allowed files:**
+```
+lib/skill-tester.ts
+lib/__tests__/skill-tester.test.ts
+cli/src/commands/test-skill.ts
+cli/src/index.ts
+.github/workflows/validate-skills.yml
+tests/skill-creator/
+```
+
+**Verify:**
+- `runTestSuite` with mocked LLM returns correct pass/fail counts (test)
+- Sanitization removes ``` and [INST] from test input before LLM call (test)
+- `npx skill-mall test skill-creator` runs 3 test cases and reports results
+- CI workflow includes optional test step that skips gracefully when no tests exist
+
+**Stop if:**
+- Test input is passed directly to LLM without sanitization
+- Need files outside allowed_files
+
+---
+
+### T257 — Write Test Suites for All Starters
+
+**Type:** Worker | **Depends on:** T251 (starters must exist), T255 (framework must exist)
+
+**Objective:** Write test suite JSON files for all 20 Domain Starters + 4 existing catalog skills. At least 3 test cases per skill. Format: `tests/<slug>/*.json`.
+
+**Each test case must be domain-specific.** Generic test cases ("contains text", "has a header") do not count. Examples of good test cases:
+
+```json
+{
+  "id": "errc-grid-quadrants",
+  "description": "ERRC Grid must have all four quadrants populated",
+  "input": "Create an ERRC Grid for a mid-market B2B SaaS company",
+  "required": [
+    "contains ELIMINATE quadrant with at least 1 item",
+    "contains REDUCE quadrant with at least 1 item",
+    "contains RAISE quadrant with at least 1 item",
+    "contains CREATE quadrant with at least 1 item"
+  ],
+  "forbidden": [
+    "produces identical output regardless of company type"
+  ]
+}
+```
+
+**Allowed files:**
+```
+tests/
+```
+
+**Verify:**
+- `find tests/ -name '*.json' | wc -l` shows >= 72 (24 skills × 3 tests)
+- Each test JSON is valid JSON with all required fields
+- Test cases are domain-specific, not generic
+
+**Stop if:**
+- Test cases are generic ("output contains text", "response is not empty") — must be domain-specific
+- Need files outside allowed_files
+
+---
+
+### T256 — Multilingual Skill Support
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** `SKILL.<locale>.md` convention, `--lang` deploy flag, CI validation, locale display on detail page.
+
+**File convention:**
+```
+skills/business/blue-ocean-strategy/
+├── SKILL.md                    # canonical, always English
+└── resources/
+    └── i18n/
+        ├── SKILL.es.md
+        └── SKILL.fr.md
+```
+
+**`lib/i18n.ts`:**
+
+```typescript
+export const SUPPORTED_LOCALES = ['es', 'fr', 'de', 'pt-BR'] as const
+export type Locale = typeof SUPPORTED_LOCALES[number]
+
+export function getLocalizedSkillPath(skillDir: string, lang: Locale): string {
+  return path.join(skillDir, 'resources', 'i18n', `SKILL.${lang}.md`)
+}
+
+export function getAvailableLocales(skillDir: string): Locale[] {
+  const i18nDir = path.join(skillDir, 'resources', 'i18n')
+  if (!fs.existsSync(i18nDir)) return []
+
+  return fs.readdirSync(i18nDir)
+    .filter(f => f.match(/^SKILL\.(es|fr|de|pt-BR)\.md$/))
+    .map(f => f.replace('SKILL.', '').replace('.md', '') as Locale)
+}
+
+export function validateTranslationStructure(
+  canonicalContent: string,
+  translatedContent: string
+): string[] {
+  const canonicalSections = canonicalContent.match(/^##\s+.+$/gm) ?? []
+  const translatedSections = translatedContent.match(/^##\s+.+$/gm) ?? []
+  const errors: string[] = []
+  if (canonicalSections.length !== translatedSections.length) {
+    errors.push(`Section count mismatch: canonical ${canonicalSections.length}, translation ${translatedSections.length}`)
+  }
+  return errors
+}
+```
+
+**Allowed files:**
+```
+lib/i18n.ts
+lib/__tests__/i18n.test.ts
+cli/src/commands/deploy.ts
+scripts/validate-skill.sh
+components/skill-mall/skill-detail/SkillTabs.tsx
+app/skills/[category]/[slug]/page.tsx
+```
+
+**Verify:**
+- `getAvailableLocales` returns correct locale list when i18n files exist (test)
+- `validateTranslationStructure` detects missing sections (test)
+- `npx skill-mall deploy ai/skill-creator --lang es` copies `SKILL.es.md` if exists, falls back to `SKILL.md`
+- Detail page shows `[ ES ] [ FR ]` locale badges when translations exist
+
+**Stop if:**
+- Need files outside allowed_files
+
+---
+
+### T261 — User Framework Override + Prompts Tab (merged)
+
+**Type:** Worker | **Depends on:** T251 (needs a skill with prompts for testing), build-metadata.json must be in pipeline (add to allowed_files)
+
+**Objective:** Add PROMPTS tab to skill detail page. Each prompt card shows: complexity dot, when_to_use text, framework badge (clickable → dropdown → regenerate). Framework regeneration reads from `resources/build-metadata.json`.
+
+**Pipeline update needed first** — add to `lib/pipeline.ts`:
+
+```typescript
+// In the atomicWrite call, add build-metadata.json to the files:
+const buildMeta: BuildMetadata = {
+  topic: researchResult.topic,
+  sources: researchResult.sources,
+  researchUnverified: researchResult.researchUnverified,
+  tools: researchResult.tools.map(t => ({
+    name: t.name,
+    slug: toSlug(t.name),
+    category: t.category,
+    description: t.description,
+    artifactType: t.artifactType,
+    artifactStructure: t.artifactStructure,
+    inputs: t.inputs,
+    outputs: t.outputs,
+    howUsed: t.howUsed,
+    selectedFrameworks: [],  // filled in by Prompt Engine
+  })),
+  generatedAt: new Date().toISOString(),
+  pipelineVersion: '1.0.0',
+}
+completeDirectory.files.push({
+  path: 'resources/build-metadata.json',
+  content: JSON.stringify(buildMeta, null, 2),
+})
+```
+
+**Prompt reading in page:** Read prompt files from `skills/<category>/<slug>/resources/prompts/` at page render time. Parse frontmatter to get `framework`, `original_framework`, `type`, `complexity`, `when_to_use`.
+
+**`POST /api/regen-prompt`:**
+1. Read `skills/<category>/<slug>/resources/build-metadata.json`
+2. Find the ResearchTool matching the prompt's `tool` slug
+3. Call `generatePromptBody(tool, topic, [newFramework], client)`
+4. Write updated prompt file with new `framework:` in frontmatter (preserve `original_framework:`)
+5. Return updated file content
+
+**Allowed files:**
+```
+app/api/regen-prompt/route.ts
+components/skill-mall/skill-detail/SkillTabs.tsx
+components/skill-mall/skill-detail/PromptCard.tsx
+components/skill-mall/skill-detail/FrameworkPicker.tsx
+app/skills/[category]/[slug]/page.tsx
+cli/src/commands/regen-prompt.ts
+cli/src/index.ts
+lib/pipeline.ts
+lib/build-metadata.ts
+```
+
+**Verify:**
+- PROMPTS tab renders on `skills/business/wrong-slug` detail page (the only skill with prompts) — smoke test
+- Framework badge clickable, dropdown shows framework options
+- `POST /api/regen-prompt` returns updated prompt with changed `framework:` field, unchanged `original_framework:` field (test)
+- `npx skill-mall regen-prompt business/wrong-slug resources/prompts/tool-strategy-canvas.md --framework 'Chain of Thought'` updates the file
+
+**Stop if:**
+- `regen-prompt` works without `build-metadata.json` existing — stop and require the pipeline update first
+- `original_framework:` field is overwritten — this must never happen
+- Need files outside allowed_files
+
+---
+
+### T262 — optimize-prompt CLI
+
+**Type:** Worker | **Depends on:** nothing (lib/prompt-optimizer.ts already exists)
+
+**Objective:** `npx skill-mall optimize-prompt <file>` or `... --stdin`.
+
+**Implementation:**
+
+```typescript
+// cli/src/commands/optimize-prompt.ts
+import { resolveProviderConfig, createLLMClient } from '@/lib/providers/index.js'
+import { optimizePrompt } from '@/lib/prompt-optimizer.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import * as p from '@clack/prompts'
+import { pc } from '../utils.js'
+
+export async function optimizePromptCommand(args: string[]): Promise<void> {
+  const useStdin = args.includes('--stdin')
+  const filePath = args.find(a => !a.startsWith('--'))
+
+  if (!useStdin && !filePath) {
+    process.stderr.write(pc.red('Usage: skill-mall optimize-prompt <file> | --stdin\n'))
+    process.exit(1)
+  }
+
+  const promptText = useStdin
+    ? fs.readFileSync('/dev/stdin', 'utf-8').trim()
+    : fs.readFileSync(path.resolve(filePath!), 'utf-8').trim()
+
+  let config
+  try { config = resolveProviderConfig() }
+  catch { process.stderr.write(pc.red('No provider configured. Run: npx skill-mall configure\n')); process.exit(1) }
+
+  const client = createLLMClient(config)
+  const s = p.spinner()
+  s.start('Auditing prompt...')
+  const audit = await optimizePrompt(promptText, client)
+  s.stop('Done.')
+
+  console.log(`\nToken efficiency: ${audit.tokenCountBefore} → ${audit.tokenCountAfter} tokens (${audit.tokenReductionPercent > 0 ? '-' : ''}${Math.abs(audit.tokenReductionPercent)}%)`)
+  console.log(`Intent completeness: ${audit.intentDimensionsPresent.length}/9`)
+  if (audit.intentDimensionsMissing.length > 0) {
+    console.log(`  Missing: ${audit.intentDimensionsMissing.join(', ')}`)
+  }
+  console.log(`Output clarity: ${audit.outputClarityPasses ? 'PASS' : 'FAIL'}`)
+  console.log(`Trigger sharpness: ${audit.triggerSharpnessPasses ? 'PASS' : 'FAIL'}`)
+
+  if (!useStdin && filePath) {
+    const outPath = filePath.replace(/\.md$/, '-optimized.md')
+    fs.writeFileSync(outPath, audit.optimizedPrompt, 'utf-8')
+    console.log(`\nOptimized: ${outPath}`)
+  } else {
+    console.log(`\n--- Optimized ---\n${audit.optimizedPrompt}`)
+  }
+}
+```
+
+**Allowed files:**
+```
+cli/src/commands/optimize-prompt.ts
+cli/src/index.ts
+```
+
+**Verify:**
+- `cd cli && npm run build` exits 0
+- `echo 'This prompt helps you...' | npx skill-mall optimize-prompt --stdin` prints audit
+
+**Stop if:** Need files outside allowed_files
+
+---
+
+### T263 — (Merged into T261)
+
+T263 is merged into T261. The Prompts tab and the Framework Override are one feature — implement them together.
+
+---
+
+### T264 — npm Package Publisher
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** `npx skill-mall publish <category/slug> --registry npm [--publish]`
+
+**Default is `--dry-run`. Actual publish ONLY with explicit `--publish` flag.**
+
+```typescript
+// lib/publish/npm.ts
+export function generateNpmPackageJson(skill: Skill): object {
+  return {
+    name: `@skill-mall/${skill.slug}`,
+    version: skill.version || '1.0.0',
+    description: skill.description,
+    keywords: ['skill', ...skill.tags],
+    author: skill.author || 'skill-mall',
+    license: skill.license || 'MIT',
+    files: ['SKILL.md', 'README.md', 'resources/', 'scripts/'],
+  }
+}
+```
+
+**Pre-publish checks (same as skills.sh T107):** quality score >= 70, description <= 1024, name matches dir, license present.
+
+**Publish flow:**
+1. Run pre-publish checks
+2. Write `package.json` to a temp directory copy of the skill
+3. If `--publish` flag: run `npm publish --access public` in the temp dir
+4. If dry-run: print the generated package.json and exit
+5. Post-publish: write `metadata.npm_package: "@skill-mall/<slug>"` to SKILL.md
+
+**Allowed files:**
+```
+cli/src/commands/publish.ts
+lib/publish/npm.ts
+```
+
+**Verify:**
+- `npx skill-mall publish ai/skill-creator --registry npm` (no --publish) prints package.json and exits 0
+- `--publish` flag is required for actual publish — test that without it, nothing is published
+- Version mismatch with existing npm package → exits 1
+
+**Stop if:**
+- `npm publish` runs without explicit `--publish` flag in any code path
+- Need files outside allowed_files
+
+---
+
+### T265 — MCP Missing Tools + Search Tracking
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Add `get_prompts` and `deploy_skill` to `/api/mcp`. Add search click-through tracking.
+
+**`get_prompts` implementation:**
+```typescript
+if (name === 'get_prompts') {
+  const skillDir = path.join(process.cwd(), 'skills', String(params.category), String(params.slug), 'resources', 'prompts')
+  if (!fs.existsSync(skillDir)) return { prompts: [] }
+  return {
+    prompts: fs.readdirSync(skillDir)
+      .filter(f => f.endsWith('.md'))
+      .map(f => ({ filename: f, path: path.join('resources/prompts', f) }))
+  }
+}
+```
+
+**`deploy_skill` implementation:**
+```typescript
+if (name === 'deploy_skill') {
+  // Check filesystem writability first
+  try { fs.accessSync(os.homedir(), fs.constants.W_OK) }
+  catch {
+    return { error: 'Filesystem is read-only. Use the CLI to deploy: npx skill-mall deploy <slug>' }
+  }
+
+  const skillPath = path.join(process.cwd(), 'skills', String(params.category), String(params.slug))
+  if (!fs.existsSync(skillPath)) return { error: `Skill not found: ${params.slug}` }
+
+  const { deployToAgents } = await import('@/lib/agents/detector.js')
+  const results = deployToAgents(skillPath, params.agent ? [String(params.agent)] : undefined)
+  return { results: results.map(r => ({ agent: r.agent.id, success: r.success })) }
+}
+```
+
+**Search click-through tracking** in `components/skill-mall/skill-card.tsx`: add `onClick` that calls `POST /api/analytics/search-click` with the skill slug before navigation (fire-and-forget, don't await).
+
+**`lib/analytics.ts` additions:**
+```typescript
+export function logSearchClickEvent(skillSlug: string): void {
+  try {
+    const db = getDb()
+    db.prepare('INSERT INTO search_clicks (skill_slug) VALUES (?)').run(skillSlug)
+  } catch { /* non-fatal */ }
+}
+
+export function getSearchClickCount(skillSlug: string): number {
+  const db = getDb()
+  const row = db.prepare('SELECT COUNT(*) as count FROM search_clicks WHERE skill_slug = ?').get(skillSlug) as { count: number }
+  return row.count
+}
+```
+
+Note: `search_clicks` table must be added to `db/migrations/001_initial.sql` — add a new migration `db/migrations/004_search_clicks.sql`.
+
+**Allowed files:**
+```
+app/api/mcp/route.ts
+lib/analytics.ts
+components/skill-mall/skill-card.tsx
+app/page.tsx
+db/migrations/004_search_clicks.sql
+scripts/migrate.js
+```
+
+**Verify:**
+- GET /api/mcp shows 5 tools (search_skills, get_skill, list_categories, get_prompts, deploy_skill)
+- deploy_skill returns helpful error when filesystem is read-only (mocked test)
+- search click fires on skill card click (smoke test)
+
+**Stop if:**
+- deploy_skill crashes with fs error instead of returning friendly message
+- Need files outside allowed_files
+
+---
+
+### T266 — Trending Missing Views + Fork Tracking
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Community Favorites, High Quality views on /trending. Fork count tracking. Fork count on detail page.
+
+**Migration `db/migrations/003_fork_events.sql`:** (schema in "All SQL Schemas" above)
+
+**Add to `lib/forking.ts`:**
+```typescript
+// After successful forkSkill(), log the event:
+import { getDb } from './db/client'
+// Inside forkSkill() after fs.rename:
+try {
+  const db = getDb()
+  db.prepare('INSERT INTO fork_events (source_slug, fork_slug) VALUES (?, ?)').run(sourceSlug, newSlug)
+} catch { /* non-fatal */ }
+```
+
+**Add to `lib/analytics.ts`:**
+```typescript
+export function getForkCount(skillSlug: string): number {
+  try {
+    const db = getDb()
+    const row = db.prepare('SELECT COUNT(*) as count FROM fork_events WHERE source_slug = ?').get(skillSlug) as { count: number }
+    return row.count
+  } catch { return 0 }
+}
+
+export function getCommunityFavorites(limit = 10): Array<{ skill_slug: string; fork_count: number }> {
+  try {
+    const db = getDb()
+    return db.prepare('SELECT source_slug as skill_slug, COUNT(*) as fork_count FROM fork_events GROUP BY source_slug ORDER BY fork_count DESC LIMIT ?').all(limit) as Array<{ skill_slug: string; fork_count: number }>
+  } catch { return [] }
+}
+```
+
+**High Quality view** requires both quality score AND effectiveness score > threshold. Compute at render time:
+```typescript
+const highQuality = allSkills.filter(s => {
+  const score = computeQualityScore(s, allSlugs).total
+  const effectiveness = getEffectivenessScore(s.slug)
+  return score >= 90 && effectiveness !== null && effectiveness >= 4.5
+})
+```
+
+**Allowed files:**
+```
+lib/analytics.ts
+lib/forking.ts
+app/trending/page.tsx
+app/skills/[category]/[slug]/page.tsx
+db/migrations/003_fork_events.sql
+scripts/migrate.js
+```
+
+**Verify:**
+- `npm run db:migrate` with 003 migration exits 0
+- Community Favorites section renders (may be empty on fresh install)
+- High Quality section renders (may be empty — requires quality > 90 AND review > 4.5)
+- Forking a skill increments fork count in fork_events (test)
+- Detail page shows `[ 0 FORKS ]` badge using fork_events count
+
+**Stop if:** Need files outside allowed_files
+
+---
+
+### T267 — `--scope project` Deploy Flag
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** `--scope project` deploys to `./<agent-dir>/skills/` in the current working directory.
+
+**Project-scoped paths for each supported agent:**
+```typescript
+export const PROJECT_SKILLS_DIRS: Record<string, string> = {
+  'claude-code': '.claude/skills',
+  'cursor':      '.cursor/skills',
+  'codex':       '.codex/skills',
+  'gemini-cli':  '.gemini/skills',
+  'copilot':     '.github/copilot-instructions',  // different convention
+  'continue':    '.continue/config/skills',
+  'agents':      '.agents/skills',
+}
+```
+
+Note: `copilot` uses a different path convention — deploy to `.github/copilot-instructions/<skill-name>.md` (single file, not directory). Document this in the deploy output.
+
+**Allowed files:**
+```
+cli/src/commands/deploy.ts
+cli/src/commands/deploy-pack.ts
+lib/agents/detector.ts
+components/skill-mall/deploy-button.tsx
+```
+
+**Verify:**
+- `npx skill-mall deploy ai/skill-creator --scope project` creates `.claude/skills/skill-creator/` in cwd
+- `npx skill-mall deploy ai/skill-creator --agents claude-code --scope project` same behavior
+- Copilot scope shows a note about different file convention
+
+**Stop if:**
+- Project-scoped paths for any agent are different from the table above — document and use the table
+- Need files outside allowed_files
+
+---
+
+### T268 — CI Trigger Evaluator + Budget Integration
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Wire trigger evaluator and budget check as OPTIONAL CI steps that skip when secrets are absent.
+
+**In `.github/workflows/validate-skills.yml`:** Add two optional steps after the existing validation step:
+
+```yaml
+- name: Trigger accuracy check (optional)
+  if: env.SKILL_MALL_PROVIDER != '' && env.SKILL_MALL_API_KEY != ''
+  continue-on-error: true
+  env:
+    SKILL_MALL_PROVIDER: ${{ secrets.SKILL_MALL_PROVIDER }}
+    SKILL_MALL_API_KEY: ${{ secrets.SKILL_MALL_API_KEY }}
+  run: |
+    for dir in $CHANGED_DIRS; do
+      slug=$(basename "$dir")
+      node cli/dist/index.js eval-triggers "$slug" \
+        --threshold ${{ inputs.trigger_accuracy_threshold || 80 }} \
+        --warn-only || true
+    done
+
+- name: Budget check (optional)
+  if: always()
+  continue-on-error: true
+  run: |
+    for dir in $CHANGED_DIRS; do
+      slug=$(basename "$dir")
+      node cli/dist/index.js budget-check "$slug" \
+        --chars-available ${{ inputs.budget_warn_at_installed || 200 }} || true
+    done
+```
+
+**In `action.yml`:** Add inputs `trigger_accuracy_threshold` (default: 80), `budget_warn_at_installed` (default: 200).
+
+**Allowed files:**
+```
+.github/workflows/validate-skills.yml
+.github/actions/skill-mall-validate/action.yml
+```
+
+**Verify:**
+- YAML is valid: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))"`
+- Both steps have `continue-on-error: true` — they never block the build
+- Trigger step is skipped when SKILL_MALL_PROVIDER is not set
+
+**Stop if:**
+- Either step can fail the build when LLM secrets are absent — must skip gracefully
+- Need files outside allowed_files
+
+---
+
+### T271 — skills.sh Static Badge
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Show `[ PUBLISHED ON SKILLS.SH ]` badge on detail page when `metadata.skills_sh_id` is set. Static link only — no live API calls.
+
+**In `lib/skills.ts`:** Add `skills_sh_id?: string` to the `Skill` type and parse from frontmatter.
+
+**Badge component:** A simple link `https://skills.sh/skills/<id>` rendered as a bracket-notation badge in the sidebar. No data fetching.
+
+**Allowed files:**
+```
+lib/skills.ts
+app/skills/[category]/[slug]/page.tsx
+components/skill-mall/skill-detail/SkillsShBadge.tsx
+```
+
+**Verify:**
+- Skill with `metadata.skills_sh_id: "abc123"` in frontmatter shows badge linking to skills.sh
+- Skill without `skills_sh_id` shows no badge
+
+**Stop if:**
+- Any HTTP fetch to skills.sh API — static badge only
+- Need files outside allowed_files
+
+---
+
+### T272 — CI README Status Badge
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Add GitHub Actions status badge to README.md.
+
+The badge URL format for a workflow file is:
+```
+https://github.com/jamesdsizemore/SkillMall/actions/workflows/validate-skills.yml/badge.svg
+```
+
+Add this to the README.md header section:
+```markdown
+[![Skill Validation](https://github.com/jamesdsizemore/SkillMall/actions/workflows/validate-skills.yml/badge.svg)](https://github.com/jamesdsizemore/SkillMall/actions/workflows/validate-skills.yml)
+```
+
+**Allowed files:**
+```
+.github/workflows/validate-skills.yml
+README.md
+```
+
+**Verify:** README.md contains the badge markdown link
+
+**Stop if:** Need files outside allowed_files
+
+---
+
+### T273 — `npx skill-mall mcp-server` CLI
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Standalone HTTP server on port 3001 for local MCP development.
+
+**Must NOT import Next.js modules.** Implement a standalone catalog reader:
+
+```typescript
+// cli/src/commands/mcp-server.ts
+import http from 'node:http'
+import fs from 'node:fs'
+import path from 'node:path'
+import matter from 'gray-matter'
+
+// Standalone skill reader — no Next.js imports
+function readSkillsFromDir(skillsDir: string) {
+  const skills = []
+  if (!fs.existsSync(skillsDir)) return skills
+
+  for (const cat of fs.readdirSync(skillsDir)) {
+    const catDir = path.join(skillsDir, cat)
+    if (!fs.statSync(catDir).isDirectory() || cat === '_template' || cat === '_starters') continue
+
+    for (const slug of fs.readdirSync(catDir)) {
+      const skillMd = path.join(catDir, slug, 'SKILL.md')
+      if (!fs.existsSync(skillMd)) continue
+
+      const { data, content } = matter(fs.readFileSync(skillMd, 'utf-8'))
+      skills.push({ slug, category: cat, name: data.name || slug, description: data.description || '', tags: data.metadata?.tags?.split(',').map((t: string) => t.trim()) || [], content })
+    }
+  }
+  return skills
+}
+```
+
+The HTTP server handles POST JSON-RPC 2.0 requests, same protocol as `/api/mcp`. It reads `process.cwd()/skills` for the catalog. Print the MCP config JSON when starting:
+
+```
+SkillMall MCP server running at http://localhost:3001
+
+Add to your MCP config:
+{
+  "mcpServers": {
+    "skillmall": { "url": "http://localhost:3001" }
+  }
+}
+```
+
+**Allowed files:**
+```
+cli/src/commands/mcp-server.ts
+cli/src/index.ts
+```
+
+**Verify:**
+- `cd cli && npm run build` exits 0
+- Server starts and responds to GET with tool list (manual smoke test)
+- No Next.js module imports anywhere in mcp-server.ts
+
+**Stop if:**
+- Imports from `next/*`, `@next/*`, or any module that depends on Next.js runtime
+- Need files outside allowed_files
+
+---
+
+### T274 — Review Score Trend in Contributor Dashboard
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** Add `getEffectivenessTrend(skillSlug)` returning 30-day daily average. Render as mini segmented bar on dashboard.
+
+**SQLite date series for 30 days:**
+
+```typescript
+export function getEffectivenessTrend(skillSlug: string): Array<{ date: string; avg: number | null }> {
+  const db = getDb()
+  const results = db.prepare(`
+    WITH RECURSIVE dates(d) AS (
+      SELECT date('now', '-29 days')
+      UNION ALL
+      SELECT date(d, '+1 day') FROM dates WHERE d < date('now')
+    )
+    SELECT
+      dates.d as date,
+      AVG(
+        CASE WHEN r.skill_slug = ? AND date(r.created_at) = dates.d
+          THEN r.rating * CASE WHEN r.is_generic = 0 THEN 2.0 ELSE 1.0 END / 
+               NULLIF(CASE WHEN r.is_generic = 0 THEN 2.0 ELSE 1.0 END, 0)
+        END
+      ) as avg
+    FROM dates
+    LEFT JOIN reviews r ON date(r.created_at) = dates.d AND r.skill_slug = ?
+    GROUP BY dates.d
+    ORDER BY dates.d
+  `).all(skillSlug, skillSlug) as Array<{ date: string; avg: number | null }>
+
+  return results
+}
+```
+
+Note: This SQL uses a recursive CTE (SQLite 3.8.3+) for date series generation. Test that SQLite version supports it: `sqlite3 --version`.
+
+**Allowed files:**
+```
+lib/analytics.ts
+lib/__tests__/analytics.test.ts
+app/dashboard/page.tsx
+```
+
+**Verify:**
+- `getEffectivenessTrend` returns exactly 30 entries (test — mock getDb)
+- Days with no reviews return `avg: null`
+- Dashboard renders trend mini-chart for authenticated author
+
+**Stop if:**
+- SQLite recursive CTE not available in the installed version — fall back to a simpler query that returns only days with data
+- Need files outside allowed_files
+
+---
+
+### T275 — Prompt Library Copy + Skills Using Framework
+
+**Type:** Worker | **Depends on:** nothing
+
+**Objective:** One-click copy button on each framework card. Count of skills using each framework.
+
+**Skill-framework index:** Compute at page render time by reading all prompt frontmatter across all skills. This is a static page — the cost is paid at build time:
+
+```typescript
+// In app/prompt-library/page.tsx
+function buildFrameworkSkillIndex(allSkills: Skill[]): Map<string, number> {
+  const index = new Map<string, number>()
+  for (const skill of allSkills) {
+    const skillDir = path.dirname(skill.path).replace(/^skills\//, '')
+    const promptDir = path.join(process.cwd(), 'skills', skillDir, 'resources', 'prompts')
+    if (!fs.existsSync(promptDir)) continue
+
+    for (const file of fs.readdirSync(promptDir).filter(f => f.endsWith('.md'))) {
+      const content = fs.readFileSync(path.join(promptDir, file), 'utf-8')
+      const match = content.match(/^framework:\s*(.+)$/m)
+      if (match) {
+        for (const fw of match[1].split(',').map(f => f.trim())) {
+          index.set(fw, (index.get(fw) ?? 0) + 1)
+        }
+      }
+    }
+  }
+  return index
+}
+```
+
+**Copy button:** Client component using `navigator.clipboard.writeText(FRAMEWORK_DESCRIPTIONS[name])`.
+
+**Allowed files:**
+```
+app/prompt-library/page.tsx
+lib/skills.ts
+```
+
+**Verify:**
+- Copy button renders on framework cards (smoke test)
+- `[ X SKILLS USE THIS ]` count appears (may be 0 for all current skills — that's OK)
+- Page still builds statically (`npm run build` shows `/prompt-library` as static)
+
+**Stop if:** Need files outside allowed_files
+
+---
+
+### T280 — Missed Features Completion Audit (Judge)
+
+**Type:** Judge | **Depends on:** T251–T275, T257 all done
+
+**Objective:** Audit all missed Phase 1/2 features. Every feature from the spec assigned to Phase 1 or Phase 2 must be present and working. Do not approve based on receipts alone — verify in the running application.
+
+**Verification checklist:**
+- [ ] `npm run build` exits 0
+- [ ] `npm test` exits 0
+- [ ] `npx tsc --noEmit` exits 0
+- [ ] `npm run db:migrate` exits 0 (applies 001, 003, 004 migrations)
+- [ ] `/skills/business/wrong-slug` shows PROMPTS tab with 3 prompt cards
+- [ ] Framework badge on a prompt card is clickable and shows dropdown
+- [ ] `/graph` renders dependency network
+- [ ] `/trending` shows Community Favorites and High Quality sections (may be empty)
+- [ ] `/prompt-library` shows copy buttons and skill-usage counts
+- [ ] `npx skill-mall budget-check ai/skill-creator --chars-available 100` prints analysis with NO invented per-agent numbers
+- [ ] `npx skill-mall optimize-prompt --help` prints usage
+- [ ] `npx skill-mall extract --help` prints usage
+- [ ] `npx skill-mall mcp-server --help` prints usage
+- [ ] `npx skill-mall deploy ai/skill-creator --scope project` creates local .claude/skills/ entry
+- [ ] `npx skill-mall publish --help` prints usage; default behavior is --dry-run
+- [ ] `tests/` directory has >= 72 test case JSON files
+- [ ] Budget Analyzer uses `--chars-available` not per-agent hardcoded values
+- [ ] `resources/build-metadata.json` is written by the pipeline when a skill is created
+- [ ] Run `feature-inventory-check` skill one final time — compare every Phase 1/2 spec feature against codebase
+
+**Do not approve if:**
+- Any T251–T275 or T257 task is queued or active
+- Budget Analyzer uses hardcoded per-agent values
+- `regen-prompt` works without `build-metadata.json`
+- Any Phase 1/2 spec feature is missing or non-functional — the spec is the source of truth
+
+---
+
+## Category 2 Task Cards — Phase 3 Features
+
+These tasks activate only after T280 passes.
+
+---
+
+### T201 — SQLite Phase 3 Migration
+
+**Type:** Worker | **Depends on:** T280
+
+**Objective:** Install reactflow, stripe. Write `db/migrations/002_phase3.sql`. Apply migration.
+
+**Note:** Migrations 001, 003, 004 already exist from Category 1 tasks. This adds 002 which covers Phase 3 tables. SQLite applies migrations alphabetically — 002 will be applied between 001 and 003, which is correct.
+
+**`db/migrations/002_phase3.sql`** (full schema in PHASE-3-PLAN original Section "SQLite Schema Additions for Phase 3"):
+```sql
 CREATE TABLE IF NOT EXISTS skill_feedback (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   skill_slug TEXT NOT NULL,
@@ -86,23 +1457,20 @@ CREATE TABLE IF NOT EXISTS skill_feedback (
   body TEXT CHECK (length(body) <= 200),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_feedback_slug ON skill_feedback(skill_slug);
 
--- Improvement suggestions (generated when feedback >= 10)
 CREATE TABLE IF NOT EXISTS improvement_suggestions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   skill_slug TEXT NOT NULL,
-  dimension TEXT NOT NULL,         -- 'description' | 'instructions' | 'templates' | 'prompts' | 'metadata'
+  dimension TEXT NOT NULL,
   suggestion TEXT NOT NULL,
-  pattern TEXT NOT NULL,           -- the feedback pattern that triggered this suggestion
+  pattern TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   generated_at TEXT NOT NULL DEFAULT (datetime('now')),
   resolved_at TEXT
 );
 
--- RAG knowledge bases
 CREATE TABLE IF NOT EXISTS knowledge_bases (
-  id TEXT PRIMARY KEY,             -- random UUID
+  id TEXT PRIMARY KEY,
   skill_slug TEXT NOT NULL UNIQUE,
   embedding_model TEXT NOT NULL DEFAULT 'text-embedding-3-small',
   chunk_size INTEGER NOT NULL DEFAULT 512,
@@ -110,8 +1478,6 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Knowledge chunks (vector storage via VSS extension)
--- Note: VSS virtual table defined separately after extension load
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   knowledge_base_id TEXT NOT NULL REFERENCES knowledge_bases(id) ON DELETE CASCADE,
@@ -120,9 +1486,8 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
   source_file TEXT NOT NULL
 );
 
--- Marketplace: purchase records
 CREATE TABLE IF NOT EXISTS purchases (
-  id TEXT PRIMARY KEY,             -- Stripe payment intent ID
+  id TEXT PRIMARY KEY,
   skill_slug TEXT NOT NULL,
   buyer_github_id TEXT NOT NULL,
   amount_cents INTEGER NOT NULL,
@@ -130,1525 +1495,239 @@ CREATE TABLE IF NOT EXISTS purchases (
   stripe_session_id TEXT NOT NULL,
   purchased_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_purchases_buyer ON purchases(buyer_github_id);
-CREATE INDEX IF NOT EXISTS idx_purchases_slug ON purchases(skill_slug);
 
--- Marketplace: skill tiers
 CREATE TABLE IF NOT EXISTS skill_tiers (
   skill_slug TEXT PRIMARY KEY,
   tier TEXT NOT NULL DEFAULT 'free' CHECK (tier IN ('free', 'sponsored', 'premium')),
-  price_cents INTEGER,             -- null for free/sponsored
-  sponsor_name TEXT,               -- for sponsored tier
-  creator_github_id TEXT,          -- for premium tier
+  price_cents INTEGER,
+  sponsor_name TEXT,
+  creator_github_id TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
-### TypeScript Types for Phase 3 (`lib/db/types.ts` additions)
-
-```typescript
-export interface SkillFeedback {
-  id: number
-  skill_slug: string
-  reviewer_github_id: string
-  satisfaction: number
-  body: string | null
-  created_at: string
-}
-
-export interface ImprovementSuggestion {
-  id: number
-  skill_slug: string
-  dimension: 'description' | 'instructions' | 'templates' | 'prompts' | 'metadata'
-  suggestion: string
-  pattern: string
-  status: 'pending' | 'approved' | 'rejected'
-  generated_at: string
-  resolved_at: string | null
-}
-
-export interface KnowledgeBase {
-  id: string
-  skill_slug: string
-  embedding_model: string
-  chunk_size: number
-  chunk_count: number
-  created_at: string
-}
-
-export interface KnowledgeChunk {
-  id: number
-  knowledge_base_id: string
-  chunk_text: string
-  chunk_index: number
-  source_file: string
-}
-
-export interface Purchase {
-  id: string
-  skill_slug: string
-  buyer_github_id: string
-  amount_cents: number
-  currency: string
-  stripe_session_id: string
-  purchased_at: string
-}
-
-export interface SkillTier {
-  skill_slug: string
-  tier: 'free' | 'sponsored' | 'premium'
-  price_cents: number | null
-  sponsor_name: string | null
-  creator_github_id: string | null
-  updated_at: string
-}
+**Allowed files:**
 ```
+db/migrations/002_phase3.sql
+package.json
+.env.local
+lib/db/types.ts
+lib/marketplace/gate.ts
+```
+
+**Verify:**
+- `npm install reactflow stripe @stripe/stripe-js` exits 0
+- `npm run db:migrate` exits 0 (all 4 migrations applied)
+- All 6 Phase 3 tables exist in database
+- `npx tsc --noEmit` exits 0
+- `npm run build` exits 0
+
+**Stop if:**
+- sqlite-vss `loadExtension()` throws — report Node.js version and error; RAG (T203) will be blocked but all other tasks proceed
+- Need files outside allowed_files
 
 ---
 
-## Skill Chain Builder
+### T202 — Skill Chain Builder
 
-### What it produces
+**Type:** Worker | **Depends on:** T201
 
-A wrapper skill at `skills/chains/<chain-name>/`:
+**Objective:** Visual canvas at `/skills/chains/new`. `buildChainDirectory` generates chain SKILL.md. POST `/api/create-chain`.
 
-```
-skills/chains/blue-ocean-to-okr/
-├── SKILL.md           # Chain skill with chain metadata in frontmatter
-├── README.md          # Documents the chain: steps, handoffs, expected output
-└── chain.json         # Machine-readable chain definition
-```
-
-### chain.json format
+**Full implementation** is in the original PHASE-3-PLAN.md "Skill Chain Builder" section — including `ChainCanvas.tsx`, `ChainEdgeConfig.tsx`, `buildChainDirectory`, `chain.json` format. Use that section. Key constraint: **ChainCanvas must be dynamically imported with `ssr: false`** to avoid SSR errors.
 
 ```typescript
-interface Chain {
-  name: string
-  slug: string
-  steps: ChainStep[]
-}
-
-interface ChainStep {
-  order: number
-  skillSlug: string               // 'category/skill-name'
-  usesOutput?: string             // output file from previous step to pass forward
-  passesAs: 'context_append' | 'context_replace' | 'named_variable'
-  namedVariable?: string          // if passesAs === 'named_variable'
-  instructions?: string           // additional instructions for this step
-}
+// app/skills/chains/new/page.tsx
+import dynamic from 'next/dynamic'
+const ChainCanvas = dynamic(
+  () => import('@/components/skill-mall/chains/ChainCanvas').then(m => m.ChainCanvas),
+  { ssr: false }
+)
 ```
 
-### SKILL.md frontmatter additions for chain skills
-
-```yaml
----
-name: blue-ocean-to-okr-chain
-description: "Run a complete Blue Ocean Strategy analysis and convert insights to OKRs."
-metadata:
-  chain: true
-  chain_steps:
-    - skill: business/blue-ocean-strategy
-      uses_output: strategy-canvas-proposed.md
-      passes_as: context_append
-    - skill: productivity/phased-implementation-plan
-      receives: strategy-canvas-proposed.md
-      instructions: "Use the proposed Strategy Canvas as strategic context for OKR setting"
----
+**Allowed files:**
+```
+app/skills/chains/new/page.tsx
+components/skill-mall/chains/ChainCanvas.tsx
+components/skill-mall/chains/ChainEdgeConfig.tsx
+lib/chains.ts
+lib/__tests__/chains.test.ts
+app/api/chains/route.ts
+app/api/chains/[slug]/route.ts
+app/api/create-chain/route.ts
 ```
 
-### Visual Canvas
+**Verify:**
+- `buildChainDirectory` with 2 steps produces SKILL.md with `chain: true` in frontmatter (test)
+- `/skills/chains/new` renders without SSR error (`npm run build` with no SSR warnings)
+- Chain SKILL.md validates against AgentSkills spec (test)
 
-Use React Flow for the drag-and-drop canvas. Each node represents a skill. Directed edges represent data flow between skills. Clicking an edge opens a configuration panel for the handoff type.
-
-**Canvas interactions:**
-- Drag skills from a sidebar panel onto the canvas
-- Draw connections between skill nodes by dragging from one node's output handle to the next node's input handle
-- Click a connection to configure: `passesAs`, `namedVariable`, `instructions`
-- Click a node to see the skill's description, available outputs, and expected inputs
-
-**Page:** `/skills/chains/new` — the chain builder canvas
-
-### File: `lib/chains.ts`
-
-```typescript
-import fs from 'fs'
-import path from 'path'
-import type { InMemoryFile, SkillMetadata } from './skill-builder'
-
-interface ChainStep {
-  order: number
-  skillSlug: string
-  usesOutput?: string
-  passesAs: 'context_append' | 'context_replace' | 'named_variable'
-  namedVariable?: string
-  instructions?: string
-}
-
-interface Chain {
-  name: string
-  slug: string
-  steps: ChainStep[]
-}
-
-/** Generate a chain skill directory from a chain definition. Does not write to disk. */
-export function buildChainDirectory(chain: Chain, meta: SkillMetadata): InMemoryFile[] {
-  const stepDescriptions = chain.steps
-    .sort((a, b) => a.order - b.order)
-    .map((s, i) => `${i + 1}. ${s.skillSlug}${s.usesOutput ? ` (uses: ${s.usesOutput})` : ''}`)
-    .join('\n')
-
-  const frontmatter = `---
-name: ${chain.slug}
-description: "Run a coordinated ${chain.name} analysis using ${chain.steps.length} skills in sequence."
-license: MIT
-metadata:
-  version: "1.0.0"
-  chain: true
-  chain_steps:
-${chain.steps.sort((a, b) => a.order - b.order).map(s => `    - skill: ${s.skillSlug}
-      passes_as: ${s.passesAs}
-${s.usesOutput ? `      uses_output: ${s.usesOutput}\n` : ''}${s.instructions ? `      instructions: "${s.instructions}"\n` : ''}`).join('')}
----`
-
-  const skillMd = `${frontmatter}
-
-# ${chain.name}
-
-A skill chain that orchestrates ${chain.steps.length} skills in sequence.
-
-## Steps
-
-${stepDescriptions}
-
-## Usage
-
-Invoke this chain to run the full sequence. Each step's output is passed to the next step as context.
-`
-
-  const chainJson = JSON.stringify(chain, null, 2)
-
-  const readme = `# ${chain.name} Chain
-
-## Steps
-
-${stepDescriptions}
-
-## How to use
-
-Deploy this chain skill, then invoke it: the agent runs each skill in sequence,
-passing outputs forward as specified in chain.json.
-`
-
-  return [
-    { path: 'SKILL.md', content: skillMd },
-    { path: 'chain.json', content: chainJson },
-    { path: 'README.md', content: readme },
-  ]
-}
-```
-
-### API Route: `POST /api/create-chain`
-
-```typescript
-// Body: { chain: Chain; metadata: SkillMetadata }
-// Auth: not required
-// Returns: { slug: string; path: string; fileCount: number }
-// Validates chain SKILL.md against AgentSkills spec before writing
-// Uses atomicWrite from lib/pipeline.ts
-```
+**Stop if:**
+- React Flow causes SSR error — add `dynamic` import with `ssr: false` immediately
+- Need files outside allowed_files
 
 ---
 
-## RAG-Enhanced Skills
+### T203 — RAG Knowledge Attachment
 
-### How it works
+**Type:** Worker | **Depends on:** T201
 
-1. User runs `npx skill-mall attach-knowledge <slug> ./docs/`
-2. CLI reads all supported files (Markdown, txt, PDF text via simple extraction)
-3. Chunks each file into 512-token segments
-4. Generates embeddings using the configured LLM provider's embedding endpoint
-5. Stores embeddings in SQLite via the VSS extension
-6. Updates SKILL.md frontmatter with `rag_enabled: true` and `knowledge_base_id`
+**Full implementation** is in the original PHASE-3-PLAN.md "RAG-Enhanced Skills" section — `lib/rag/embeddings.ts`, `lib/rag/chunker.ts`, `lib/rag/knowledge-base.ts`, `POST /api/retrieve`, CLI `attach-knowledge`. **Claude Code CLI does not support embeddings** — throw with helpful message. Use `SKILL_MALL_EMBEDDING_PROVIDER` env var to specify a separate embedding provider if the main provider doesn't support embeddings.
 
-At agent invocation time, the agent (or user) calls `POST /api/retrieve` with the current query, which returns the top-5 most relevant chunks. These are prepended to the skill context.
+**Stop if:** sqlite-vss `loadExtension()` fails — block T203 with receipt, proceed with all other tasks.
 
-### Embedding Strategy
-
-**Provider-specific embedding:**
-
-| Provider | Embedding call | Dimensions |
-|---|---|---|
-| openai | `openai.embeddings.create({ model: 'text-embedding-3-small', input })` | 1536 |
-| claude-code | Not supported natively — fallback to OpenAI or Ollama for embeddings | — |
-| ollama | `POST http://localhost:11434/api/embeddings { model: 'nomic-embed-text', prompt }` | 768 |
-| gemini | `genAI.getGenerativeModel({ model: 'text-embedding-004' }).embedContent(text)` | 768 |
-| groq | Not supported — use OpenAI-compatible endpoint or fallback | — |
-
-**For providers that don't support embeddings:** the CLI prints an error and instructs the user to configure a separate embedding provider. A `SKILL_MALL_EMBEDDING_PROVIDER` env var can specify a different provider for embeddings (defaults to the main provider).
-
-### File: `lib/rag/embeddings.ts`
-
-```typescript
-import type { LLMClient, ProviderID } from '../providers'
-
-export interface EmbeddingResult {
-  vector: number[]
-  tokenCount: number
-}
-
-/** Generate an embedding vector for the given text. Not all providers support this. */
-export async function generateEmbedding(
-  text: string,
-  provider: ProviderID,
-  apiKey?: string
-): Promise<EmbeddingResult> {
-  if (provider === 'openai' || provider === 'groq') {
-    const { OpenAI } = await import('openai')
-    const client = new OpenAI({
-      apiKey,
-      baseURL: provider === 'groq' ? 'https://api.groq.com/openai/v1' : undefined,
-    })
-    const result = await client.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: text,
-    })
-    return {
-      vector: result.data[0].embedding,
-      tokenCount: result.usage.prompt_tokens,
-    }
-  }
-
-  if (provider === 'ollama') {
-    const res = await fetch('http://localhost:11434/api/embeddings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', prompt: text }),
-    })
-    const data = await res.json() as { embedding: number[] }
-    return { vector: data.embedding, tokenCount: Math.ceil(text.split(/\s+/).length * 1.35) }
-  }
-
-  if (provider === 'gemini') {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai')
-    const genAI = new GoogleGenerativeAI(apiKey!)
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' })
-    const result = await model.embedContent(text)
-    return { vector: result.embedding.values, tokenCount: Math.ceil(text.split(/\s+/).length * 1.35) }
-  }
-
-  throw new Error(`Provider "${provider}" does not support embeddings. Set SKILL_MALL_EMBEDDING_PROVIDER to openai or ollama.`)
-}
+**Allowed files:**
 ```
-
-### File: `lib/rag/chunker.ts`
-
-```typescript
-/** Split text into chunks of approximately targetTokens tokens. */
-export function chunkText(text: string, targetTokens = 512): string[] {
-  const words = text.split(/\s+/)
-  const wordsPerChunk = Math.floor(targetTokens / 1.35)  // rough token-to-word ratio
-  const chunks: string[] = []
-
-  for (let i = 0; i < words.length; i += wordsPerChunk) {
-    chunks.push(words.slice(i, i + wordsPerChunk).join(' '))
-  }
-
-  return chunks.filter(c => c.trim().length > 20)  // skip near-empty chunks
-}
-
-/** Read and extract text from supported file types. */
-export function extractText(filePath: string): string {
-  const fs = require('fs')
-  const content = fs.readFileSync(filePath, 'utf-8')
-  // For now: read as plain text. PDF support can be added later.
-  return content
-}
+lib/rag/embeddings.ts
+lib/rag/chunker.ts
+lib/rag/knowledge-base.ts
+lib/__tests__/rag.test.ts
+app/api/retrieve/route.ts
+cli/src/commands/attach-knowledge.ts
+cli/src/index.ts
 ```
-
-### CLI: `npx skill-mall attach-knowledge <slug> <dir>`
-
-```typescript
-// 1. Find skill in catalog
-// 2. Create knowledge base entry in SQLite
-// 3. Walk <dir> recursively for .md, .txt files
-// 4. Chunk each file
-// 5. Generate embedding for each chunk (via generateEmbedding)
-// 6. Store in knowledge_chunks table
-// 7. Store embedding vector in VSS virtual table
-// 8. Update SKILL.md frontmatter with rag_enabled: true, knowledge_base_id: <id>
-// 9. Print: "Embedded X chunks from Y files"
-```
-
-### API Route: `POST /api/retrieve`
-
-```typescript
-// Body: { skillSlug: string; query: string; topK?: number }
-// Generates embedding for query
-// Runs VSS nearest-neighbor search against knowledge_chunks for this skill
-// Returns: { chunks: Array<{ text: string; source: string; similarity: number }> }
-// Default topK: 5
-```
-
----
-
-## Skill Self-Improvement Loop
-
-### Feedback Collection
-
-After deploying a skill, users may submit structured feedback via the catalog UI:
-
-- **Satisfaction:** 1–5 stars
-- **Body:** free text, max 200 chars, optional field. Prompt: "What worked and what did not?"
-- **Opt-in only.** Never prompted automatically.
-
-**Trigger:** when a skill accumulates >= 10 feedback instances, the system runs the analysis.
-
-### Feedback Analysis (LLM)
-
-```typescript
-// lib/self-improvement/analyzer.ts
-
-interface FeedbackPattern {
-  dimension: 'description' | 'instructions' | 'templates' | 'prompts' | 'metadata'
-  pattern: string       // the observed pattern across feedback items
-  suggestion: string    // specific change recommendation
-}
-
-async function analyzeFeedback(
-  skill: Skill,
-  feedback: SkillFeedback[],
-  client: LLMClient
-): Promise<FeedbackPattern[]>
-```
-
-**Analysis prompt:**
-
-```
-You are analyzing user feedback for an AI agent skill to generate improvement suggestions.
-
-Skill: ${skill.name}
-Description: "${skill.description}"
-Category: ${skill.category}
-
-User feedback (${feedback.length} items):
-${feedback.map(f => `- Rating: ${f.satisfaction}/5. ${f.body ?? '(no text)'}`).join('\n')}
-
-Identify patterns in the feedback and generate specific improvement suggestions.
-For each suggestion, name the skill dimension it applies to and the specific change.
-
-Return JSON:
-{
-  "patterns": [
-    {
-      "dimension": "description|instructions|templates|prompts|metadata",
-      "pattern": "<the feedback pattern you observed>",
-      "suggestion": "<specific actionable change to make>"
-    }
-  ]
-}
-
-Rules:
-- Only generate suggestions when the feedback pattern is clear (appears in >= 30% of responses)
-- Be specific: not "improve the instructions" but "add a validation step after step 3 that checks..."
-- Do not suggest changes to things that feedback doesn't mention
-```
-
-### Approval Gate
-
-All suggestions are stored in `improvement_suggestions` with `status: 'pending'`. The skill author sees them at `/skills/<category>/<slug>/improvements`. Each suggestion can be approved or rejected. Only approved suggestions are applied.
-
-**No automatic writes ever happen.** The system never edits a SKILL.md, template, or prompt file without author approval.
-
-### API Routes
-
-**GET /api/improvements/[skillSlug]** — list pending suggestions (auth required, must be skill author)
-**POST /api/improvements/[id]/approve** — approve and apply a suggestion (auth required, must be skill author)
-**POST /api/improvements/[id]/reject** — reject a suggestion (auth required, must be skill author)
-
-### Applying Approved Suggestions
-
-When a suggestion is approved:
-1. Load current file content
-2. Apply the suggestion via LLM call ("Given this current content and this suggestion, generate the updated content")
-3. Write to disk
-4. Bump `metadata.version` in SKILL.md (patch if description/clarity change, minor if new instructions added)
-5. Record `resolved_at` timestamp on the suggestion
-
----
-
-## Skill Marketplace
-
-### Three-Tier Model
-
-| Tier | Description | Revenue |
-|---|---|---|
-| `free` | All current public skills. Permanent. Never paywalled. | None |
-| `sponsored` | Company funds maintenance. Skill remains free to use. | Attribution badge only |
-| `premium` | Creator charges for specialized skills. | 70% creator / 20% ops / 10% community fund |
-
-### Launch Conditions (code-enforced gate)
-
-```typescript
-// lib/marketplace/gate.ts
-
-interface LaunchConditions {
-  minSkillCount: number         // 200
-  minCommunityMembers: number   // 500
-  minRatingsMonths: number      // 3
-  minSkillsWithTests: number    // 50
-}
-
-const CONDITIONS: LaunchConditions = {
-  minSkillCount: 200,
-  minCommunityMembers: 500,
-  minRatingsMonths: 3,
-  minSkillsWithTests: 50,
-}
-
-export async function checkMarketplaceReady(db: Database): Promise<{
-  ready: boolean
-  conditions: Record<keyof LaunchConditions, { required: number; current: number; met: boolean }>
-}>
-```
-
-**The Marketplace UI tabs, Stripe checkout, and premium skill listings are hidden behind this gate.** If `checkMarketplaceReady()` returns `ready: false`, the marketplace section does not render — not a disabled state, not a "coming soon" — it simply does not exist in the UI.
-
-### Stripe Integration
-
-**Environment variables:**
-```
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-```
-
-**Payment flow:**
-1. User clicks "Purchase" on a premium skill
-2. API creates Stripe Checkout Session
-3. User completes payment on Stripe-hosted page
-4. Stripe webhook fires `checkout.session.completed`
-5. Webhook handler records purchase in SQLite `purchases` table
-6. User is granted access
-
-**Webhook validation:** always verify the Stripe webhook signature using `stripe.webhooks.constructEvent()`. Reject any webhook that doesn't verify.
-
-### Revenue Split Implementation
-
-The 70/20/10 split is tracked in the `purchases` table. Actual disbursement to creators is a manual process (Stripe Connect or direct bank transfer) — Phase 3 only tracks the purchases, not the automated payouts.
-
-### File: `lib/marketplace/payments.ts`
-
-```typescript
-import Stripe from 'stripe'
-import { getDb } from '../db/client'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia',
-})
-
-export async function createCheckoutSession(
-  skillSlug: string,
-  priceCents: number,
-  buyerGithubLogin: string
-): Promise<string> {  // returns checkout URL
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: [{
-      price_data: {
-        currency: 'usd',
-        product_data: { name: `SkillMall: ${skillSlug}` },
-        unit_amount: priceCents,
-      },
-      quantity: 1,
-    }],
-    mode: 'payment',
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/skills/${skillSlug}?purchased=true`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/skills/${skillSlug}`,
-    metadata: { skillSlug, buyerGithubLogin },
-  })
-  return session.url!
-}
-
-export function handleWebhook(payload: Buffer, signature: string): void {
-  const event = stripe.webhooks.constructEvent(
-    payload, signature, process.env.STRIPE_WEBHOOK_SECRET!
-  )
-
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.Checkout.Session
-    const { skillSlug, buyerGithubLogin } = session.metadata!
-
-    const db = getDb()
-    db.prepare(`
-      INSERT OR IGNORE INTO purchases (id, skill_slug, buyer_github_id, amount_cents, stripe_session_id)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(session.id, skillSlug, buyerGithubLogin, session.amount_total, session.id)
-  }
-}
-```
-
----
-
-## Rough Task Breakdown (Detail Written During Goal-Prep)
-
-The following task IDs are reserved for Phase 3. Detailed `allowed_files`, `verify`, and `stop_if` blocks are written during the Phase 3 goal-prep session.
-
-### T201 — SQLite Phase 3 Migration
-
-**Objective:** Apply `db/migrations/002_phase3.sql`. Install SQLite-VSS extension. Verify all new tables created and VSS available.
-
-**Key decision:** install `sqlite-vss` via npm. Load the extension in `lib/db/client.ts` using `db.loadExtension()`. If `loadExtension` is not available (Electron sandbox), document the workaround.
-
----
-
-### T202 — Skill Chain Builder (Canvas + API)
-
-**Objective:** Visual canvas at `/skills/chains/new` using React Flow. `POST /api/create-chain` route that validates and writes the chain skill directory. Chain SKILL.md validates against AgentSkills spec.
-
-**Implementation:** Follow the "Skill Chain Builder" section — Chain TypeScript interfaces, `lib/chains.ts`, `buildChainDirectory`, SKILL.md frontmatter format, chain.json format, React Flow canvas interactions.
-
----
-
-### T203 — RAG Knowledge Attachment (CLI)
-
-**Objective:** `npx skill-mall attach-knowledge <slug> <dir>` command. Chunk files, generate embeddings, store in SQLite+VSS, update SKILL.md frontmatter.
-
-**Implementation:** Follow the "RAG-Enhanced Skills" section — `lib/rag/embeddings.ts`, `lib/rag/chunker.ts`, CLI command, `POST /api/retrieve` route, SQLite VSS query.
-
-**Provider caveat:** Claude Code CLI does not support embeddings. Users with claude-code as their provider must set `SKILL_MALL_EMBEDDING_PROVIDER=ollama` (or openai) for RAG to work. Surface this clearly in CLI output.
 
 ---
 
 ### T204 — Self-Improvement Feedback Collection
 
-**Objective:** Feedback form on skill detail page (opt-in, 1-5 satisfaction + 200-char text). `POST /api/feedback` API route. Trigger analysis when count reaches 10.
+**Type:** Worker | **Depends on:** T201
 
-**Implementation:** Follow the "Skill Self-Improvement Loop" section — `skill_feedback` table (from migration T201), feedback collection UI, analysis trigger, `lib/self-improvement/analyzer.ts`, suggestion storage in `improvement_suggestions` table, suggestion review UI at `/skills/<category>/<slug>/improvements`.
+**Full implementation** is in the original PHASE-3-PLAN.md "Skill Self-Improvement Loop — Feedback Collection" section. Feedback form is opt-in only. Never auto-prompt. Trigger analysis at 10+ submissions.
+
+**Allowed files:**
+```
+lib/self-improvement/feedback.ts
+lib/__tests__/feedback.test.ts
+app/api/feedback/route.ts
+app/skills/[category]/[slug]/page.tsx
+components/skill-mall/improvements/FeedbackForm.tsx
+```
 
 ---
 
 ### T205 — Self-Improvement Approval and Application
 
-**Objective:** Author reviews pending suggestions, approves or rejects each. Approved suggestions applied via LLM-generated edit with version bump.
+**Type:** Worker | **Depends on:** T204
 
-**Strict constraint:** no automatic writes. Ever. The approval route must verify the authenticated user is the skill author before applying any change. Use `skill.author` from SKILL.md frontmatter matched against `session.github_login`.
+**Full implementation** is in the original PHASE-3-PLAN.md "Self-Improvement Applier Implementation" section. CRITICAL: author identity verification must happen before any suggestion is applied — `session.github_login === skill.author`. No automatic writes under any circumstances.
+
+**Allowed files:**
+```
+lib/self-improvement/analyzer.ts
+lib/self-improvement/applier.ts
+lib/__tests__/self-improvement.test.ts
+app/api/improvements/[skillSlug]/route.ts
+app/api/improvements/[id]/approve/route.ts
+app/api/improvements/[id]/reject/route.ts
+app/skills/[category]/[slug]/improvements/page.tsx
+components/skill-mall/improvements/SuggestionCard.tsx
+components/skill-mall/improvements/SuggestionList.tsx
+```
+
+**Stop if:**
+- `applySuggestion` does not verify `session.github_login === skill.author` — fix before proceeding
+- Any automatic write happens without author approval
 
 ---
 
-### T206 — Marketplace Launch Gate and Tier System
+### T206 — Marketplace Gate and Tier System
 
-**Objective:** Implement `checkMarketplaceReady()` gate. `skill_tiers` table (from migration T201). Admin route to set skill tier. UI renders marketplace UI only when gate passes.
+**Type:** Worker | **Depends on:** T201
+
+**Full implementation** is in the original PHASE-3-PLAN.md "Marketplace Launch Gate" and "TierBadge" and "PremiumTeaser" sections. `checkMarketplaceReady()` must use real data from SQLite and skill catalog — not hardcoded false. The marketplace UI and checkout button are hidden (not disabled) when `ready: false`.
+
+**Allowed files:**
+```
+lib/marketplace/gate.ts
+lib/marketplace/entitlement.ts
+lib/__tests__/marketplace.test.ts
+app/api/marketplace/status/route.ts
+app/api/marketplace/entitlement/route.ts
+components/skill-mall/marketplace/TierBadge.tsx
+components/skill-mall/marketplace/PremiumTeaser.tsx
+app/skills/[category]/[slug]/page.tsx
+```
 
 ---
 
 ### T207 — Stripe Payment Integration
 
-**Objective:** `createCheckoutSession`, Stripe webhook handler, purchase record in SQLite, entitlement check on premium skill access.
+**Type:** Worker | **Depends on:** T206
 
-**Stripe CLI for local webhook testing:** add `stripe listen --forward-to localhost:3000/api/webhooks/stripe` to dev setup docs. Never test webhooks by directly calling the webhook endpoint — always use the Stripe CLI to simulate events.
+**Full implementation** is in the original PHASE-3-PLAN.md "Stripe Integration" section. **Critical:** `export const config = { api: { bodyParser: false } }` in webhook route. Webhook validates Stripe-Signature header before processing any payload. Bad signature → 400, never processes payload.
+
+**Environment variables required:** Add `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` to `.env.local` before starting.
+
+**Allowed files:**
+```
+lib/marketplace/payments.ts
+app/api/marketplace/checkout/route.ts
+app/api/webhooks/stripe/route.ts
+app/api/marketplace/entitlement/route.ts
+```
+
+**Stop if:**
+- `export const config = { api: { bodyParser: false } }` missing from webhook route
+- Webhook processes payload without verifying Stripe-Signature header first
+- STRIPE_SECRET_KEY not in .env.local
 
 ---
 
 ### T208 — Phase 3 Documentation
 
-**Objective:** Write all Phase 3 doc deliverables >= 500 words each.
+**Type:** Worker | **Depends on:** T202, T203, T204, T205, T206, T207
 
-- `docs/user/skill-chains.md` — chain builder walkthrough, canvas interactions, chain SKILL.md format
-- `docs/user/rag-enhanced-skills.md` — knowledge attachment guide, provider embedding support matrix, retrieval API usage
-- `docs/user/self-improvement-loop.md` — feedback submission, how suggestions are generated, approval workflow
-- `docs/user/marketplace.md` — three tiers, pricing model, revenue split, launch conditions
-- `docs/reference/chain-format.md` — chain SKILL.md frontmatter spec, chain.json format spec
+**Objective:** Write all Phase 3 docs. Each >= 500 words. Include all missed Phase 1/2 features that now exist.
+
+**Files:**
+```
+docs/user/skill-chains.md
+docs/user/rag-enhanced-skills.md
+docs/user/self-improvement-loop.md
+docs/user/marketplace.md
+docs/reference/chain-format.md
+docs/user/budget-analyzer.md           (T252 — new)
+docs/user/domain-starter-templates.md  (T251 — new)
+docs/user/multilingual-support.md      (T256 — new)
+docs/reference/build-metadata.md       (T261 — new)
+```
+
+**Allowed files:**
+```
+docs/user/
+docs/reference/
+```
+
+**Verify:** All 9 files exist, each >= 500 words
 
 ---
 
 ### T209 — Phase 3 Completion Audit (Judge)
 
-**Objective:** Audit whether Phase 3 is complete. All T201–T208 done, all tests passing, build clean, launch conditions verified if marketplace active.
+**Type:** Judge | **Depends on:** T201–T208, T280
+
+**Objective:** Final audit. All 30 tasks done. Every spec feature present and working. Run `feature-inventory-check` one final time.
+
+**Do not mark complete if:**
+- T280 (missed features audit) did not pass with `approved`
+- `npm run build` or `npm test` fails
+- Marketplace UI appears when `checkMarketplaceReady()` returns false
+- Any Phase 3 or Phase 1/2 spec feature is missing or broken
+- `feature-inventory-check` skill run reveals any gap
 
 ---
 
-## Complete API Surface for Phase 3
-
-Every API route Phase 3 adds. Each route inherits the Phase 1/2 error response conventions (400 invalid_input, 401 unauthorized, 403 forbidden, 422 pipeline_failed, 503 provider_not_configured).
-
-### Chain Routes
-
-**POST /api/create-chain**
-```typescript
-// Body: {
-//   chain: Chain                  // name, slug, steps[]
-//   metadata: SkillMetadata       // slug, category, tags, targetAgents
-// }
-// Returns: { slug: string; path: string; fileCount: number }
-// Validates chain SKILL.md with validateSkillDirectory before writing
-// Writes atomically via atomicWrite to skills/chains/<slug>/
-// Error 422 if validation fails (returns errors array)
-```
-
-**GET /api/chains**
-```typescript
-// Returns: Array<{ slug: string; name: string; steps: number; skills: string[] }>
-// Lists all skills in skills/chains/ with their step count and skill slugs
-```
-
-**GET /api/chains/[slug]**
-```typescript
-// Returns: { skill: Skill; chain: Chain } — the skill metadata + parsed chain.json
-// 404 if chain not found
-```
-
-### RAG Routes
-
-**POST /api/retrieve**
-```typescript
-// Body: { skillSlug: string; query: string; topK?: number }
-// Auth: not required — retrieval is read-only
-// Generates query embedding using configured embedding provider
-// Runs VSS nearest-neighbor search
-// Returns: {
-//   chunks: Array<{
-//     text: string
-//     source: string           // source filename
-//     chunkIndex: number
-//     similarity: number       // cosine similarity 0.0-1.0
-//   }>
-// }
-// Default topK: 5, max: 20
-// 503 if no embedding provider configured
-// 404 if skill has no knowledge base
-```
-
-**DELETE /api/knowledge-bases/[skillSlug]**
-```typescript
-// Auth: required (must be skill author)
-// Deletes all chunks and the knowledge base entry
-// Removes rag_enabled and knowledge_base_id from SKILL.md frontmatter
-// Returns: { success: true; chunksDeleted: number }
-```
-
-### Feedback Routes
-
-**POST /api/feedback**
-```typescript
-// Body: { skillSlug: string; satisfaction: number (1-5); body?: string (max 200 chars) }
-// Auth: required (GitHub session)
-// Returns: { feedback: SkillFeedback; analysisTriggered: boolean }
-// analysisTriggered: true when submission count just hit 10 (triggers background analysis)
-// Idempotent: same user can submit feedback multiple times (creates new rows, not upsert)
-```
-
-**GET /api/improvements/[skillSlug]**
-```typescript
-// Auth: required (must be skill author — session.github_login === skill.author)
-// Returns: {
-//   suggestions: ImprovementSuggestion[]
-//   feedbackCount: number
-//   analysisReady: boolean     // true when feedbackCount >= 10
-// }
-```
-
-**POST /api/improvements/[id]/approve**
-```typescript
-// Auth: required (must be skill author)
-// Applies the suggestion to the relevant skill file via LLM-generated edit
-// Bumps version in SKILL.md (patch for clarity, minor for instructions/content)
-// Sets suggestion status to 'approved', resolved_at to now()
-// Returns: { success: boolean; newVersion: string; changedFile: string }
-```
-
-**POST /api/improvements/[id]/reject**
-```typescript
-// Auth: required (must be skill author)
-// Sets status to 'rejected', resolved_at to now()
-// Returns: { success: true }
-```
-
-### Marketplace Routes
-
-**GET /api/marketplace/status**
-```typescript
-// No auth required
-// Returns: {
-//   ready: boolean
-//   conditions: {
-//     skillCount: { required: 200; current: number; met: boolean }
-//     communityMembers: { required: 500; current: number; met: boolean }
-//     ratingsMonths: { required: 3; current: number; met: boolean }
-//     skillsWithTests: { required: 50; current: number; met: boolean }
-//   }
-// }
-```
-
-**POST /api/marketplace/checkout**
-```typescript
-// Body: { skillSlug: string }
-// Auth: required
-// Returns: { checkoutUrl: string }
-// 403 if skill is not premium
-// 402 if marketplace not ready (launch conditions not met)
-// Creates Stripe Checkout Session, returns redirect URL
-```
-
-**POST /api/webhooks/stripe**
-```typescript
-// Raw body required (do not parse as JSON — Stripe needs raw bytes for signature verification)
-// Validates Stripe-Signature header using stripe.webhooks.constructEvent()
-// 400 if signature invalid
-// Handles: checkout.session.completed → records purchase in SQLite
-// Returns 200 immediately; processing is synchronous
-// CRITICAL: add export const config = { api: { bodyParser: false } } to this route
-```
-
-**GET /api/marketplace/entitlement**
-```typescript
-// Body: { skillSlug: string }  (query param)
-// Auth: required
-// Returns: { hasAccess: boolean; tier: 'free' | 'sponsored' | 'premium' | null }
-// hasAccess is always true for free/sponsored skills
-// For premium: true if purchase record exists for this buyer + skill
-```
-
----
-
-## Complete File Tree for Phase 3 (new files only)
-
-```
-app/
-  skills/
-    chains/
-      new/
-        page.tsx                  # React Flow canvas
-  api/
-    chains/
-      route.ts                    # GET all chains
-      [slug]/
-        route.ts                  # GET single chain
-    create-chain/
-      route.ts                    # POST create chain
-    retrieve/
-      route.ts                    # POST RAG retrieval
-    knowledge-bases/
-      [skillSlug]/
-        route.ts                  # DELETE knowledge base
-    feedback/
-      route.ts                    # POST submit feedback
-    improvements/
-      [skillSlug]/
-        route.ts                  # GET suggestions for skill
-      [id]/
-        approve/
-          route.ts                # POST approve suggestion
-        reject/
-          route.ts                # POST reject suggestion
-    marketplace/
-      status/
-        route.ts                  # GET launch conditions
-      checkout/
-        route.ts                  # POST create Stripe session
-      entitlement/
-        route.ts                  # GET access check
-    webhooks/
-      stripe/
-        route.ts                  # POST Stripe webhook
-
-lib/
-  chains.ts                       # buildChainDirectory
-  rag/
-    embeddings.ts                 # generateEmbedding
-    chunker.ts                    # chunkText, extractText
-    knowledge-base.ts             # createKnowledgeBase, attachKnowledge, retrieveChunks
-  self-improvement/
-    analyzer.ts                   # analyzeFeedback
-    applier.ts                    # applySuggestion (LLM-based edit + version bump)
-    feedback.ts                   # createFeedback, getFeedbackCount, getRecentFeedback
-  marketplace/
-    gate.ts                       # checkMarketplaceReady
-    payments.ts                   # createCheckoutSession, handleWebhook
-    entitlement.ts                # hasAccess, getTier
-
-components/
-  skill-mall/
-    chains/
-      ChainCanvas.tsx             # React Flow canvas
-      ChainNodePanel.tsx          # Sidebar with skill search
-      ChainEdgeConfig.tsx         # Connection configuration panel
-    improvements/
-      SuggestionCard.tsx
-      SuggestionList.tsx
-
-cli/
-  src/
-    commands/
-      attach-knowledge.ts
-      chain.ts                    # npx skill-mall chain create <name>
-
-db/
-  migrations/
-    002_phase3.sql                # All Phase 3 tables
-
-docs/
-  user/
-    skill-chains.md
-    rag-enhanced-skills.md
-    self-improvement-loop.md
-    marketplace.md
-  reference/
-    chain-format.md
-```
-
----
-
-## Security Requirements for Phase 3
-
-Every Phase 3 route that touches sensitive operations has stricter security requirements than Phase 1/2.
-
-### Author verification pattern
-
-Before applying any improvement suggestion or modifying a skill, always verify:
-
-```typescript
-async function verifySkillAuthor(skillSlug: string, session: Session): Promise<void> {
-  const skill = getAllSkills().find(s => s.slug === skillSlug)
-  if (!skill) throw new Error('Skill not found')
-  if (skill.author !== session.github_login) {
-    throw new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 })
-  }
-}
-```
-
-### Stripe webhook security
-
-```typescript
-// In app/api/webhooks/stripe/route.ts:
-export const config = { api: { bodyParser: false } }  // MUST be present
-
-export async function POST(req: NextRequest) {
-  const body = await req.arrayBuffer()
-  const payload = Buffer.from(body)
-  const signature = req.headers.get('Stripe-Signature')!
-
-  try {
-    // This throws if signature is invalid — never skip this check
-    stripe.webhooks.constructEvent(payload, signature, process.env.STRIPE_WEBHOOK_SECRET!)
-  } catch {
-    return NextResponse.json({ error: 'invalid_signature' }, { status: 400 })
-  }
-  // ... handle event
-}
-```
-
-### RAG content validation
-
-When attaching knowledge, validate that:
-1. The target directory is within the current working directory (no path traversal)
-2. Files are within size limits (max 5MB per file, max 50MB total per knowledge base)
-3. File extensions are from the allowed set (.md, .txt — no executables)
-
-```typescript
-function validateKnowledgePath(targetDir: string): void {
-  const resolved = path.resolve(targetDir)
-  const cwd = process.cwd()
-  if (!resolved.startsWith(cwd)) {
-    throw new Error('Knowledge directory must be within the project directory')
-  }
-}
-```
-
-### Marketplace entitlement
-
-Premium skill content must not be served to users without a verified purchase record. The skill detail page must check entitlement before rendering the full SKILL.md content for premium skills.
-
-```typescript
-// In app/skills/[category]/[slug]/page.tsx — after Phase 3:
-const tier = getSkillTier(skill.slug)  // from skill_tiers table
-if (tier === 'premium') {
-  const session = await getCurrentSession()
-  if (!session || !hasPurchase(skill.slug, session.github_id)) {
-    // Render teaser view: name, description, quality score, purchase button
-    // Do NOT render SKILL.md content
-    return <PremiumTeaser skill={skill} price={tier.price_cents} />
-  }
-}
-```
-
----
-
-## React Flow Canvas Implementation
-
-### Component Structure
-
-```typescript
-// components/skill-mall/chains/ChainCanvas.tsx
-'use client'
-
-import ReactFlow, {
-  Node, Edge, Connection, addEdge,
-  Background, Controls, MiniMap,
-  useNodesState, useEdgesState,
-  Handle, Position,
-} from 'reactflow'
-import 'reactflow/dist/style.css'
-import { useState, useCallback } from 'react'
-import type { Skill } from '@/lib/skills'
-
-interface SkillNodeData {
-  skill: Skill
-  outputs: string[]   // derived from skill.hasSamples ? skill resources
-}
-
-function SkillNode({ data }: { data: SkillNodeData }) {
-  return (
-    <div className="border border-sm-border bg-sm-surface px-4 py-3 min-w-[200px]">
-      <Handle type="target" position={Position.Left} className="!bg-sm-blue !border-sm-border" />
-
-      <p
-        className="text-[9px] tracking-widest text-sm-secondary mb-1"
-        style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-      >
-        [ {data.skill.category.toUpperCase()} ]
-      </p>
-      <p className="text-sm font-semibold text-sm-display">{data.skill.name}</p>
-      <p className="text-xs text-sm-secondary mt-1 line-clamp-2">{data.skill.description}</p>
-
-      <Handle type="source" position={Position.Right} className="!bg-sm-blue !border-sm-border" />
-    </div>
-  )
-}
-
-const nodeTypes = { skillNode: SkillNode }
-
-interface ChainCanvasProps {
-  availableSkills: Skill[]
-  onChainReady: (chain: ChainDefinition) => void
-}
-
-interface ChainDefinition {
-  nodes: Node<SkillNodeData>[]
-  edges: Edge[]
-}
-
-export function ChainCanvas({ availableSkills, onChainReady }: ChainCanvasProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<SkillNodeData>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
-  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null)
-  const [chainName, setChainName] = useState('')
-
-  const onConnect = useCallback((connection: Connection) => {
-    setEdges(eds => addEdge({
-      ...connection,
-      data: { passesAs: 'context_append', namedVariable: null, instructions: null },
-    }, eds))
-  }, [setEdges])
-
-  const addSkill = (skill: Skill) => {
-    const id = `skill-${skill.slug}-${Date.now()}`
-    setNodes(nds => [...nds, {
-      id,
-      type: 'skillNode',
-      position: { x: nds.length * 280, y: 100 },
-      data: { skill, outputs: [] },
-    }])
-  }
-
-  const buildChain = () => {
-    if (!chainName.trim() || nodes.length < 2) return
-
-    const slug = chainName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const sortedNodes = [...nodes].sort((a, b) => a.position.x - b.position.x)
-
-    const steps = sortedNodes.map((node, i) => ({
-      order: i + 1,
-      skillSlug: `${node.data.skill.category}/${node.data.skill.slug}`,
-      passesAs: 'context_append' as const,
-    }))
-
-    onChainReady({ nodes, edges })
-  }
-
-  return (
-    <div className="flex h-[calc(100vh-200px)]">
-      {/* Skill sidebar */}
-      <div className="w-64 border-r border-sm-border bg-sm-surface overflow-y-auto p-3">
-        <p
-          className="text-[9px] tracking-widest text-sm-secondary mb-3"
-          style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-        >
-          [ DRAG SKILLS ONTO CANVAS ]
-        </p>
-        {availableSkills.map(skill => (
-          <button
-            key={skill.slug}
-            onClick={() => addSkill(skill)}
-            className="w-full text-left border border-sm-border p-2 mb-1 hover:border-sm-display transition-colors"
-          >
-            <p className="text-xs font-semibold text-sm-display">{skill.name}</p>
-            <p
-              className="text-[9px] tracking-widest text-sm-disabled"
-              style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-            >
-              {skill.category.toUpperCase()}
-            </p>
-          </button>
-        ))}
-      </div>
-
-      {/* Canvas */}
-      <div className="flex-1 relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onEdgeClick={(_, edge) => setSelectedEdge(edge)}
-          fitView
-          className="bg-sm-bg"
-        >
-          <Background color="var(--border-visible)" gap={16} size={1} />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
-
-        {/* Build controls */}
-        <div className="absolute bottom-4 left-4 flex items-center gap-3 bg-sm-surface border border-sm-border p-3">
-          <div className="border-b border-sm-border">
-            <input
-              value={chainName}
-              onChange={e => setChainName(e.target.value)}
-              placeholder="chain name"
-              className="bg-transparent text-sm text-sm-primary outline-none placeholder:text-sm-disabled py-1"
-            />
-          </div>
-          <button
-            onClick={buildChain}
-            disabled={!chainName.trim() || nodes.length < 2}
-            className="bg-sm-display px-4 py-2 text-[10px] tracking-widest text-sm-bg disabled:opacity-30 hover:opacity-80"
-            style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-          >
-            [ BUILD CHAIN ]
-          </button>
-        </div>
-      </div>
-
-      {/* Edge configuration panel */}
-      {selectedEdge && (
-        <ChainEdgeConfig
-          edge={selectedEdge}
-          onUpdate={(config) => {
-            setEdges(eds => eds.map(e => e.id === selectedEdge.id ? { ...e, data: config } : e))
-            setSelectedEdge(null)
-          }}
-          onClose={() => setSelectedEdge(null)}
-        />
-      )}
-    </div>
-  )
-}
-```
-
-### Edge Configuration Panel
-
-```typescript
-// components/skill-mall/chains/ChainEdgeConfig.tsx
-'use client'
-
-import type { Edge } from 'reactflow'
-import { useState } from 'react'
-
-interface EdgeConfig {
-  passesAs: 'context_append' | 'context_replace' | 'named_variable'
-  namedVariable: string | null
-  instructions: string | null
-}
-
-interface Props {
-  edge: Edge
-  onUpdate: (config: EdgeConfig) => void
-  onClose: () => void
-}
-
-export function ChainEdgeConfig({ edge, onUpdate, onClose }: Props) {
-  const [config, setConfig] = useState<EdgeConfig>({
-    passesAs: edge.data?.passesAs ?? 'context_append',
-    namedVariable: edge.data?.namedVariable ?? null,
-    instructions: edge.data?.instructions ?? null,
-  })
-
-  return (
-    <div className="w-64 border-l border-sm-border bg-sm-surface p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <p
-          className="text-[9px] tracking-widest text-sm-secondary"
-          style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-        >
-          [ CONFIGURE HANDOFF ]
-        </p>
-        <button
-          onClick={onClose}
-          className="text-[9px] tracking-widest text-sm-disabled hover:text-sm-primary"
-          style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-        >
-          [ X ]
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        {(['context_append', 'context_replace', 'named_variable'] as const).map(opt => (
-          <button
-            key={opt}
-            onClick={() => setConfig(c => ({ ...c, passesAs: opt }))}
-            className={`w-full text-left border px-3 py-2 text-[10px] tracking-widest transition-colors ${
-              config.passesAs === opt ? 'border-sm-display text-sm-display' : 'border-sm-border text-sm-secondary'
-            }`}
-            style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-          >
-            [ {opt.toUpperCase().replace(/_/g, ' ')} ]
-          </button>
-        ))}
-      </div>
-
-      {config.passesAs === 'named_variable' && (
-        <div className="border-b border-sm-border focus-within:border-sm-display transition-colors">
-          <input
-            value={config.namedVariable ?? ''}
-            onChange={e => setConfig(c => ({ ...c, namedVariable: e.target.value }))}
-            placeholder="variable name"
-            className="w-full bg-transparent py-1 text-sm text-sm-primary outline-none placeholder:text-sm-disabled"
-          />
-        </div>
-      )}
-
-      <div className="border-b border-sm-border focus-within:border-sm-display transition-colors">
-        <textarea
-          value={config.instructions ?? ''}
-          onChange={e => setConfig(c => ({ ...c, instructions: e.target.value || null }))}
-          placeholder="additional instructions for next step (optional)"
-          rows={3}
-          className="w-full bg-transparent py-1 text-sm text-sm-primary outline-none placeholder:text-sm-disabled resize-none"
-        />
-      </div>
-
-      <button
-        onClick={() => onUpdate(config)}
-        className="w-full bg-sm-display py-2 text-[10px] tracking-widest text-sm-bg hover:opacity-80 transition-opacity"
-        style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-      >
-        [ SAVE HANDOFF ]
-      </button>
-    </div>
-  )
-}
-```
-
----
-
-## Self-Improvement Applier Implementation
-
-### File: `lib/self-improvement/applier.ts`
-
-```typescript
-import fs from 'fs'
-import path from 'path'
-import { getDb } from '../db/client'
-import { getAllSkills } from '../skills'
-import type { LLMClient } from '../providers'
-import type { ImprovementSuggestion } from '../db/types'
-
-/**
- * Apply an approved improvement suggestion to the relevant skill file.
- * Uses LLM to generate the edit. Bumps version in SKILL.md.
- * Never writes without explicit approval — this function is only called
- * after the author has approved the suggestion.
- */
-export async function applySuggestion(
-  suggestion: ImprovementSuggestion,
-  client: LLMClient
-): Promise<{ changedFile: string; newVersion: string }> {
-  const skills = getAllSkills()
-  const skill = skills.find(s => s.slug === suggestion.skill_slug)
-  if (!skill) throw new Error(`Skill not found: ${suggestion.skill_slug}`)
-
-  const skillDir = path.dirname(skill.path)
-
-  // Determine which file to edit based on dimension
-  const fileToEdit = getFileForDimension(suggestion.dimension, skillDir, skill.path)
-  const currentContent = fs.readFileSync(fileToEdit, 'utf-8')
-
-  // LLM generates the edited content
-  const editPrompt = `You are editing an AI agent skill file to apply an improvement suggestion.
-
-Current file content:
-<current>
-${currentContent}
-</current>
-
-Improvement suggestion:
-Dimension: ${suggestion.dimension}
-Pattern observed: ${suggestion.pattern}
-Suggested change: ${suggestion.suggestion}
-
-Apply the suggestion to the file content. Return ONLY the complete updated file content.
-Do not add any explanation, preamble, or markdown fences. Return the raw file content.`
-
-  const updatedContent = await client.complete(editPrompt, {
-    temperature: 0.2,
-    maxTokens: 4000,
-    systemPrompt: 'You apply specific, targeted improvements to skill files. Return only the raw updated file content.',
-  })
-
-  // Determine version bump type
-  const bumpType = suggestion.dimension === 'instructions' ? 'minor' : 'patch'
-  const newVersion = bumpVersion(skill.version, bumpType)
-
-  // Update version in SKILL.md if we're editing a different file
-  let skillMdContent = fs.readFileSync(skill.path, 'utf-8')
-  skillMdContent = skillMdContent.replace(
-    /^  version: ".*"$/m,
-    `  version: "${newVersion}"`
-  )
-
-  // Write atomically: write to temp first, then rename
-  const tempPath = `${fileToEdit}.tmp-${Date.now()}`
-  fs.writeFileSync(tempPath, updatedContent, 'utf-8')
-  fs.renameSync(tempPath, fileToEdit)
-
-  if (fileToEdit !== skill.path) {
-    const tempSkillMd = `${skill.path}.tmp-${Date.now()}`
-    fs.writeFileSync(tempSkillMd, skillMdContent, 'utf-8')
-    fs.renameSync(tempSkillMd, skill.path)
-  }
-
-  // Mark suggestion as resolved
-  const db = getDb()
-  db.prepare(`
-    UPDATE improvement_suggestions
-    SET status = 'approved', resolved_at = datetime('now')
-    WHERE id = ?
-  `).run(suggestion.id)
-
-  return { changedFile: path.relative(process.cwd(), fileToEdit), newVersion }
-}
-
-function getFileForDimension(
-  dimension: ImprovementSuggestion['dimension'],
-  skillDir: string,
-  skillMdPath: string
-): string {
-  switch (dimension) {
-    case 'description':
-    case 'instructions':
-    case 'metadata':
-      return skillMdPath
-    case 'templates': {
-      const templatesDir = path.join(skillDir, 'resources', 'templates')
-      const files = fs.existsSync(templatesDir) ? fs.readdirSync(templatesDir) : []
-      // Edit the first template file — Worker should refine which file if needed
-      return files.length > 0 ? path.join(templatesDir, files[0]) : skillMdPath
-    }
-    case 'prompts': {
-      const promptsDir = path.join(skillDir, 'resources', 'prompts')
-      const files = fs.existsSync(promptsDir) ? fs.readdirSync(promptsDir) : []
-      return files.length > 0 ? path.join(promptsDir, files[0]) : skillMdPath
-    }
-  }
-}
-
-function bumpVersion(current: string, type: 'patch' | 'minor' | 'major'): string {
-  const parts = current.match(/^(\d+)\.(\d+)\.(\d+)$/)
-  if (!parts) return current
-
-  const [, major, minor, patch] = parts.map(Number)
-  switch (type) {
-    case 'major': return `${major + 1}.0.0`
-    case 'minor': return `${major}.${minor + 1}.0`
-    case 'patch': return `${major}.${minor}.${patch + 1}`
-  }
-}
-```
-
----
-
-## Marketplace Frontend Components
-
-### Skill Tier Badge (`components/skill-mall/marketplace/TierBadge.tsx`)
-
-```typescript
-'use client'
-
-type Tier = 'free' | 'sponsored' | 'premium' | null
-
-export function TierBadge({ tier }: { tier: Tier }) {
-  if (!tier || tier === 'free') return null
-
-  return (
-    <span
-      className={`text-[9px] tracking-widest px-2 py-0.5 border ${
-        tier === 'premium'
-          ? 'border-sm-accent text-sm-accent'
-          : 'border-sm-blue text-sm-blue'
-      }`}
-      style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-    >
-      [ {tier.toUpperCase()} ]
-    </span>
-  )
-}
-```
-
-### Premium Teaser (`components/skill-mall/marketplace/PremiumTeaser.tsx`)
-
-```typescript
-'use client'
-
-import { useState } from 'react'
-import type { Skill } from '@/lib/skills'
-
-interface Props {
-  skill: Skill
-  priceCents: number
-}
-
-export function PremiumTeaser({ skill, priceCents }: Props) {
-  const [loading, setLoading] = useState(false)
-
-  const handlePurchase = async () => {
-    setLoading(true)
-    const res = await fetch('/api/marketplace/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skillSlug: skill.slug }),
-    })
-    const { checkoutUrl } = await res.json()
-    window.location.href = checkoutUrl
-  }
-
-  return (
-    <div className="bg-sm-bg min-h-screen px-4 py-12 sm:px-6">
-      <div className="mx-auto max-w-2xl">
-        <p
-          className="mb-2 text-[9px] tracking-widest text-sm-accent"
-          style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-        >
-          [ PREMIUM SKILL ]
-        </p>
-        <h1 className="mb-3 text-3xl font-bold text-sm-display">{skill.name}</h1>
-        <p className="mb-8 text-sm text-sm-secondary">{skill.description}</p>
-
-        <div className="border border-sm-border bg-sm-surface p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-sm-primary">Full skill access</span>
-            <span
-              className="text-2xl font-black text-sm-display"
-              style={{ fontFamily: '"Doto", monospace' }}
-            >
-              ${(priceCents / 100).toFixed(2)}
-            </span>
-          </div>
-          <ul className="space-y-2 text-xs text-sm-secondary">
-            <li>— SKILL.md with complete instructions</li>
-            <li>— All artifact templates</li>
-            <li>— Completed sample outputs</li>
-            <li>— All framework-selected prompts</li>
-          </ul>
-          <button
-            onClick={handlePurchase}
-            disabled={loading}
-            className="w-full bg-sm-display py-3 text-[10px] tracking-widest text-sm-bg hover:opacity-80 transition-opacity disabled:opacity-30"
-            style={{ fontFamily: 'var(--font-space-mono, monospace)' }}
-          >
-            {loading ? '[ REDIRECTING TO CHECKOUT... ]' : `[ PURCHASE — $${(priceCents / 100).toFixed(2)} ]`}
-          </button>
-        </div>
-
-        <p className="mt-4 text-[10px] text-sm-disabled text-center" style={{ fontFamily: 'var(--font-space-mono, monospace)' }}>
-          Powered by Stripe. Revenue split: 70% creator / 20% ops / 10% community fund.
-        </p>
-      </div>
-    </div>
-  )
-}
-```
-
----
-
-## Test Cases for Phase 3
-
-### Chain Builder Tests
-
-- `buildChainDirectory` with 2 steps produces SKILL.md with `chain: true` frontmatter
-- `buildChainDirectory` with 3 steps produces 3 entries in `chain_steps` frontmatter
-- `validateSkillDirectory` on chain SKILL.md returns valid: true
-- chain.json round-trips correctly (parse → stringify → parse produces identical object)
-
-### RAG Tests
-
-- `chunkText` with 1000-word text produces chunks of approximately 380 words each
-- `chunkText` filters out near-empty chunks (< 20 chars)
-- `generateEmbedding` with openai provider calls `openai.embeddings.create` (mocked)
-- `generateEmbedding` with claude-code provider throws with helpful error message
-- Retrieval returns top-K chunks sorted by similarity descending
-
-### Self-Improvement Tests
-
-- `analyzeFeedback` with 10 mixed feedback items returns at least 1 pattern
-- `applySuggestion` with mocked LLM updates file content and bumps version
-- `bumpVersion('1.2.3', 'patch')` returns `'1.2.4'`
-- `bumpVersion('1.2.3', 'minor')` returns `'1.3.0'`
-- Author verification: approving suggestion as non-author returns 403
-
-### Marketplace Tests
-
-- `checkMarketplaceReady` returns `ready: false` when conditions not met
-- `checkMarketplaceReady` returns `ready: true` only when ALL conditions are met
-- Stripe webhook with invalid signature → 400 (never processes payload)
-- `hasAccess` returns true for free skills without purchase record
-- `hasAccess` returns false for premium skills without purchase record
-
----
-
-## Dependency Graph for Phase 3 Tasks
-
-```
-T201 (DB Migration)
-  ├─→ T202 (Chain Builder)
-  ├─→ T203 (RAG)
-  ├─→ T204 (Feedback Collection)
-  │     └─→ T205 (Approval + Application)
-  └─→ T206 (Marketplace Gate + Tiers)
-        └─→ T207 (Stripe Payments)
-
-T208 (Documentation) — parallel with T202-T207
-T209 (Completion Audit) — after all T201-T208
-```
-
-T202 and T203 can run in parallel after T201.
-T204 must complete before T205.
-T206 must complete before T207.
-T208 runs in parallel with T202-T207 as features stabilize.
-
----
-
-## GoalBuddy Setup
-
-Phase 3 goal-prep runs AFTER Phase 2 completion audit passes and all launch conditions are verified.
-
-```bash
-# /goal-prep
-# Slug: skillmall-phase3
-# Input shape: existing_plan
-# This file: docs/superpowers/plans/PHASE-3-PLAN.md
-# Gate: verify ALL launch conditions before creating board
-#   - catalog >= 200 skills
-#   - community >= 500 authenticated members
-#   - ratings system >= 3 months active
-#   - >= 50 skills with test coverage
-```
-
-During goal-prep, verify each launch condition against actual data before creating the board. If any condition is not met, do not create the board — record which conditions are missing and set a follow-up date.
-
-Task types:
-- T201–T207: Worker tasks (detailed specs written at goal-prep time)
-- T208: Worker (documentation)
-- T209: Judge (completion audit)
+## Completion Proof
+
+- All 30 tasks done with receipts
+- `npm run build` clean, `npm test` passing, `npx tsc --noEmit` clean
+- T280 Judge receipt shows `approved`
+- `/skills/business/wrong-slug` shows PROMPTS tab with framework badges
+- Chain created via canvas and deployed successfully
+- RAG embeds documents and retrieves relevant chunks
+- Self-improvement approval gate prevents any automatic file writes
+- Marketplace hidden until `checkMarketplaceReady()` returns true
+- All 9 Phase 3 docs >= 500 words
+- All 5-9 missed-feature docs >= 500 words
+- `feature-inventory-check` skill run against spec shows zero gaps
