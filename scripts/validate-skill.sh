@@ -123,6 +123,27 @@ validate_file() {
     ((WARNINGS++)); ((file_warnings++))
   fi
 
+  # In strict mode: validate translation structure matches canonical SKILL.md sections
+  if [[ $STRICT == true ]]; then
+    local canonical_sections
+    canonical_sections=$(grep -E '^## ' "$file" 2>/dev/null | sed 's/^## //' | tr '[:upper:]' '[:lower:]' || true)
+
+    for locale_file in "$dir"/SKILL.*.md; do
+      [[ -f "$locale_file" ]] || continue
+      local locale_name; locale_name=$(basename "$locale_file")
+      local translation_sections
+      translation_sections=$(grep -E '^## ' "$locale_file" 2>/dev/null | sed 's/^## //' | tr '[:upper:]' '[:lower:]' || true)
+
+      while IFS= read -r section; do
+        [[ -z "$section" ]] && continue
+        if ! echo "$translation_sections" | grep -qF "$section"; then
+          echo -e "${RED}ERROR${NC} $rel: $locale_name missing section: '## $section'"
+          ((ERRORS++)); ((file_errors++))
+        fi
+      done <<< "$canonical_sections"
+    done
+  fi
+
   if [[ $file_errors -eq 0 && $file_warnings -eq 0 ]]; then
     echo -e "${GREEN}OK${NC}    $rel"
   fi

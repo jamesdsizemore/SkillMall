@@ -6,6 +6,8 @@ import { computeQualityScore } from "@/lib/quality-score";
 import { getSession } from "@/lib/auth/github";
 import { getReviews, getEffectivenessScore, getReviewCount } from "@/lib/reviews";
 import { getInstallCount } from "@/lib/analytics";
+import { getAvailableLocales } from "@/lib/i18n";
+import nodePath from "node:path";
 import { DeployButton } from "@/components/skill-mall/deploy-button";
 import { ForkButton } from "@/components/skill-mall/fork-button";
 import { ReviewForm } from "@/components/skill-mall/reviews/ReviewForm";
@@ -27,6 +29,8 @@ export default async function SkillPage({ params }: Props) {
   if (!skill) notFound();
 
   const readme = getSkillReadme(category, slug);
+  const skillDir = nodePath.join(process.cwd(), nodePath.dirname(skill.path));
+  const availableLocales = getAvailableLocales(skillDir);
   const allSkills = getAllSkills();
   const allSlugs = new Set(allSkills.map((s) => s.slug));
   const score = computeQualityScore(skill, allSlugs).total;
@@ -79,7 +83,7 @@ export default async function SkillPage({ params }: Props) {
             )}
 
             {/* Bracket-notation tabs */}
-            <SkillTabs skill={skill} readme={readme} />
+            <SkillTabs skill={skill} readme={readme} availableLocales={availableLocales} />
           </div>
 
           {/* Sidebar — quality panel + deploy */}

@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T256
+active_task: T257
 
 tasks:
 
@@ -305,7 +305,7 @@ tasks:
   - id: T256
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: default
     objective: "Implement Multilingual Skill Support: SKILL.<locale>.md convention (es, fr, de, pt-BR), CLI deploy with --lang flag (copies locale-specific file), CI validation that translation structure matches canonical SKILL.md sections, catalog UI shows available locales on skill detail page. Canonical SKILL.md is always English and always the source of truth."
     allowed_files:
@@ -323,12 +323,30 @@ tasks:
       - "validate-skill.sh --strict fails if translation SKILL.es.md has different section structure than canonical SKILL.md (test)"
     stop_if:
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/i18n.ts
+        - lib/__tests__/i18n.test.ts
+        - cli/src/commands/deploy.ts
+        - scripts/validate-skill.sh
+        - components/skill-mall/skill-detail/SkillTabs.tsx
+        - app/skills/[category]/[slug]/page.tsx
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/i18n"
+          status: pass
+        - cmd: "bash scripts/validate-skill.sh skills/_starters/code-review"
+          status: pass
+      summary: "lib/i18n.ts: SUPPORTED_LOCALES (es,fr,de,pt-BR), getAvailableLocales() scans for SKILL.<locale>.md, getLocaleContent() falls back to SKILL.md, validateTranslationStructure() compares ##-level sections case-insensitively. deploy.ts: --lang <locale> flag copies SKILL.<locale>.md as SKILL.md in dest (falls back with warning). validate-skill.sh --strict: validates translation sections match canonical. SkillTabs shows [TRANSLATIONS] locale badges. page.tsx passes availableLocales. 11 tests passing."
 
   - id: T257
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Write test suite JSON files for all 20 Domain Starter Templates plus the 4 existing catalog skills (skill-creator, development-workflow, phased-implementation-plan, wrong-slug). Each skill needs at least 3 test cases in tests/<slug>/*.json format: {id, description, input, required[], forbidden[]}. This is required for the Phase 3 marketplace gate (skillsWithTests >= 50 — we need 24 skills with tests minimum)."
     allowed_files:

@@ -10,9 +10,10 @@ type Tab = typeof TABS[number];
 type Props = {
   skill: Skill;
   readme: string | null;
+  availableLocales?: string[];
 };
 
-export function SkillTabs({ skill, readme }: Props) {
+export function SkillTabs({ skill, readme, availableLocales = [] }: Props) {
   const [active, setActive] = useState<Tab>("OVERVIEW");
 
   return (
@@ -87,6 +88,27 @@ export function SkillTabs({ skill, readme }: Props) {
           <BudgetPanel category={skill.category} slug={skill.slug} />
         )}
       </div>
+
+      {availableLocales.length > 0 && (
+        <div className="mt-4 flex items-center gap-2">
+          <span
+            className="text-[9px] tracking-widest text-sm-disabled"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            [ TRANSLATIONS ]
+          </span>
+          {availableLocales.map(locale => (
+            <span
+              key={locale}
+              className="border border-sm-border px-2 py-0.5 text-[9px] tracking-widest text-sm-secondary"
+              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+              title={`npx skill-mall deploy ${skill.category}/${skill.slug} --lang ${locale}`}
+            >
+              {locale}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
