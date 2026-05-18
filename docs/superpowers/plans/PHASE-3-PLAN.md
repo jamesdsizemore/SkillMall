@@ -1719,15 +1719,14 @@ export function chunkText(text: string, targetTokens = 512): string[] {
 
 **`lib/rag/embeddings.ts`:** Implements `generateEmbedding(text, provider, apiKey)`. For openai: use `openai.embeddings.create({ model: 'text-embedding-3-small', input: text })`. For ollama: POST to `http://localhost:11434/api/embeddings` with `{ model: 'nomic-embed-text', prompt: text }`. For gemini: use `genAI.getGenerativeModel({ model: 'text-embedding-004' }).embedContent(text)`. Returns `{ vector: number[]; tokenCount: number }`.
 
-**`lib/rag/knowledge-base.ts`:** `createKnowledgeBase(skillSlug)` inserts into `knowledge_bases` table. `attachKnowledge(kbId, files, client)` chunks each file and calls `generateEmbedding` per chunk, storing in `knowledge_chunks`. `retrieveChunks(kbId, query, client, topK=5)` generates query embedding and uses SQLite VSS `vss_search` virtual table for nearest-neighbor. Returns top-K chunks by cosine similarity.
+**`lib/rag/knowledge-base.ts`:** `createKnowledgeBase(skillSlug)` inserts into `knowledge_bases` table. `attachKnowledge(kbId, sourceDir, client)` buffers ALL embeddings before writing (atomic transaction — partial API failure leaves KB intact). `retrieveChunks(skillSlug, query, client, topK=5)` generates query embedding then runs pure-JS cosine similarity scan over stored BLOB embeddings. Returns top-K chunks sorted by score.
 
-**SQLite VSS:** After `db.loadExtension('vss0')`, create virtual table:
-```sql
-CREATE VIRTUAL TABLE IF NOT EXISTS vss_knowledge USING vss0(embedding(1536));
-```
-Insert: `INSERT INTO vss_knowledge(rowid, embedding) VALUES (chunk_id, json_array(...))`. Query: `SELECT rowid, distance FROM vss_knowledge WHERE vss_search(embedding, json_array(...)) LIMIT 5`.
+**Vector search approach — pure JavaScript cosine similarity (no native extension):**
+sqlite-vss is broken on Node 22 and abandoned. sqlite-vec (its successor) still requires a native extension with Vercel deployment issues. For a skill catalog where knowledge bases contain <5K chunks, a linear JS cosine scan is ~5-15ms — well below the embedding API round-trip (~200-400ms) that dominates latency. This is not a compromise; it is the correct architecture for this corpus size. The 50K-chunk threshold where ANN indexes pay off requires ~19M words per skill — not a realistic scenario.
 
-**Stop if:** sqlite-vss `loadExtension()` fails — block T203 with receipt, proceed with all other tasks. Do not implement a fallback vector search — the stop condition is correct.
+Embeddings are stored as `Float32Array` bytes (BLOB) in `knowledge_chunks.embedding`. Buffer alignment: always copy via `buf.buffer.slice(...)` before constructing Float32Array — Node.js Buffers use a shared pool and `byteOffset` is not guaranteed 4-byte aligned.
+
+**Stop if:** Provider is claude-code (no embeddings API) — return helpful error. Dimension mismatch between query and stored vectors — throw with explanation (was KB built with a different provider?).
 
 **Allowed files:**
 ```

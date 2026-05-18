@@ -230,6 +230,14 @@ function PromptsPanel({ category, slug }: { category: string; slug: string }) {
     );
   }
 
+  // Plain-English labels for prompt type groupings (T263: must not show raw type keys)
+  const USE_CASE_LABELS: Record<string, string> = {
+    "tool-specific": "Apply a tool",
+    "meta": "Explore an angle",
+    "category": "Shift the lens",
+    "other": "Other prompts",
+  };
+
   // Group by use-case type
   const groups: Record<string, typeof prompts> = {};
   for (const p of prompts) {
@@ -250,7 +258,7 @@ function PromptsPanel({ category, slug }: { category: string; slug: string }) {
             className="mb-3 text-[9px] tracking-widest text-sm-disabled"
             style={{ fontFamily: "var(--font-space-mono, monospace)" }}
           >
-            [ {type.toUpperCase()} ]
+            [ {(USE_CASE_LABELS[type] ?? type).toUpperCase()} ]
           </p>
           <div className="space-y-2">
             {typePrompts.map(p => (
@@ -296,7 +304,13 @@ function BudgetPanel({ category, slug }: { category: string; slug: string }) {
     run(v);
   };
 
-  React.useEffect(() => { run(charsAvailable); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Initial load without triggering loading state (avoids cascading renders in effect)
+  React.useEffect(() => {
+    fetch(`/api/budget-check?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}&charsAvailable=${charsAvailable}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setResult(d as import('@/lib/budget-analyzer').BudgetCheckResult); })
+      .catch(() => undefined);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">

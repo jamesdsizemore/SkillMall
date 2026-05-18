@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -58,8 +59,10 @@ export function ChainCanvas({ availableSkills, onChainReady }: Props) {
     [setEdges]
   );
 
+  const nodeCounter = React.useRef(0);
+
   const addSkill = (skill: Skill) => {
-    const id = `skill-${skill.slug}-${Date.now()}`;
+    const id = `skill-${skill.slug}-${++nodeCounter.current}`;
     setNodes((nds) => [
       ...nds,
       {

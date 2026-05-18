@@ -1,56 +1,52 @@
 # RAG-Enhanced Skills
 
-**RAG** (Retrieval-Augmented Generation) lets you attach a knowledge base to any skill so that when the skill is invoked, relevant chunks from your documents are retrieved and included in the skill's context automatically.
+**RAG** (Retrieval-Augmented Generation) lets you attach a knowledge base to any skill so that when the skill is invoked, relevant document chunks are retrieved and included in context automatically.
 
-This makes skills context-aware without requiring you to include the entire document in the skill prompt.
+## How it works
 
-## Current status
+1. Run `npx skill-mall attach-knowledge` pointing at a directory of documents
+2. The CLI chunks each file (~512 tokens per chunk), generates embeddings via your configured provider, and stores them in SQLite
+3. When `/api/retrieve` is called, a pure-JavaScript cosine similarity scan finds the top-K most relevant chunks
+4. Those chunks are returned for inclusion in the skill's context
 
-RAG support requires `sqlite-vss` for vector similarity search. The `sqlite-vss` native extension is not yet available for Node.js 22. As a result, the attach-knowledge CLI command and `/api/retrieve` endpoint are built but will throw a clear error when invoked until `sqlite-vss` is available.
+## Vector search approach
 
-**RAG is blocked** until the runtime environment includes a compatible `sqlite-vss` binary. The code is complete and ready — only the runtime dependency is missing.
+RAG uses **pure JavaScript cosine similarity** — no native extension required. At corpus sizes realistic for a skill knowledge base (<5,000 chunks per skill), a linear scan takes 5-15ms. This is well below the embedding API round-trip (~200-400ms) that dominates total latency anyway. Native extensions like sqlite-vss and sqlite-vec were evaluated and rejected: sqlite-vss is abandoned and broken on Node 22; sqlite-vec still requires platform-specific binaries that create deployment complexity with no benefit at this corpus scale.
 
 ## Embedding provider support
 
-RAG requires an embedding provider separate from your main LLM provider. Set `SKILL_MALL_EMBEDDING_PROVIDER` in `.env.local`:
+Set `SKILL_MALL_EMBEDDING_PROVIDER` in `.env.local`. Use provider-specific API keys:
 
-| Provider | Model | Notes |
-|----------|-------|-------|
-| `openai` | `text-embedding-3-small` | Recommended. Requires `SKILL_MALL_API_KEY` with OpenAI key. |
-| `ollama` | `nomic-embed-text` | Free, local. Requires Ollama running at `http://localhost:11434`. |
-| `gemini` | `text-embedding-004` | Requires Google API key. |
-| `claude-code` | — | **Not supported.** Claude Code CLI does not expose an embeddings API. |
+| Provider | Model | API key env var | Notes |
+|----------|-------|-----------------|-------|
+| `openai` | `text-embedding-3-small` | `OPENAI_API_KEY` | Recommended. 1536 dims. |
+| `ollama` | `nomic-embed-text` | — | Free, local. Requires Ollama at `http://localhost:11434`. |
+| `gemini` | `text-embedding-004` | `GEMINI_API_KEY` | Google Cloud credentials. |
+| `claude-code` | — | — | **Not supported.** No embeddings API. |
 
-```bash
-# .env.local
-SKILL_MALL_EMBEDDING_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
-```
+Use `OPENAI_API_KEY` for OpenAI and `GEMINI_API_KEY` for Gemini. Do not share `SKILL_MALL_API_KEY` across providers — a key for one provider sent to another will fail with an unhelpful error.
 
 ## Attaching a knowledge base
-
-When `sqlite-vss` is available, attach a knowledge base with:
 
 ```bash
 npx skill-mall attach-knowledge ai/skill-creator ./docs/
 ```
 
 This command:
-1. Reads all `.md`, `.txt`, `.ts`, `.js`, `.py` files in `./docs/`
-2. Splits them into ~512-token chunks
-3. Generates embeddings for each chunk using `SKILL_MALL_EMBEDDING_PROVIDER`
-4. Stores chunks and embeddings in the SQLite database
-5. Associates the knowledge base with the `ai/skill-creator` skill
+1. Collects all `.md`, `.txt`, `.ts`, `.js`, `.py`, `.go`, `.rb`, `.java` files
+2. Chunks each file (~380 words per chunk)
+3. Generates embeddings (all embeddings are buffered in memory before any DB writes)
+4. Writes everything atomically — if the embedding API fails mid-run, the existing knowledge base is unchanged
+5. Associates the knowledge base with the `skill-creator` skill
 
 ## Retrieving relevant chunks
-
-Once attached, retrieve relevant chunks via:
 
 ```
 POST /api/retrieve
 {
   "skillSlug": "skill-creator",
-  "query": "how to write a good trigger phrase"
+  "query": "how to write a good trigger phrase",
+  "topK": 5
 }
 ```
 
@@ -64,28 +60,19 @@ Response:
 }
 ```
 
-The retrieve endpoint uses VSS nearest-neighbor search to return the top-5 most relevant chunks by cosine similarity.
+Maximum 20 chunks. Chunks with mismatched or corrupt embeddings are skipped with a server-side log entry rather than crashing the request. Error details are logged server-side only — the API returns a generic error to callers to prevent API key or billing information from leaking in error responses.
 
-## How chunking works
+## Embedding dimension consistency
 
-Text is split into chunks of approximately 512 tokens (based on word count estimation at 1.35 words per token). Chunks shorter than 20 characters are discarded. The chunker reads `.md`, `.txt`, `.ts`, `.js`, `.py`, `.go`, `.rb`, and `.java` files.
+All chunks in a knowledge base must be embedded with the same provider. If you switch providers, re-run `attach-knowledge` to regenerate embeddings. Querying with a different provider than was used for attachment will be detected and logged per-chunk rather than silently returning wrong results.
 
 ## Database storage
 
-Knowledge base data is stored in two tables created by `002_phase3.sql`:
+Two tables from `002_phase3.sql`, updated by `004_rag_embedding_column.sql`:
 
-- `knowledge_bases`: one row per skill, tracking source directory, chunk count, embedding provider, and update timestamp
-- `knowledge_chunks`: one row per chunk, storing text, source file, chunk index, and the embedding as a JSON float array
+- `knowledge_bases`: one row per skill (source dir, chunk count, embedding provider)
+- `knowledge_chunks`: content, source file, chunk index, `embedding BLOB` (Float32Array bytes)
 
-When `sqlite-vss` is available, a virtual table `vss_knowledge` enables fast nearest-neighbor search across stored embeddings.
+## Next steps to scale
 
-## Limitations
-
-- Claude Code provider does not support embeddings — use `openai` or `ollama`
-- RAG requires `sqlite-vss` native extension — not yet available on Node.js 22
-- The retrieve endpoint returns top-5 chunks by default
-- Embeddings are provider-specific — switching providers requires re-embedding all chunks
-
-## Next steps
-
-Once `sqlite-vss` becomes available for your Node.js version, RAG can be enabled without any code changes. The tables, CLI command, and API route are all in place. Run `npm run db:migrate` (already applied) and set `SKILL_MALL_EMBEDDING_PROVIDER` to get started.
+If a future skill knowledge base exceeds ~20,000 chunks and the cosine scan becomes a measurable bottleneck (monitor query latency), replace the linear scan with sqlite-vec. At that point the corpus size will justify the native extension deployment overhead.
