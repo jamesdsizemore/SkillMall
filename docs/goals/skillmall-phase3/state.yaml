@@ -419,7 +419,7 @@ tasks:
       - .github/workflows/validate-skills.yml
       - .github/actions/skill-mall-validate/action.yml
     verify:
-      - "python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))" exits 0"
+      - "python3 -m yaml .github/workflows/validate-skills.yml exits 0 (YAML is parseable)"
       - "action.yml documents trigger_accuracy_threshold and budget_warn_at_installed inputs"
     stop_if:
       - "eval-triggers step runs in CI without SKILL_MALL_PROVIDER and SKILL_MALL_API_KEY secrets configured — the step must be OPTIONAL and skip with a warning when secrets are not present, never fail the build"
@@ -460,7 +460,7 @@ tasks:
       - .github/workflows/validate-skills.yml
       - README.md
     verify:
-      - "python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate-skills.yml'))" exits 0"
+      - "python3 -m yaml .github/workflows/validate-skills.yml exits 0 (YAML is parseable)"
       - "README.md contains a badge link pointing to the workflow status"
     stop_if:
       - "Need files outside allowed_files"
