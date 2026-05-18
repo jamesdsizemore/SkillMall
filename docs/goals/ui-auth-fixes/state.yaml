@@ -1,0 +1,83 @@
+goal:
+  title: "UI & Auth Fixes"
+  slug: ui-auth-fixes
+  status: active
+  created_at: "2026-05-18"
+  goal_file: docs/goals/ui-auth-fixes/goal.md
+  intake:
+    input_shape: specific
+    authority: approved
+    proof_type: demo
+  agents:
+    scout: bundled_not_installed
+    worker: bundled_not_installed
+    judge: bundled_not_installed
+
+tasks:
+  - id: T001
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "F1: redirect to /dashboard after OAuth callback. F2: use dirCategory as canonical URL category in parseSkill. F3: add dynamicParams=true to skill page. F4: apply pending DB migrations at getDb() init."
+    allowed_files:
+      - app/api/auth/callback/github/route.ts
+      - lib/skills.ts
+      - app/skills/[category]/[slug]/page.tsx
+      - lib/db/client.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Migration runner causes test DB corruption."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "F5+F7+F8: build /settings hub page with sidebar nav, auth-gate all /settings/* routes, add Settings link to nav header when user is logged in."
+    allowed_files:
+      - app/settings/page.tsx
+      - app/settings/providers/page.tsx
+      - app/layout.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "F6+F9: build /settings/appearance page with dark/light/system theme toggle. Build ThemeProvider client component that persists preference to localStorage and applies data-theme attribute to html element."
+    allowed_files:
+      - app/settings/appearance/page.tsx
+      - components/skill-mall/theme-provider.tsx
+      - app/layout.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "tsc fails after two repair attempts."
+      - "Theme toggle requires a new dependency that doesn't exist."
+    receipt: null
+
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: "Audit: all three user-reported issues fixed. Login redirects to /dashboard. Skill cards navigate correctly. /settings hub exists and is auth-gated. Theme toggle works. tsc clean, tests green, committed."
+    inputs:
+      - "All T001-T003 receipts"
+      - "npx tsc --noEmit output"
+      - "npm test output"
+      - "git diff --stat"
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+    receipt: null
