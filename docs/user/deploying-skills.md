@@ -1,76 +1,69 @@
 # Deploying Skills
 
-SkillMall skills follow the [AgentSkills open standard](https://agentskills.io) and work with any compatible agent. Copy a skill's directory to the right location for your agent.
+> **This page has moved.** The full deploy documentation is in the [CLI Reference — deploy command](../developer/cli-reference.md#deploy).
 
-## Agent paths
+---
 
-| Agent | Global (personal) | Project |
-|-------|-------------------|---------|
-| Universal | `~/.agents/skills/` | `.agents/skills/` |
-| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
-| Cursor | `~/.cursor/skills/` | `.cursor/skills/` |
-| GitHub Copilot | `~/.agents/skills/` | `.agents/skills/` |
-| OpenAI Codex | `~/.agents/skills/` | `.agents/skills/` |
-| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/` |
+SkillMall skills follow the [AgentSkills open standard](https://agentskills.io) and work with any compatible agent.
 
-**Global** skills are available in all your projects. **Project** skills are available only in the current directory (checked into version control).
-
-## Deploy with the CLI
-
-The `npx skill-mall deploy` command handles the copy and target selection:
+## Deploy with the CLI (recommended)
 
 ```bash
-# Deploy to universal path (default)
-npx skill-mall deploy development/my-skill
+# Deploy to Claude Code (default)
+npx skill-mall deploy business/blue-ocean-strategy
 
-# Deploy to a specific agent
-npx skill-mall deploy development/my-skill --agent claude-code
-npx skill-mall deploy development/my-skill --agent cursor
+# Deploy to all detected agents
+npx skill-mall deploy business/blue-ocean-strategy --all-agents
 
-# Deploy as a project skill (current directory)
-npx skill-mall deploy development/my-skill --agent claude-code --scope project
+# Deploy to project directory (not user home)
+npx skill-mall deploy business/blue-ocean-strategy --scope project
+
+# Deploy a localized version
+npx skill-mall deploy business/blue-ocean-strategy --lang es
 ```
+
+The CLI automatically detects which agents are installed and deploys to the correct directory for each.
 
 ## Deploy manually
 
-```bash
-# Copy from the SkillMall catalog
-cp -r skills/development/my-skill ~/.claude/skills/
+Copy the skill directory to your agent's skills folder:
 
-# Verify it's visible in Claude Code
-# Open Claude Code and run:
-/my-skill
-```
-
-## Project vs global skills
-
-Use **global** when:
-- You want a skill available in every project
-- The skill is general-purpose (e.g., a code review skill)
-
-Use **project** when:
-- The skill contains project-specific knowledge
-- You want to share it with your team via version control
-- The skill references project-specific files or scripts
-
-## Live reload
-
-Most agents detect skill file changes without restarting. Claude Code watches skill directories and picks up edits within the current session. Cursor and Copilot behave similarly. If a skill does not appear after copying, restart your agent session.
-
-## Verifying deployment
-
-After deploying, verify the skill is visible:
-
-| Agent | Command |
-|-------|---------|
-| Claude Code | `/skills` or ask "what skills are available?" |
-| Cursor | Type `/` in agent chat to see available skills |
-| GitHub Copilot | Type `#` in Copilot Chat |
-
-## Removing a skill
-
-Delete the skill directory:
+| Agent | Directory |
+|---|---|
+| Claude Code | `~/.claude/skills/` |
+| Cursor | `~/.cursor/skills/` |
+| Codex | `~/.codex/skills/` |
+| Gemini CLI | `~/.gemini/skills/` |
+| GitHub Copilot | `~/.agents/skills/` |
 
 ```bash
-rm -rf ~/.claude/skills/my-skill
+# Manual deploy to Claude Code
+cp -r skills/business/blue-ocean-strategy ~/.claude/skills/
 ```
+
+## Deploy a collection
+
+Deploy a curated set of related skills at once:
+
+```bash
+npx skill-mall deploy-pack full-stack-developer-kit
+npx skill-mall deploy-pack strategic-business-pack --agent cursor
+```
+
+Collections are defined in `collections/<slug>/collection.json`. See [Using Collections](../guide/using-collections.md) for the full guide.
+
+## Deploy scope: user vs project
+
+By default, skills are deployed to your user home directory (`~/.claude/skills/`) and are available in all your Claude Code sessions.
+
+With `--scope project`, skills are deployed to `.claude/skills/` in your current working directory — useful for team projects where skills should be project-local and committed to the repository.
+
+## After deploying
+
+Invoke the skill in your next agent session:
+
+- **Claude Code:** Type `/blue-ocean-strategy` or ask about competitive strategy
+- **Cursor:** The skill is available in your next chat session
+- Other agents: Refer to your agent's documentation for skill invocation
+
+For complete documentation of all deploy flags and options, see [CLI Reference — deploy](../developer/cli-reference.md#deploy).

@@ -2,6 +2,8 @@
 
 SkillMall skills follow the [AgentSkills open standard](https://agentskills.io). Every skill in the catalog works with any compatible agent by default. This page documents agent-specific behavior and known differences.
 
+> **See also:** [CLI Reference — deploy command](../developer/cli-reference.md#deploy) for deploy flags including `--all-agents`, `--agents`, and `--scope project`. The [Developer Getting Started guide](../developer/getting-started.md) covers configuring all 5 supported LLM providers. The [Architecture guide](../developer/architecture.md) explains how skills are stored and served efficiently.
+
 For detailed, per-agent skill creation guidance, see [docs/agents/](../agents/README.md).
 
 ## Supported agents

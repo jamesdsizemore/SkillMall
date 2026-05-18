@@ -1,65 +1,54 @@
 # Getting Started
 
-SkillMall is a catalog of [Agent Skills](https://agentskills.io) — structured Markdown files that extend what AI coding agents can do. The same skill works in Claude Code, Cursor, GitHub Copilot, OpenAI Codex, and any other AgentSkills-compatible agent.
+> **This page has moved.** The full Getting Started guide is now at [docs/developer/getting-started.md](../developer/getting-started.md).
+> The user-facing quick start tutorial is at [docs/guide/quick-start.md](../guide/quick-start.md).
 
-## Prerequisites
+---
 
-- Node.js 18+
-- An AI coding agent (Claude Code, Cursor, Copilot, Codex, or similar)
-- Git
+## Quick navigation
 
-## Browse the catalog
+**New to SkillMall?** → [Introduction](../guide/introduction.md) — plain-language overview, user personas, 10-minute preview
 
-```bash
-git clone https://github.com/jamesdsizemore/SkillMall
-cd SkillMall
-npm install
-npm run dev
-```
+**Developer setting up the codebase?** → [Developer Getting Started](../developer/getting-started.md) — clone, configure, run, first contribution walkthrough
 
-Open `http://localhost:3000` to browse all skills locally.
+**Just want to deploy a skill?** → [Quick Start Tutorial](../guide/quick-start.md) — zero to deployed skill in 10 minutes
 
-## Deploy your first skill
+**Want to create a skill?** → [Wizard Tutorial](../guide/tutorials/wizard-tutorial.md) or [CLI Tutorial](../guide/tutorials/cli-tutorial.md)
 
-1. Find a skill in the catalog
-2. Copy it to your agent's skills directory
+---
 
-```bash
-# Universal (GitHub Copilot, Codex, most agents)
-cp -r skills/<category>/<skill-name> ~/.agents/skills/
+## Brief overview
 
-# Claude Code (personal/global)
-cp -r skills/<category>/<skill-name> ~/.claude/skills/
+SkillMall is a catalog of [Agent Skills](https://agentskills.io) — structured Markdown files that extend what AI coding agents can do. The same skill works in Claude Code, Cursor, GitHub Copilot, OpenAI Codex, Gemini CLI, and any other AgentSkills-compatible agent.
 
-# Cursor (personal/global)
-cp -r skills/<category>/<skill-name> ~/.cursor/skills/
-```
+A skill is a `SKILL.md` file that contains instructions, templates, and examples that guide an AI agent's behavior for a specific task. When you invoke a skill (e.g., `/blue-ocean-strategy` in Claude Code), the agent reads the skill's contents and uses them to structure its response.
 
-3. Invoke the skill
+Skills are:
+- **Portable** — follow the AgentSkills open standard, work across 5+ agents
+- **Versioned** — committed to git, reviewed via PR, tracked with git blame
+- **Composable** — link related skills with `linked-skills` in frontmatter
+- **Quality-scored** — every skill has a 0-100 quality score across 5 dimensions
 
-```
-# In your agent's chat, type:
-/<skill-name>
-```
-
-Or just describe a task — if the skill's description matches, the agent loads it automatically.
-
-## Use the CLI
-
-The `skill-mall` CLI makes deploying, searching, and creating skills faster:
+## Installing your first skill
 
 ```bash
-# Install globally
-npm install -g skill-mall
-
-# Or use without installing
-npx skill-mall
+# Deploy the Blue Ocean Strategy skill to Claude Code
+npx skill-mall deploy business/blue-ocean-strategy
 ```
 
-See [CLI Reference](cli.md) for all commands.
+The next time you start a Claude Code session, the skill is available. Ask Claude to "apply the Blue Ocean Strategy framework" and it will follow the skill's structured methodology.
 
-## Next steps
+## Creating a skill
 
-- [Deploying Skills](deploying-skills.md) — agent-specific paths and options
-- [Creating Skills](creating-skills.md) — how to build your own
-- [Frontmatter Spec](../reference/frontmatter.md) — full field reference
+```bash
+# Research-first pipeline
+npx skill-mall create "incident postmortem" \
+  --urls https://sre.google/workbook/postmortem-analysis/ \
+  --category development
+
+# Build and deploy
+npx skill-mall confirm-research incident-postmortem
+npx skill-mall deploy development/incident-postmortem
+```
+
+For the full walkthrough with screenshots, error recovery guidance, and explanation of every step, see [docs/guide/quick-start.md](../guide/quick-start.md).
