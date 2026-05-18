@@ -5,20 +5,24 @@ import { getSuggestions, analyzeFeedback } from '@/lib/self-improvement/analyzer
 import { getSkill } from '@/lib/skills'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers'
 
+// In this route, [id] is a skill slug (e.g. "my-skill").
+// The [id] segment name is shared with the approve/reject sibling routes
+// which use a numeric suggestion ID — Next.js requires a single segment name per level.
+
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ skillSlug: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { skillSlug } = await params
+  const { id: skillSlug } = await params
   const suggestions = getSuggestions(skillSlug)
   return NextResponse.json({ suggestions })
 }
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ skillSlug: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { skillSlug } = await params
+  const { id: skillSlug } = await params
 
   const cookieStore = await cookies()
   const token = cookieStore.get('sm_session')?.value
