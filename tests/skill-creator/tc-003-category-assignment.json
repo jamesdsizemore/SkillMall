@@ -1,0 +1,13 @@
+{
+  "id": "tc-003",
+  "description": "Assigns an appropriate category from the valid category list",
+  "input": "Create a skill for designing database schemas and writing optimized SQL queries for PostgreSQL.",
+  "required": [
+    "category assigned from: development, design, writing, research, productivity, infrastructure, ai, business"
+  ],
+  "forbidden": [
+    "category: other",
+    "category: unknown",
+    "category: general"
+  ]
+}

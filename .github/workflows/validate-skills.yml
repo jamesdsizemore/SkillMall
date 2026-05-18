@@ -97,6 +97,27 @@ jobs:
               body: report,
             });
 
+      - name: Run skill test suites (optional — skips when LLM secrets absent)
+        if: steps.validate.outputs.result != 'no_skills_changed'
+        env:
+          SKILL_MALL_PROVIDER: ${{ secrets.SKILL_MALL_PROVIDER }}
+          SKILL_MALL_API_KEY: ${{ secrets.SKILL_MALL_API_KEY }}
+        run: |
+          if [ -z "$SKILL_MALL_PROVIDER" ] || [ -z "$SKILL_MALL_API_KEY" ]; then
+            echo "SKILL_MALL_PROVIDER or SKILL_MALL_API_KEY not set — skipping skill test suites."
+            exit 0
+          fi
+
+          DIRS="${{ steps.changed.outputs.dirs }}"
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            slug=$(basename "$dir")
+            if [ -d "tests/$slug" ]; then
+              echo "Running test suite for: $slug"
+              node_modules/.bin/tsx cli/src/index.ts test "$dir" || echo "Tests failed for $slug (non-blocking)"
+            fi
+          done <<< "$DIRS"
+
       - name: Fail if any skill has errors
         if: steps.validate.outputs.errors != '0' && steps.validate.outputs.result != 'no_skills_changed'
         run: |

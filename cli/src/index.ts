@@ -14,6 +14,7 @@ import { revertCommand } from "./commands/revert.js";
 import { publishCommand } from "./commands/publish.js";
 import { budgetCheckCommand } from "./commands/budget-check.js";
 import { extractCommand } from "./commands/extract.js";
+import { testSkillCommand } from "./commands/test-skill.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -33,6 +34,7 @@ ${pc.bold("Commands:")}
   ${pc.cyan("new")} --from-template <slug> <name> Scaffold from a domain starter in skills/_starters/
   ${pc.cyan("budget-check")} <cat/slug>          Simulate description visibility at N chars (--chars-available)
   ${pc.cyan("extract")} <dir> --output <slug>    Extract skill patterns from a codebase directory
+  ${pc.cyan("test")} <category/slug>             Run test suite for a skill (tests/<slug>/*.json)
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
@@ -111,6 +113,10 @@ async function main(): Promise<void> {
 
     case "extract":
       await extractCommand(rest);
+      break;
+
+    case "test":
+      await testSkillCommand(rest);
       break;
 
     case "--help":

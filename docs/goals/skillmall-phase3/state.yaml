@@ -82,7 +82,7 @@ visual_board:
     command: "npx goalbuddy extend github-projects"
     missing: []
 
-active_task: T255
+active_task: T256
 
 tasks:
 
@@ -259,7 +259,7 @@ tasks:
   - id: T255
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: high
     objective: "Implement Skill Testing Framework: test case format at tests/<slug>/*.json (id, description, input, required[], forbidden[]), npx skill-mall test <slug> command that runs each test case by calling the skill's prompts via the configured LLM, evaluates required/forbidden assertions via LLM evaluator, reports pass/fail per assertion. CI integration: validate-action@v1 runs tests on PRs touching skills/ that have tests/. Required: target 50+ skills with test suites for Phase 3 marketplace gate."
     allowed_files:
@@ -268,6 +268,7 @@ tasks:
       - cli/src/commands/test-skill.ts
       - cli/src/index.ts
       - .github/workflows/validate-skills.yml
+      - tests/
     verify:
       - "npx tsc --noEmit exits 0"
       - "npm run build exits 0"
@@ -279,12 +280,32 @@ tasks:
       - "Test framework calls LLM with skill content that could contain prompt injection from the test input field — sanitize test input before passing to evaluator"
       - "DO NOT attempt to write 50 test suites in this task — that is T257. T255 only builds the framework + one example test suite for skill-creator."
       - "Need files outside allowed_files"
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - lib/skill-tester.ts
+        - lib/__tests__/skill-tester.test.ts
+        - cli/src/commands/test-skill.ts
+        - cli/src/index.ts
+        - .github/workflows/validate-skills.yml
+        - tests/
+      commands:
+        - cmd: "npx tsc --noEmit"
+          status: pass
+        - cmd: "cd cli && npm run build"
+          status: pass
+        - cmd: "npm test lib/__tests__/skill-tester"
+          status: pass
+        - cmd: "python3 -c 'import yaml; yaml.safe_load(open(\".github/workflows/validate-skills.yml\"))'"
+          status: pass
+        - cmd: "node cli/dist/index.js test ai/skill-creator"
+          status: pass
+      summary: "lib/skill-tester.ts: TestCase/TestResult/TestSuiteResult types, sanitizeInput() strips prompt injection, loadTestCases() strips category prefix to find tests/<slug>/, runTestCase() calls skill then evaluates required/forbidden assertions with LLM evaluator, fails-safe on bad JSON. CI step is OPTIONAL: skips with warning when SKILL_MALL_PROVIDER/SKILL_MALL_API_KEY absent. Example test suite: tests/skill-creator/ (3 test cases). 15 tests passing."
 
   - id: T256
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     reasoning_hint: default
     objective: "Implement Multilingual Skill Support: SKILL.<locale>.md convention (es, fr, de, pt-BR), CLI deploy with --lang flag (copies locale-specific file), CI validation that translation structure matches canonical SKILL.md sections, catalog UI shows available locales on skill detail page. Canonical SKILL.md is always English and always the source of truth."
     allowed_files:

@@ -1,0 +1,12 @@
+{
+  "id": "tc-002",
+  "description": "Warns when description would exceed 150 characters",
+  "input": "Create a skill for running comprehensive end-to-end tests across all microservices in a distributed system architecture using multiple testing frameworks and tools.",
+  "required": [
+    "skill description under 150 characters or a warning about the character limit"
+  ],
+  "forbidden": [
+    "I cannot help with this",
+    "this request is outside my capabilities"
+  ]
+}

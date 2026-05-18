@@ -1,0 +1,15 @@
+{
+  "id": "tc-001",
+  "description": "Produces a SKILL.md with required frontmatter fields when given a clear topic",
+  "input": "Create a skill for reviewing pull requests. The skill should help developers write thorough, constructive code reviews.",
+  "required": [
+    "SKILL.md frontmatter with name field",
+    "description field present",
+    "category field present"
+  ],
+  "forbidden": [
+    "I cannot create this skill",
+    "I don't have enough information",
+    "please provide more details before I can help"
+  ]
+}
