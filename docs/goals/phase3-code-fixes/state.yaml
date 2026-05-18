@@ -1,0 +1,112 @@
+goal:
+  title: "Phase 3 Code Fixes"
+  slug: phase3-code-fixes
+  status: active
+  created_at: "2026-05-18"
+  goal_file: docs/goals/phase3-code-fixes/goal.md
+  intake:
+    input_shape: existing_plan
+    authority: approved
+    proof_type: artifact + test
+    existing_plan_facts:
+      - "FIXES.md has 16 items with file:line, before/after diffs, and rationale."
+      - "Items are severity-grouped: 3 blocking, 7 required, 6 suggestions."
+      - "FIX-16 (rate limiting) has no existing infra — deliver as a TODO comment only."
+  agents:
+    scout: bundled_not_installed
+    worker: bundled_not_installed
+    judge: bundled_not_installed
+
+tasks:
+  - id: T001
+    type: worker
+    assignee: Worker
+    status: active
+    objective: "Apply FIX-01 (Gemini key in URL), FIX-03 (INSERT race condition), FIX-04 (Stripe error leak), FIX-05 (Stripe webhook type check), FIX-06 (shouldTriggerAnalysis semantics), FIX-07 (category default), FIX-08 (duplicate purchase query), FIX-10 (YAML injection), FIX-13 (set_at sentinel), FIX-15 (session.url assertion). Verify tsc and tests pass."
+    allowed_files:
+      - lib/rag/embeddings.ts
+      - lib/self-improvement/analyzer.ts
+      - lib/self-improvement/feedback.ts
+      - lib/marketplace/entitlement.ts
+      - lib/marketplace/gate.ts
+      - lib/marketplace/payments.ts
+      - lib/chains.ts
+      - app/api/marketplace/checkout/route.ts
+      - app/api/webhooks/stripe/route.ts
+      - app/api/improvements/[skillSlug]/route.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Fix requires changes outside allowed_files."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Apply FIX-02 (chain edge config discarded — graph traversal rewrite in ChainCanvas.tsx). Verify tsc passes."
+    allowed_files:
+      - components/skill-mall/chains/ChainCanvas.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "Fix requires imports or types not already present in the file."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Apply FIX-09 (LLM output validation before disk write in applier.ts). Verify tsc passes."
+    allowed_files:
+      - lib/self-improvement/applier.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "Fix requires new imports not already available."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Apply suggestions FIX-11 (chunker overlap), FIX-12 (tokenCount rename), FIX-14 (cache checkMarketplaceReady). Update any callers of renamed field. Verify tsc and tests pass."
+    allowed_files:
+      - lib/rag/chunker.ts
+      - lib/rag/embeddings.ts
+      - lib/rag/knowledge-base.ts
+      - lib/marketplace/gate.ts
+      - lib/__tests__/rag.test.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "FIX-12 rename breaks callers outside allowed_files."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T005
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: "Audit: verify all 16 FIXES.md items are applied (or explicitly deferred with rationale), tsc is clean, tests pass, and changes are committed. Confirm full_outcome_complete."
+    inputs:
+      - "All T001-T004 receipts"
+      - "git diff --stat HEAD~4"
+      - "npx tsc --noEmit"
+      - "npm test output"
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "any missing fixes"
+    receipt: null

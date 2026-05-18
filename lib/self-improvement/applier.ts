@@ -91,8 +91,27 @@ Return the complete improved skill content with updated frontmatter. Set version
     maxTokens: 3000,
   })
 
-  // Write to disk
-  fs.writeFileSync(skillMdPath, improvedContent, 'utf-8')
+  // Validate LLM output before writing
+  const parsed = matter(improvedContent)
+  if (!parsed.data.name || !parsed.data.description) {
+    return { success: false, newVersion: '', error: 'LLM returned content missing required frontmatter fields (name, description)' }
+  }
+  const returnedVersion = String(parsed.data.metadata?.version ?? parsed.data.version ?? '')
+  if (returnedVersion !== newVersion) {
+    return { success: false, newVersion: '', error: `LLM did not apply version bump (expected ${newVersion}, got "${returnedVersion}")` }
+  }
+
+  // Back up original, write, then remove backup on success
+  const backupPath = skillMdPath + '.bak'
+  fs.copyFileSync(skillMdPath, backupPath)
+  try {
+    fs.writeFileSync(skillMdPath, improvedContent, 'utf-8')
+    fs.unlinkSync(backupPath)
+  } catch (writeErr) {
+    fs.copyFileSync(backupPath, skillMdPath)
+    fs.unlinkSync(backupPath)
+    throw writeErr
+  }
 
   // Mark suggestion as approved and applied
   db.prepare(

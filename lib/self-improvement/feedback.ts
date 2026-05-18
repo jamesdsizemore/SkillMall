@@ -4,6 +4,10 @@ import type { SkillFeedback } from '../db/types'
 const MAX_BODY_LENGTH = 200
 const ANALYSIS_TRIGGER_COUNT = 10
 
+// TODO(FIX-16): Add per-user rate limiting — no rate-limit infra exists yet.
+// Suggested: 1 submission per user per skill per hour, tracked in a rate_limits table.
+// Without this, a malicious user can spam low ratings to skew averages and trigger
+// repeated LLM analysis calls (shouldTriggerAnalysis) at no cost to them.
 export function createFeedback(params: {
   skillSlug: string
   authorGithubLogin: string
@@ -47,5 +51,6 @@ export function getRecentFeedback(skillSlug: string, limit = 50): SkillFeedback[
 }
 
 export function shouldTriggerAnalysis(skillSlug: string): boolean {
-  return getFeedbackCount(skillSlug) >= ANALYSIS_TRIGGER_COUNT
+  const count = getFeedbackCount(skillSlug)
+  return count > 0 && count % ANALYSIS_TRIGGER_COUNT === 0
 }

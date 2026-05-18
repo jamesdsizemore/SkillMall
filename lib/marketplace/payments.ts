@@ -62,8 +62,9 @@ export async function createCheckoutSession(
     cancel_url: cancelUrl,
   })
 
+  if (!session.url) throw new Error('Stripe checkout session returned no URL')
   return {
-    checkoutUrl: session.url!,
+    checkoutUrl: session.url,
     sessionId: session.id,
   }
 }

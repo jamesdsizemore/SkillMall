@@ -20,12 +20,20 @@ export interface MarketplaceReadiness {
   conditions: MarketplaceConditions
 }
 
+let readinessCache: { result: MarketplaceReadiness; expiresAt: number } | null = null
+const READINESS_CACHE_TTL_MS = 30_000
+
 /**
  * Check whether marketplace launch conditions are met.
  * All four conditions must pass before marketplace UI activates.
  * This function enforces itself at runtime — there is no manual override.
+ * Result is cached for 30 seconds to avoid redundant filesystem scans on every checkout.
  */
 export function checkMarketplaceReady(): MarketplaceReadiness {
+  if (readinessCache && Date.now() < readinessCache.expiresAt) {
+    return readinessCache.result
+  }
+
   const db = getDb()
 
   // Condition 1: catalog >= 200 skills
@@ -79,7 +87,9 @@ export function checkMarketplaceReady(): MarketplaceReadiness {
     ratingsMonthsActive >= 3 &&
     skillsWithTests >= 50
 
-  return { ready, conditions }
+  const result = { ready, conditions }
+  readinessCache = { result, expiresAt: Date.now() + READINESS_CACHE_TTL_MS }
+  return result
 }
 
 export function getSkillTier(skillSlug: string): SkillTier {
@@ -87,7 +97,7 @@ export function getSkillTier(skillSlug: string): SkillTier {
   const row = db
     .prepare('SELECT * FROM skill_tiers WHERE skill_slug = ?')
     .get(skillSlug) as SkillTier | undefined
-  return row ?? { skill_slug: skillSlug, tier: 'free', price_cents: 0, set_at: new Date().toISOString() }
+  return row ?? { skill_slug: skillSlug, tier: 'free', price_cents: 0, set_at: '' }
 }
 
 export function setSkillTier(skillSlug: string, tier: 'free' | 'sponsored' | 'premium', priceCents = 0): void {

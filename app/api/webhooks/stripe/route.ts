@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
 import { handleWebhook } from '@/lib/marketplace/payments'
 
 // Next.js App Router: raw body is accessed via req.arrayBuffer()
@@ -20,11 +21,10 @@ export async function POST(req: NextRequest) {
     const result = await handleWebhook(rawBody, signature)
     return NextResponse.json({ received: true, ...result })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    // Stripe signature verification failed or webhook secret missing
-    if (message.includes('signature') || message.includes('secret') || message.includes('No signatures')) {
+    if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
       return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
     }
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[stripe-webhook] unexpected error:', err)
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 }

@@ -23,6 +23,12 @@ interface SkillNodeData {
   skill: Skill;
 }
 
+interface EdgeConfig {
+  passesAs: "context_append" | "context_replace" | "named_variable";
+  namedVariable?: string;
+  instructions?: string;
+}
+
 function SkillNode({ data }: { data: SkillNodeData }) {
   return (
     <div className="border border-sm-border bg-sm-surface px-4 py-3 min-w-[200px]">
@@ -81,12 +87,60 @@ export function ChainCanvas({ availableSkills, onChainReady }: Props) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
-    const sorted = [...nodes].sort((a, b) => a.position.x - b.position.x);
-    const steps: ChainStep[] = sorted.map((n, i) => ({
-      order: i + 1,
-      skillSlug: `${n.data.skill.category}/${n.data.skill.slug}`,
-      passesAs: "context_append" as const,
-    }));
+    // Build incoming edge map: targetNodeId → { sourceNodeId, edgeData }
+    const inEdgeMap = new Map<string, { sourceId: string; data: EdgeConfig }>();
+    for (const e of edges) {
+      if (e.source && e.target) {
+        inEdgeMap.set(e.target, {
+          sourceId: e.source,
+          data: (e.data as EdgeConfig | undefined) ?? { passesAs: "context_append" },
+        });
+      }
+    }
+
+    // Build outgoing edge map: sourceNodeId → targetNodeId
+    const outEdgeMap = new Map<string, string>();
+    for (const e of edges) {
+      if (e.source && e.target) outEdgeMap.set(e.source, e.target);
+    }
+
+    // Find start: no incoming edge
+    const startNode = nodes.find((n) => !inEdgeMap.has(n.id));
+    if (!startNode) {
+      setStatus("Error: cycle detected — chain must have a clear starting node");
+      return;
+    }
+
+    // Walk chain in edge-connection order
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+    const ordered: Node<SkillNodeData>[] = [];
+    const visited = new Set<string>();
+    let current: Node<SkillNodeData> | undefined = startNode;
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      ordered.push(current);
+      const nextId = outEdgeMap.get(current.id);
+      current = nextId ? nodeMap.get(nextId) : undefined;
+    }
+
+    if (ordered.length !== nodes.length) {
+      setStatus("Error: not all skills are connected — check for disconnected nodes");
+      return;
+    }
+
+    const steps: ChainStep[] = ordered.map((n, i) => {
+      const inEdge = inEdgeMap.get(n.id);
+      const cfg: EdgeConfig = inEdge?.data ?? { passesAs: "context_append" };
+      const sourceNode = inEdge ? nodeMap.get(inEdge.sourceId) : undefined;
+      return {
+        order: i + 1,
+        skillSlug: `${n.data.skill.category}/${n.data.skill.slug}`,
+        passesAs: cfg.passesAs,
+        ...(sourceNode ? { usesOutput: sourceNode.data.skill.slug } : {}),
+        ...(cfg.namedVariable ? { namedVariable: cfg.namedVariable } : {}),
+        ...(cfg.instructions ? { instructions: cfg.instructions } : {}),
+      };
+    });
 
     setStatus("Building chain...");
     try {

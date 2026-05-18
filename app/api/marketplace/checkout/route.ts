@@ -42,9 +42,7 @@ export async function POST(req: NextRequest) {
     )
     return NextResponse.json({ checkoutUrl: result.checkoutUrl })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Checkout failed' },
-      { status: 503 }
-    )
+    console.error('[checkout] createCheckoutSession failed:', err)
+    return NextResponse.json({ error: 'Checkout unavailable' }, { status: 503 })
   }
 }

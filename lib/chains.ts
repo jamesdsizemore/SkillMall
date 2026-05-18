@@ -28,12 +28,13 @@ export function buildChainDirectory(
     .map((s, i) => `${i + 1}. ${s.skillSlug}${s.usesOutput ? ` (uses: ${s.usesOutput})` : ''}`)
     .join('\n')
 
+  const escYaml = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   const chainStepsYaml = sortedSteps
     .map(s => {
       let entry = `    - skill: ${s.skillSlug}\n      passes_as: ${s.passesAs}\n`
       if (s.usesOutput) entry += `      uses_output: ${s.usesOutput}\n`
-      if (s.instructions) entry += `      instructions: "${s.instructions}"\n`
-      if (s.namedVariable) entry += `      named_variable: ${s.namedVariable}\n`
+      if (s.instructions) entry += `      instructions: "${escYaml(s.instructions)}"\n`
+      if (s.namedVariable) entry += `      named_variable: "${escYaml(s.namedVariable)}"\n`
       return entry
     })
     .join('')

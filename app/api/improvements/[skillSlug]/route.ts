@@ -28,7 +28,10 @@ export async function POST(
   }
 
   const body = await req.json().catch(() => ({})) as { category?: string }
-  const category = body.category ?? 'ai'
+  const { category } = body
+  if (!category) {
+    return NextResponse.json({ error: 'category is required' }, { status: 400 })
+  }
   const skill = getSkill(category, skillSlug)
 
   if (!skill) {

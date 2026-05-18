@@ -18,8 +18,5 @@ export function getEntitlement(skillSlug: string, githubLogin: string | null): E
 }
 
 export function hasPurchased(skillSlug: string, githubLogin: string): boolean {
-  const db = getDb()
-  return !!db
-    .prepare('SELECT id FROM purchases WHERE skill_slug = ? AND buyer_github_login = ?')
-    .get(skillSlug, githubLogin)
+  return getEntitlement(skillSlug, githubLogin) === 'purchased'
 }

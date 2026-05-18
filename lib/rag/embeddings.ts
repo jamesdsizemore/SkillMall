@@ -2,7 +2,8 @@ import type { LLMClient } from '../providers'
 
 export interface EmbeddingResult {
   vector: number[]
-  tokenCount: number
+  /** Exact for OpenAI; word-count estimate (~1.35 tokens/word) for Ollama and Gemini. */
+  estimatedTokenCount: number
 }
 
 const FETCH_TIMEOUT_MS = 30_000
@@ -50,7 +51,7 @@ async function generateOpenAIEmbedding(text: string): Promise<EmbeddingResult> {
     data: Array<{ embedding: number[] }>
     usage: { total_tokens: number }
   }
-  return { vector: data.data[0].embedding, tokenCount: data.usage.total_tokens }
+  return { vector: data.data[0].embedding, estimatedTokenCount: data.usage.total_tokens }
 }
 
 async function generateOllamaEmbedding(text: string): Promise<EmbeddingResult> {
@@ -68,10 +69,7 @@ async function generateOllamaEmbedding(text: string): Promise<EmbeddingResult> {
   }
 
   const data = await res.json() as { embedding: number[] }
-  // Ollama doesn't return token counts; estimate from word count
-  // (note: OpenAI returns exact counts via API response)
-  const tokenCount = Math.ceil(text.split(/\s+/).length * 1.35)
-  return { vector: data.embedding, tokenCount }
+  return { vector: data.embedding, estimatedTokenCount: Math.ceil(text.split(/\s+/).length * 1.35) }
 }
 
 async function generateGeminiEmbedding(text: string): Promise<EmbeddingResult> {
@@ -80,10 +78,13 @@ async function generateGeminiEmbedding(text: string): Promise<EmbeddingResult> {
   if (!apiKey) throw new Error('Set GEMINI_API_KEY in .env.local for Gemini embeddings')
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+    'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify({ content: { parts: [{ text }] } }),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     }
@@ -94,6 +95,5 @@ async function generateGeminiEmbedding(text: string): Promise<EmbeddingResult> {
   }
 
   const data = await res.json() as { embedding: { values: number[] } }
-  const tokenCount = Math.ceil(text.split(/\s+/).length * 1.35)
-  return { vector: data.embedding.values, tokenCount }
+  return { vector: data.embedding.values, estimatedTokenCount: Math.ceil(text.split(/\s+/).length * 1.35) }
 }

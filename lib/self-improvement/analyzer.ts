@@ -44,14 +44,14 @@ Suggest ONE specific, actionable improvement to this skill. Be concrete: what ex
   })
 
   const db = getDb()
-  db.prepare(
+  const { lastInsertRowid } = db.prepare(
     `INSERT INTO improvement_suggestions (skill_slug, suggestion_body, generated_from_feedback_count)
      VALUES (?, ?, ?)`
   ).run(skillSlug, suggestionBody.trim(), count)
 
   return db
-    .prepare('SELECT * FROM improvement_suggestions WHERE skill_slug = ? ORDER BY id DESC LIMIT 1')
-    .get(skillSlug) as ImprovementSuggestion
+    .prepare('SELECT * FROM improvement_suggestions WHERE id = ?')
+    .get(lastInsertRowid) as ImprovementSuggestion
 }
 
 export function getPendingSuggestions(skillSlug: string): ImprovementSuggestion[] {
