@@ -44,6 +44,7 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`${spaceGrotesk.variable} ${spaceMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         {/* Prevent flash of wrong theme — runs synchronously before paint */}
@@ -59,6 +60,7 @@ export default async function RootLayout({
       <body
         className="flex min-h-full flex-col bg-sm-bg text-sm-primary"
         style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}
+        suppressHydrationWarning
       >
         <header className="sticky top-0 z-50 border-b border-sm-border bg-sm-surface/90 backdrop-blur-md">
           <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
