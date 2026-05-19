@@ -1,0 +1,115 @@
+version: 2
+active_task: T601
+
+goal:
+  title: "Phase 6 — Spec Gap Closure"
+  slug: phase6-spec-gaps
+  status: active
+  created_at: "2026-05-18"
+  goal_file: docs/goals/phase6-spec-gaps/goal.md
+  intake:
+    input_shape: existing_plan
+    authority: approved
+    proof_type: demo
+    existing_plan_facts:
+      - "8 gaps across wizard, budget analyzer, dependency graph, and minor polish"
+      - "N1+N2 are in the same wizard component files — one Worker"
+      - "N3 requires reading lib/budget-analyzer.ts first to understand char-to-agent mapping"
+      - "N4+N5+N6 are all graph — one Worker to avoid file conflicts"
+      - "N7+N8 are minor polish — one Worker"
+      - "Spec §§3.1, 4.2, 4.3, 5.3, 2.3 are implementation source of truth"
+
+agents:
+  scout: unknown
+  worker: unknown
+  judge: unknown
+
+tasks:
+  - id: T601
+    type: worker
+    assignee: Worker
+    status: active
+    objective: "N1+N2: (1) Step4Preview — add inline editing for all fields with real-time SKILL.md re-render and live 1024-char counter on description. (2) Step6Confirm — add expand toggle per file to show its content inline. Both must follow Nothing design system."
+    allowed_files:
+      - components/skill-mall/wizard/Step4Preview.tsx
+      - components/skill-mall/wizard/Step6Confirm.tsx
+      - components/skill-mall/wizard/wizard-reducer.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Inline editing requires changes to WizardContext or API routes beyond allowed_files."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T602
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "N3: Enhance Budget Analyzer tab. Add agent dropdown (claude-code, cursor, gemini-cli, copilot, codex, other). Add skill-count slider (1–100). Map agent+skill-count to chars-available using known budget tables. Show analysis at 10/20/30/50 installed skills as a 4-row table. Keep backward compat with existing chars slider for manual override. Read lib/budget-analyzer.ts first."
+    allowed_files:
+      - lib/budget-analyzer.ts
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - app/api/budget-check/route.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Agent budget tables not available — fall back to char-per-agent estimates with visible disclaimer."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T603
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "N4+N5+N6: Enhance Dependency Graph. (N4) Add category filter checkboxes above graph — toggle hides/shows nodes by category. (N5) Add hover tooltip showing skill description on each node. (N6) Add cluster detection in lib/graph.ts: find groups of 5+ nodes with internal connectivity > external. Surface clusters with a distinct node ring color and a legend entry flagging them as Collection candidates."
+    allowed_files:
+      - lib/graph.ts
+      - components/skill-mall/graph/DependencyGraph.tsx
+      - components/skill-mall/graph/GraphNode.tsx
+      - app/graph/page.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "ReactFlow tooltip approach requires a dependency not already installed — use CSS title attribute instead."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T604
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "N7+N8: (N7) Add 'Most Forked' indicator on skill detail page when forkCount exceeds 5 — a small badge next to the fork count. (N8) Update FrameworkPicker to show artifact-type-appropriate defaults: pass artifactType prop from PromptCard, map artifact types (matrix, canvas, grid, analysis, flowchart, list) to relevant default framework subsets from the spec §2 PE Framework Library."
+    allowed_files:
+      - app/skills/[category]/[slug]/page.tsx
+      - components/skill-mall/skill-detail/FrameworkPicker.tsx
+      - components/skill-mall/skill-detail/PromptCard.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T605
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: "Final audit: verify all 8 gaps (N1–N8) are closed per spec. tsc clean, tests green, committed. full_outcome_complete."
+    inputs:
+      - "All T601–T604 receipts"
+      - "npx tsc --noEmit"
+      - "npm test output"
+      - "git diff --stat"
+      - "gap inventory from goal.md"
+    expected_output:
+      - "complete | not_complete per gap"
+      - "full_outcome_complete: true | false"
+      - "any remaining gaps"
+    receipt: null
