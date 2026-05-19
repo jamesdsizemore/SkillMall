@@ -43,6 +43,48 @@ export interface CompletePipelineResult {
   writeResult?: WriteResult;
 }
 
+export interface BuildSkillFromResearchInput {
+  researchResult: ResearchResult;
+  metadata: SkillMetadata;
+  selectedToolNames?: string[];
+  selectedMetaTypes?: string[];
+  writeToDisk?: boolean;
+  outputBasePath?: string;
+}
+
+export interface BuildSkillFromResearchResult {
+  researchResult: ResearchResult;
+  filteredResearchResult: ResearchResult;
+  skillDirectory: InMemorySkillDirectory;
+  validation: ValidationResult;
+  promptCount: number;
+  writeResult?: WriteResult;
+}
+
+export function filterResearchResult(
+  researchResult: ResearchResult,
+  selectedToolNames?: string[]
+): ResearchResult {
+  if (!selectedToolNames || selectedToolNames.length === 0) return researchResult;
+
+  return {
+    ...researchResult,
+    tools: researchResult.tools.filter((tool) => selectedToolNames.includes(tool.name)),
+  };
+}
+
+export function estimateSkillResourceScore(
+  directory: InMemorySkillDirectory,
+  tags: string[]
+): number {
+  return (
+    (directory.files.some((file) => file.path.startsWith("scripts/")) ? 20 : 0) +
+    (directory.files.some((file) => file.path.startsWith("resources/templates/")) ? 30 : 0) +
+    (directory.files.some((file) => file.path.startsWith("resources/samples/")) ? 30 : 0) +
+    Math.min(tags.length * 4, 20)
+  );
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────
 
 export function validateSkillDirectory(dir: InMemorySkillDirectory): ValidationResult {
@@ -122,6 +164,49 @@ export async function atomicWrite(
   }
 }
 
+// ─── Confirmed research build/write ──────────────────────────────────────
+
+export async function buildSkillFromResearch(
+  input: BuildSkillFromResearchInput,
+  client: LLMClient
+): Promise<BuildSkillFromResearchResult> {
+  const filteredResearchResult = filterResearchResult(
+    input.researchResult,
+    input.selectedToolNames
+  );
+
+  const [skillDirectory, promptFiles] = await Promise.all([
+    buildSkillDirectory(filteredResearchResult, input.metadata, client),
+    generatePrompts(filteredResearchResult, input.metadata, client, input.selectedMetaTypes),
+  ]);
+
+  const completeDirectory: InMemorySkillDirectory = {
+    ...skillDirectory,
+    files: [...skillDirectory.files, ...promptFiles],
+  };
+
+  const validation = validateSkillDirectory(completeDirectory);
+
+  let writeResult: WriteResult | undefined;
+  if (input.writeToDisk && validation.valid) {
+    const outputPath = path.join(
+      input.outputBasePath ?? "skills",
+      input.metadata.category,
+      input.metadata.slug
+    );
+    writeResult = await atomicWrite(completeDirectory, outputPath);
+  }
+
+  return {
+    researchResult: input.researchResult,
+    filteredResearchResult,
+    skillDirectory: completeDirectory,
+    validation,
+    promptCount: promptFiles.length,
+    writeResult,
+  };
+}
+
 // ─── Main pipeline ────────────────────────────────────────────────────────
 
 /**
@@ -152,45 +237,25 @@ export async function runPipeline(
     return { stage: "awaiting-confirmation", researchResult };
   }
 
-  // Apply tool filter (user removed tools in UI Step 2)
-  const filteredResult =
-    input.selectedToolNames && input.selectedToolNames.length > 0
-      ? { ...researchResult, tools: researchResult.tools.filter((t) => input.selectedToolNames!.includes(t.name)) }
-      : researchResult;
-
-  // Stages 3 + 4: Skill Builder and Prompt Engine run in parallel
-  const [skillDirectory, promptFiles] = await Promise.all([
-    buildSkillDirectory(filteredResult, input.metadata, client),
-    generatePrompts(filteredResult, input.metadata, client, input.selectedMetaTypes),
-  ]);
-
-  const completeDirectory: InMemorySkillDirectory = {
-    ...skillDirectory,
-    files: [...skillDirectory.files, ...promptFiles],
-  };
-
-  // Stage 5: Validate
-  const validation = validateSkillDirectory(completeDirectory);
-  if (!validation.valid) {
-    return {
-      stage: "complete",
-      result: { researchResult, skillDirectory: completeDirectory, validation },
-    };
-  }
-
-  // Stage 5b: Write to disk (atomic)
-  let writeResult: WriteResult | undefined;
-  if (input.writeToDisk) {
-    const outputPath = path.join(
-      input.outputBasePath ?? "skills",
-      input.metadata.category,
-      input.metadata.slug
-    );
-    writeResult = await atomicWrite(completeDirectory, outputPath);
-  }
+  const result = await buildSkillFromResearch(
+    {
+      researchResult,
+      metadata: input.metadata,
+      selectedToolNames: input.selectedToolNames,
+      selectedMetaTypes: input.selectedMetaTypes,
+      writeToDisk: input.writeToDisk,
+      outputBasePath: input.outputBasePath,
+    },
+    client
+  );
 
   return {
     stage: "complete",
-    result: { researchResult, skillDirectory: completeDirectory, validation, writeResult },
+    result: {
+      researchResult,
+      skillDirectory: result.skillDirectory,
+      validation: result.validation,
+      writeResult: result.writeResult,
+    },
   };
 }

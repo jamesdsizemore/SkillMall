@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiCreateSkillBodySchema } from "@/lib/validators";
 import { resolveProviderConfig, createLLMClient, ConfigError } from "@/lib/providers";
-import { buildSkillDirectory } from "@/lib/skill-builder";
-import { generatePrompts } from "@/lib/prompt-engine";
-import { validateSkillDirectory, atomicWrite } from "@/lib/pipeline";
+import { buildSkillFromResearch } from "@/lib/pipeline";
 import { logInstallEvent } from "@/lib/analytics";
-import path from "path";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -34,41 +31,33 @@ export async function POST(req: NextRequest) {
   const client = createLLMClient(config);
   const { researchResult, metadata, selectedToolNames, selectedMetaTypes } = parsed.data;
 
-  const filteredResult =
-    selectedToolNames && selectedToolNames.length > 0
-      ? { ...researchResult, tools: researchResult.tools.filter((t) => selectedToolNames.includes(t.name)) }
-      : researchResult;
-
   try {
-    const [skillDirectory, promptFiles] = await Promise.all([
-      buildSkillDirectory(filteredResult, metadata, client),
-      generatePrompts(filteredResult, metadata, client, selectedMetaTypes),
-    ]);
+    const result = await buildSkillFromResearch({
+      researchResult,
+      metadata,
+      selectedToolNames,
+      selectedMetaTypes,
+      writeToDisk: true,
+    }, client);
 
-    const completeDirectory = {
-      ...skillDirectory,
-      files: [...skillDirectory.files, ...promptFiles],
-    };
-
-    const validation = validateSkillDirectory(completeDirectory);
-    if (!validation.valid) {
+    if (!result.validation.valid) {
       return NextResponse.json(
-        { error: "validation_failed", details: validation.errors },
+        { error: "validation_failed", details: result.validation.errors },
         { status: 422 }
       );
     }
-
-    const outputPath = path.join("skills", metadata.category, metadata.slug);
-    const writeResult = await atomicWrite(completeDirectory, outputPath);
+    if (!result.writeResult) {
+      return NextResponse.json({ error: "write_failed" }, { status: 500 });
+    }
 
     // Log install event (aggregate analytics, no PII)
     logInstallEvent(metadata.slug, "claude-code");
 
     return NextResponse.json({
       slug: metadata.slug,
-      path: writeResult.path,
-      fileCount: writeResult.fileCount,
-      promptCount: promptFiles.length,
+      path: result.writeResult.path,
+      fileCount: result.writeResult.fileCount,
+      promptCount: result.promptCount,
     });
   } catch (err) {
     return NextResponse.json(

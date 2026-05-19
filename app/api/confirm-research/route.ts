@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiCreateSkillBodySchema } from "@/lib/validators";
 import { resolveProviderConfig, createLLMClient, ConfigError } from "@/lib/providers";
-import { buildSkillDirectory } from "@/lib/skill-builder";
-import { generatePrompts } from "@/lib/prompt-engine";
-import { validateSkillDirectory } from "@/lib/pipeline";
+import { buildSkillFromResearch } from "@/lib/pipeline";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -32,29 +30,19 @@ export async function POST(req: NextRequest) {
   const client = createLLMClient(config);
   const { researchResult, metadata, selectedToolNames, selectedMetaTypes } = parsed.data;
 
-  const filteredResult =
-    selectedToolNames && selectedToolNames.length > 0
-      ? { ...researchResult, tools: researchResult.tools.filter((t) => selectedToolNames.includes(t.name)) }
-      : researchResult;
-
   try {
-    const [skillDirectory, promptFiles] = await Promise.all([
-      buildSkillDirectory(filteredResult, metadata, client),
-      generatePrompts(filteredResult, metadata, client, selectedMetaTypes),
-    ]);
-
-    const completeDirectory = {
-      ...skillDirectory,
-      files: [...skillDirectory.files, ...promptFiles],
-    };
-
-    const validation = validateSkillDirectory(completeDirectory);
+    const result = await buildSkillFromResearch({
+      researchResult,
+      metadata,
+      selectedToolNames,
+      selectedMetaTypes,
+    }, client);
 
     return NextResponse.json({
-      skillDirectory: completeDirectory,
-      promptCount: promptFiles.length,
-      fileCount: completeDirectory.files.length,
-      validation,
+      skillDirectory: result.skillDirectory,
+      promptCount: result.promptCount,
+      fileCount: result.skillDirectory.files.length,
+      validation: result.validation,
     });
   } catch (err) {
     return NextResponse.json(

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runPipeline, validateSkillDirectory, atomicWrite } from "../pipeline";
+import {
+  atomicWrite,
+  buildSkillFromResearch,
+  estimateSkillResourceScore,
+  runPipeline,
+  validateSkillDirectory,
+} from "../pipeline";
 import { MockLLMClient } from "./mocks/mock-llm-client";
 import blueOceanFixture from "./fixtures/research-result-blue-ocean.json";
 import type { ResearchResult } from "../validators";
@@ -53,6 +59,30 @@ function buildPipelineClient(): MockLLMClient {
   return client;
 }
 
+function buildConfirmedResearchClient(): MockLLMClient {
+  const client = new MockLLMClient({});
+  const responses: string[] = [
+    SAMPLE_RESPONSE,
+    SAMPLE_RESPONSE,
+    SAMPLE_RESPONSE,
+    SELECTION_RESPONSE,
+    BODY_RESPONSE,
+    SELECTION_RESPONSE,
+    BODY_RESPONSE,
+    SELECTION_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+    BODY_RESPONSE,
+  ];
+  client.withSequence(responses);
+  return client;
+}
+
 describe("validateSkillDirectory", () => {
   it("returns valid: true for a well-formed skill directory", () => {
     const dir = {
@@ -90,6 +120,81 @@ describe("validateSkillDirectory", () => {
     const result = validateSkillDirectory(dir);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.field === "name" && e.message.includes("match slug"))).toBe(true);
+  });
+});
+
+describe("buildSkillFromResearch", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("builds and validates a confirmed research result without running research again", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      text: async () => SAMPLE_HTML,
+    }));
+    const client = buildConfirmedResearchClient();
+
+    const result = await buildSkillFromResearch({
+      researchResult: blueOcean,
+      metadata: META,
+    }, client);
+
+    expect(result.validation.valid).toBe(true);
+    expect(result.writeResult).toBeUndefined();
+    expect(result.promptCount).toBe(10);
+    expect(result.skillDirectory.files.some((file) => file.path === "SKILL.md")).toBe(true);
+    expect(client.calls[0].prompt).not.toContain("Extract named");
+  });
+
+  it("filters selected tools and writes atomically when requested", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      text: async () => SAMPLE_HTML,
+    }));
+    const client = new MockLLMClient({});
+    client.withSequence([
+      SAMPLE_RESPONSE,
+      SELECTION_RESPONSE,
+      BODY_RESPONSE,
+      BODY_RESPONSE,
+      BODY_RESPONSE,
+      BODY_RESPONSE,
+      BODY_RESPONSE,
+      BODY_RESPONSE,
+      BODY_RESPONSE,
+    ]);
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "skillmall-pipeline-"));
+
+    const result = await buildSkillFromResearch({
+      researchResult: blueOcean,
+      metadata: META,
+      selectedToolNames: ["Strategy Canvas"],
+      writeToDisk: true,
+      outputBasePath: tmpDir,
+    }, client);
+
+    expect(result.filteredResearchResult.tools.map((tool) => tool.name)).toEqual(["Strategy Canvas"]);
+    expect(result.writeResult?.success).toBe(true);
+    expect(result.promptCount).toBe(7);
+    expect(await fs.readFile(path.join(tmpDir, "business", "blue-ocean-strategy", "SKILL.md"), "utf-8"))
+      .toContain("name: blue-ocean-strategy");
+
+    await fs.rm(tmpDir, { recursive: true });
+  });
+
+  it("estimates resource score from generated file richness and tags", async () => {
+    const score = estimateSkillResourceScore({
+      slug: "rich-skill",
+      category: "business",
+      files: [
+        { path: "scripts/run.sh", content: "" },
+        { path: "resources/templates/template.md", content: "" },
+        { path: "resources/samples/sample.md", content: "" },
+      ],
+    }, ["one", "two", "three", "four", "five", "six"]);
+
+    expect(score).toBe(100);
   });
 });
 
