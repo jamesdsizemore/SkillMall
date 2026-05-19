@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { wizardReducer, INITIAL_WIZARD_STATE } from "../wizard-reducer";
-import type { WizardAction, ResearchResult } from "../WizardContext";
+import type { ResearchResult } from "../WizardContext";
 
 const mockResearchResult: ResearchResult = {
   topic: "Blue Ocean Strategy",
@@ -100,6 +100,40 @@ describe("wizardReducer", () => {
   it("SET_ERROR sets error", () => {
     const state = wizardReducer(INITIAL_WIZARD_STATE, { type: "SET_ERROR", error: "test error" });
     expect(state.error).toBe("test error");
+  });
+
+  it("SET_SKILL_MD_PREVIEW persists edited SKILL.md content into previewDirectory", () => {
+    const previewState = wizardReducer(INITIAL_WIZARD_STATE, {
+      type: "SET_PREVIEW",
+      skillMd: "original",
+      directory: {
+        slug: "test-skill",
+        category: "business",
+        files: [
+          { path: "SKILL.md", content: "original" },
+          { path: "README.md", content: "readme" },
+        ],
+      },
+    });
+
+    const edited = wizardReducer(previewState, {
+      type: "SET_SKILL_MD_PREVIEW",
+      skillMd: "edited",
+    });
+
+    expect(edited.skillMdPreview).toBe("edited");
+    expect(edited.previewDirectory?.files.find((file) => file.path === "SKILL.md")?.content).toBe("edited");
+    expect(edited.previewDirectory?.files.find((file) => file.path === "README.md")?.content).toBe("readme");
+  });
+
+  it("SET_SKILL_MD_PREVIEW can edit content before a previewDirectory exists", () => {
+    const edited = wizardReducer(INITIAL_WIZARD_STATE, {
+      type: "SET_SKILL_MD_PREVIEW",
+      skillMd: "draft",
+    });
+
+    expect(edited.skillMdPreview).toBe("draft");
+    expect(edited.previewDirectory).toBeNull();
   });
 
   it("RESET returns INITIAL_WIZARD_STATE", () => {

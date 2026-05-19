@@ -213,6 +213,20 @@ The browser-based creation wizard at `http://localhost:3000/skills/create` runs 
 
 ---
 
+**Problem:** Step 4 `SKILL.md` preview is blank or the wizard stays on metadata
+
+**What it means:** The wizard calls `/api/preview-skill` when you click `[ PREVIEW SKILL → ]` from the metadata step. That route must generate an in-memory skill directory containing a valid `SKILL.md`. If the route fails or the generated directory is invalid, the wizard stays on Step 3 and shows an error instead of advancing to an empty editor.
+
+**Fix:**
+1. Confirm an LLM provider is configured. A missing provider returns `provider_not_configured` and links back to `/settings/providers`.
+2. Check the development server output for the `/api/preview-skill` request. The route returns `invalid_skill_preview` when validation fails and `pipeline_failed` when generation throws.
+3. If the error mentions `SKILL.md`, retry with a narrower topic or fewer selected tools. Very broad research results can produce low-quality or invalid generated frontmatter.
+4. If you edited the Step 4 text and final creation fails later, check the validation error. The edited `SKILL.md` is validated again before disk write.
+
+**If none work:** Copy the `/api/preview-skill` response from the browser network tab, redact any sensitive values, and inspect the `validation.errors` array. The first error usually identifies the missing or invalid frontmatter field.
+
+---
+
 **Problem:** `Skill already exists: skills/<category>/<slug>` when the wizard or CLI tries to write the skill
 
 **What it means:** The `atomicWrite` function in `lib/pipeline.ts` checks whether the target directory exists before writing. If `skills/<category>/<slug>/` already exists on disk, the write is rejected to prevent accidental overwrites of existing skills, especially important in a shared repository.

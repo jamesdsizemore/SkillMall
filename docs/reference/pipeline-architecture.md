@@ -30,6 +30,8 @@ Available via:
 - Browser wizard (`/skills/create`)
 - CLI (`npx skill-mall create`)
 
+The browser wizard has an additional preview checkpoint after metadata selection. It calls `POST /api/preview-skill` to run Stage 3 only, then shows the generated `SKILL.md` in an editable text area before prompt files are generated.
+
 ---
 
 ## Stage 2: Research Engine (`lib/research-engine.ts`)
@@ -63,6 +65,8 @@ Available via:
 - Generates one sample file per tool via LLM call (parallel)
 
 **Output:** `InMemorySkillDirectory` — all files in memory, nothing written to disk
+
+In the browser wizard, Stage 3 can run by itself through `/api/preview-skill` so the user can review and edit the actual `SKILL.md` before selecting prompt options. Later preview and create routes rebuild the directory and replace `SKILL.md` with the reviewed content before validation.
 
 ---
 
@@ -111,7 +115,7 @@ Available via:
 
 The pipeline pauses after Stage 2 in all paths. No files are written until the user explicitly confirms the extracted research:
 
-- **Web wizard:** Step 2 requires expanding DETAILS on at least one tool, then clicking Confirm Research
+- **Web wizard:** Step 2 requires expanding DETAILS on at least one tool, then clicking Confirm Research. Step 3 generates a `SKILL.md` preview before Step 4. Step 4 edits are carried into prompt preview and final creation.
 - **CLI:** writes `research-result.json`, user reviews, runs `confirm-research <slug>`
 
 This gate is non-skippable. The pipeline cannot proceed to Stages 3–5 without user confirmation.

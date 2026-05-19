@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ApiCreateSkillBodySchema } from "@/lib/validators";
 import { resolveProviderConfig, createLLMClient, ConfigError } from "@/lib/providers";
 import { buildSkillDirectory } from "@/lib/skill-builder";
-import { generatePrompts } from "@/lib/prompt-engine";
-import { replaceSkillMdContent, validateSkillDirectory } from "@/lib/pipeline";
+import { validateSkillDirectory } from "@/lib/pipeline";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -30,34 +29,31 @@ export async function POST(req: NextRequest) {
   }
 
   const client = createLLMClient(config);
-  const { researchResult, metadata, selectedToolNames, selectedMetaTypes, skillMdContent } = parsed.data;
-
+  const { researchResult, metadata, selectedToolNames } = parsed.data;
   const filteredResult =
     selectedToolNames && selectedToolNames.length > 0
       ? { ...researchResult, tools: researchResult.tools.filter((t) => selectedToolNames.includes(t.name)) }
       : researchResult;
 
   try {
-    const [skillDirectory, promptFiles] = await Promise.all([
-      buildSkillDirectory(filteredResult, metadata, client),
-      generatePrompts(filteredResult, metadata, client, selectedMetaTypes),
-    ]);
+    const skillDirectory = await buildSkillDirectory(filteredResult, metadata, client);
+    const validation = validateSkillDirectory(skillDirectory);
+    const skillMd = skillDirectory.files.find((file) => file.path === "SKILL.md")?.content.trim();
 
-    let completeDirectory = {
-      ...skillDirectory,
-      files: [...skillDirectory.files, ...promptFiles],
-    };
-
-    if (skillMdContent !== undefined) {
-      completeDirectory = replaceSkillMdContent(completeDirectory, skillMdContent);
+    if (!validation.valid || !skillMd) {
+      return NextResponse.json(
+        {
+          error: "invalid_skill_preview",
+          message: "Generated preview did not include a valid SKILL.md file.",
+          validation,
+        },
+        { status: 422 }
+      );
     }
 
-    const validation = validateSkillDirectory(completeDirectory);
-
     return NextResponse.json({
-      skillDirectory: completeDirectory,
-      promptCount: promptFiles.length,
-      fileCount: completeDirectory.files.length,
+      skillDirectory,
+      fileCount: skillDirectory.files.length,
       validation,
     });
   } catch (err) {

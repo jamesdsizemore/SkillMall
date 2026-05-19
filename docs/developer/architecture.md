@@ -151,7 +151,7 @@ The entire addition is ~50 lines and one new file.
 
 ## The 5-Stage Pipeline
 
-The skill creation pipeline runs when a user calls `POST /api/create-skill` (web wizard) or `npx skill-mall confirm-research` (CLI). It produces a complete skill directory from a topic and optional source URLs.
+The skill creation pipeline runs when a user calls `POST /api/create-skill` (web wizard) or `npx skill-mall confirm-research` (CLI). It produces a complete skill directory from a topic and optional source URLs. The web wizard also calls `POST /api/preview-skill` after metadata selection so users can review and edit the generated `SKILL.md` before prompt files or final disk writes are produced.
 
 ### Stage 1 — Input Validation
 
@@ -212,6 +212,8 @@ export interface InMemorySkillDirectory {
 
 The distinction matters for testing: template-generated files can be tested without an LLM mock; LLM-powered files require `MockLLMClient`.
 
+In the browser wizard, the Stage 3 output is returned to Step 4 as an editable `SKILL.md` preview. Later `/api/confirm-research` and `/api/create-skill` calls accept the reviewed `skillMdContent`, rebuild the directory, replace `SKILL.md` with the reviewed content, and validate before returning a preview or writing to disk.
+
 ### Stage 4 — Prompt Engine (`lib/prompt-engine.ts`)
 
 The Prompt Engine generates framework-specific prompts for each tool. This is the most LLM-intensive stage — a 20-tool domain generates 60+ LLM calls.
@@ -259,7 +261,7 @@ This prevents the catalog from containing half-written skills if a write fails m
 
 The multi-step wizard uses `useReducer` + React Context (`WizardContext`) with `sessionStorage` persistence.
 
-**Why not Zustand?** Zustand is a library dependency for state that could be handled with React primitives. The wizard state is simple: a few fields advancing through 4 steps. `useReducer` is sufficient and requires zero additional packages.
+**Why not Zustand?** Zustand is a library dependency for state that could be handled with React primitives. The wizard state is simple: fields advancing through six ordered steps. `useReducer` is sufficient and requires zero additional packages.
 
 **Why not URL state?** The research result contains thousands of characters of JSON (tools, prompts, samples). Encoding this in a URL would produce a URL too long for browsers and would expose sensitive pipeline output in browser history and server logs.
 
@@ -268,13 +270,19 @@ The multi-step wizard uses `useReducer` + React Context (`WizardContext`) with `
 **State shape:**
 ```typescript
 type WizardState = {
-  step: 'topic' | 'research' | 'review' | 'building' | 'done'
+  step: 1 | 2 | 3 | 4 | 5 | 6
   topic: string
   sourceUrls: string[]
-  category: string
   researchResult: ResearchResult | null
-  selectedTools: string[]
-  buildResult: BuildResult | null
+  selectedToolNames: string[]
+  category: string
+  tags: string[]
+  targetAgents: string[]
+  selectedMetaTypes: string[]
+  skillMdPreview: string | null
+  previewDirectory: InMemorySkillDirectory | null
+  isLoading: boolean
+  error: string | null
 }
 ```
 

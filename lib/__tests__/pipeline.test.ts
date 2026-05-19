@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runPipeline, validateSkillDirectory, atomicWrite } from "../pipeline";
+import { runPipeline, validateSkillDirectory, atomicWrite, replaceSkillMdContent } from "../pipeline";
 import { MockLLMClient } from "./mocks/mock-llm-client";
 import blueOceanFixture from "./fixtures/research-result-blue-ocean.json";
 import type { ResearchResult } from "../validators";
@@ -90,6 +90,58 @@ describe("validateSkillDirectory", () => {
     const result = validateSkillDirectory(dir);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.field === "name" && e.message.includes("match slug"))).toBe(true);
+  });
+});
+
+describe("replaceSkillMdContent", () => {
+  it("replaces only SKILL.md content without mutating other files", () => {
+    const original = {
+      slug: "my-skill",
+      category: "business",
+      files: [
+        { path: "SKILL.md", content: "original" },
+        { path: "README.md", content: "readme" },
+      ],
+    };
+
+    const updated = replaceSkillMdContent(original, "edited");
+
+    expect(updated).not.toBe(original);
+    expect(updated.files.find((file) => file.path === "SKILL.md")?.content).toBe("edited");
+    expect(updated.files.find((file) => file.path === "README.md")?.content).toBe("readme");
+    expect(original.files.find((file) => file.path === "SKILL.md")?.content).toBe("original");
+  });
+
+  it("leaves directories without SKILL.md unchanged", () => {
+    const original = {
+      slug: "my-skill",
+      category: "business",
+      files: [{ path: "README.md", content: "readme" }],
+    };
+
+    const updated = replaceSkillMdContent(original, "edited");
+
+    expect(updated.files).toEqual(original.files);
+  });
+
+  it("allows blank reviewed SKILL.md content to fail normal validation", () => {
+    const original = {
+      slug: "my-skill",
+      category: "business",
+      files: [
+        {
+          path: "SKILL.md",
+          content: `---\nname: my-skill\ndescription: "Apply the skill."\n---\n`,
+        },
+        { path: "README.md", content: "readme" },
+      ],
+    };
+
+    const updated = replaceSkillMdContent(original, "");
+    const validation = validateSkillDirectory(updated);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.some((error) => error.field === "name")).toBe(true);
   });
 });
 

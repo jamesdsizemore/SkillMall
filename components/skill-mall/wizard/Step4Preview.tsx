@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 
 const DESC_MAX = 1024;
 
@@ -11,14 +11,13 @@ function extractDescription(content: string): string {
 
 type Props = {
   skillMdPreview: string;
+  onContentChange: (content: string) => void;
   onNext: () => void;
   onBack: () => void;
 };
 
-export function Step4Preview({ skillMdPreview, onNext, onBack }: Props) {
-  const [content, setContent] = useState(skillMdPreview);
-
-  const description = useMemo(() => extractDescription(content), [content]);
+export function Step4Preview({ skillMdPreview, onContentChange, onNext, onBack }: Props) {
+  const description = useMemo(() => extractDescription(skillMdPreview), [skillMdPreview]);
   const descLen = description.length;
   const overLimit = descLen > DESC_MAX;
 
@@ -33,8 +32,8 @@ export function Step4Preview({ skillMdPreview, onNext, onBack }: Props) {
 
       <div className="border border-sm-border bg-sm-surface">
         <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
+          value={skillMdPreview}
+          onChange={(e) => onContentChange(e.target.value)}
           className="w-full resize-none bg-transparent p-5 font-mono text-xs leading-relaxed text-sm-secondary outline-none focus:text-sm-primary"
           rows={28}
           spellCheck={false}

@@ -108,6 +108,7 @@ export const ApiCreateSkillBodySchema = z.object({
   }),
   selectedToolNames: z.array(z.string()).optional(),
   selectedMetaTypes: z.array(z.string()).optional(),
+  skillMdContent: z.string().optional(),
 });
 
 export type ResearchResult = z.infer<typeof ResearchResultSchema>;

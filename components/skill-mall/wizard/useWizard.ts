@@ -16,6 +16,7 @@ export function useWizard() {
   const toggleMetaType = (metaType: string) => dispatch({ type: "TOGGLE_META_TYPE", metaType });
   const setPreview = (directory: InMemorySkillDirectory, skillMd: string) =>
     dispatch({ type: "SET_PREVIEW", directory, skillMd });
+  const setSkillMdPreview = (skillMd: string) => dispatch({ type: "SET_SKILL_MD_PREVIEW", skillMd });
   const setLoading = (loading: boolean) => dispatch({ type: "SET_LOADING", loading });
   const setError = (error: string | null) => dispatch({ type: "SET_ERROR", error });
   const nextStep = () => dispatch({ type: "NEXT_STEP" });
@@ -32,6 +33,7 @@ export function useWizard() {
     setMetadata,
     toggleMetaType,
     setPreview,
+    setSkillMdPreview,
     setLoading,
     setError,
     nextStep,
