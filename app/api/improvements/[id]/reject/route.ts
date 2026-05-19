@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth/github'
-import { rejectSuggestion, getSuggestions } from '@/lib/self-improvement/analyzer'
+import {
+  authenticationRequiredResponse,
+  getSessionFromCookies,
+  requireSkillAuthor,
+} from '@/lib/auth/policy'
+import { rejectSuggestion } from '@/lib/self-improvement/analyzer'
 import { getSkill } from '@/lib/skills'
 
 export async function POST(
@@ -14,11 +17,9 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid suggestion ID' }, { status: 400 })
   }
 
-  const cookieStore = await cookies()
-  const token = cookieStore.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = await getSessionFromCookies()
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return authenticationRequiredResponse()
   }
 
   const body = await req.json().catch(() => ({})) as { skillSlug?: string; skillCategory?: string }
@@ -29,8 +30,9 @@ export async function POST(
   }
 
   const skill = getSkill(skillCategory, skillSlug)
-  if (skill && skill.author !== session.github_login) {
-    return NextResponse.json({ error: 'Only the skill author can reject suggestions' }, { status: 403 })
+  if (skill) {
+    const authorError = requireSkillAuthor(session, skill, 'Only the skill author can reject suggestions')
+    if (authorError) return authorError
   }
 
   rejectSuggestion(suggestionId)

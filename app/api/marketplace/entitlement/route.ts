@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth/github'
+import { getSessionFromCookies } from '@/lib/auth/policy'
 import { getEntitlement } from '@/lib/marketplace/entitlement'
 
 export const runtime = 'nodejs'
@@ -13,9 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'skillSlug is required' }, { status: 400 })
   }
 
-  const cookieStore = await cookies()
-  const token = cookieStore.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = await getSessionFromCookies()
 
   const entitlement = getEntitlement(skillSlug, session?.github_login ?? null)
   return NextResponse.json({ entitlement, skillSlug })

@@ -3,7 +3,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers'
-import { getSession } from '@/lib/auth/github'
+import {
+  authenticationRequiredResponse,
+  getSessionFromRequest,
+  requireSkillAuthorWhenPresent,
+} from '@/lib/auth/policy'
 import { getSkill } from '@/lib/skills'
 
 const SYSTEM_PROMPT =
@@ -71,10 +75,9 @@ export async function GET(req: NextRequest) {
 
 // POST /api/regen-prompt — regenerate prompt with new framework
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = getSessionFromRequest(req)
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return authenticationRequiredResponse()
   }
 
   const body = await req.json().catch(() => null)
@@ -99,9 +102,12 @@ export async function POST(req: NextRequest) {
   if (!skill) {
     return NextResponse.json({ error: `Skill not found: ${category}/${slug}` }, { status: 404 })
   }
-  if (skill.author && skill.author !== session.github_login) {
-    return NextResponse.json({ error: 'Only the skill author can regenerate prompts' }, { status: 403 })
-  }
+  const authorError = requireSkillAuthorWhenPresent(
+    session,
+    skill,
+    'Only the skill author can regenerate prompts'
+  )
+  if (authorError) return authorError
 
   // Security: validate promptFile path stays within skill directory
   const promptsDir = getPromptsDir(category, slug)
