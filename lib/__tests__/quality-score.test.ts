@@ -16,6 +16,7 @@ function mockSkill(overrides: Partial<Skill> = {}): Skill {
     linked_skills: [],
     content: "---\nname: my-skill\n---\n",
     path: "skills/business/my-skill/SKILL.md",
+    hasReadme: true,
     hasScripts: true,
     hasTemplates: true,
     hasSamples: true,
