@@ -12,9 +12,10 @@ type Props = {
   skill: Skill;
   readme: string | null;
   availableLocales?: string[];
+  testCount?: number;
 };
 
-export function SkillTabs({ skill, readme, availableLocales = [] }: Props) {
+export function SkillTabs({ skill, readme, availableLocales = [], testCount = 0 }: Props) {
   const [active, setActive] = useState<Tab>("OVERVIEW");
 
   return (
@@ -112,6 +113,23 @@ export function SkillTabs({ skill, readme, availableLocales = [] }: Props) {
               {locale}
             </span>
           ))}
+        </div>
+      )}
+
+      {testCount > 0 && (
+        <div className="mt-3 flex items-center gap-3">
+          <span
+            className="border border-sm-border px-2 py-0.5 text-[9px] tracking-widest text-sm-secondary"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            [ {testCount} TEST {testCount === 1 ? "CASE" : "CASES"} ]
+          </span>
+          <span
+            className="text-[9px] tracking-widest text-sm-disabled"
+            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+          >
+            npx skill-mall test {skill.category}/{skill.slug}
+          </span>
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ import { getReviews, getEffectivenessScore, getReviewCount } from "@/lib/reviews
 import { getInstallCount, getForkCount } from "@/lib/analytics";
 import { getAvailableLocales } from "@/lib/i18n";
 import nodePath from "node:path";
+import fs from "node:fs";
 import { SkillsShBadge } from "@/components/skill-mall/skill-detail/SkillsShBadge";
 import { FeedbackForm } from "@/components/skill-mall/improvements/FeedbackForm";
 import { TierBadge } from "@/components/skill-mall/marketplace/TierBadge";
@@ -37,6 +38,10 @@ export default async function SkillPage({ params }: Props) {
   const readme = getSkillReadme(category, slug);
   const skillDir = nodePath.join(process.cwd(), nodePath.dirname(skill.path));
   const availableLocales = getAvailableLocales(skillDir);
+  const testDir = nodePath.join(process.cwd(), "tests", slug);
+  const testCount = fs.existsSync(testDir)
+    ? fs.readdirSync(testDir).filter((f) => f.endsWith(".json")).length
+    : 0;
   const forkCount = getForkCount(skill.slug);
   const skillTier = getSkillTier(skill.slug);
   const allSkills = getAllSkills();
@@ -96,7 +101,7 @@ export default async function SkillPage({ params }: Props) {
             )}
 
             {/* Bracket-notation tabs */}
-            <SkillTabs skill={skill} readme={readme} availableLocales={availableLocales} />
+            <SkillTabs skill={skill} readme={readme} availableLocales={availableLocales} testCount={testCount} />
           </div>
 
           {/* Sidebar — quality panel + deploy */}

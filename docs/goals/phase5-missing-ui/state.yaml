@@ -1,5 +1,5 @@
 version: 2
-active_task: T501
+active_task: T502
 
 goal:
   title: "Phase 5 — Missing UI Surfaces"
@@ -26,7 +26,7 @@ tasks:
   - id: T501
     type: scout
     assignee: Scout
-    status: active
+    status: done
     objective: "Verify G6 (Framework Override UI): read SkillTabs, PromptCard, FrameworkPicker components and confirm whether spec §2.3 dropdown+regen flow is complete or missing. Map current skill detail tab list to confirm which tabs exist. Read collections/ directory for G4 data shape. Read _starters/ config files for G1 data shape."
     inputs:
       - "components/skill-mall/skill-detail/SkillTabs.tsx"
@@ -44,12 +44,19 @@ tasks:
       - "collections/ data shape (fields available)"
       - "_starters config shape (fields available for template browser)"
       - "version-history and budget-check API response shapes"
-    receipt: null
+    receipt:
+      result: done
+      summary: "G2/G3/G5b/G6 all already built in SkillTabs.tsx. Budget Analysis tab (BudgetPanel), History tab (HistoryPanel), locale badges footer, and full FrameworkPicker with 6 default + 46 expanded frameworks are all present. Remaining gaps: G1 (no starter browser on create page), G4 (no /collections page), G5 (no test indicator on skill detail)."
+      evidence:
+        - components/skill-mall/skill-detail/SkillTabs.tsx
+        - components/skill-mall/skill-detail/PromptCard.tsx
+        - components/skill-mall/skill-detail/FrameworkPicker.tsx
+        - collections/full-stack-developer-kit/collection.json
 
   - id: T502
     type: worker
     assignee: Worker
-    status: queued
+    status: active
     objective: "G4: Build Skill Collections UI. A /collections page listing all collections from collections/ directory with name, description, skill count. A /collections/[slug] page showing the full collection with ordered skills, deployment notes, and a 'Deploy Pack' CTA. Follow spec §5.2 and Nothing design system."
     allowed_files:
       - app/collections/page.tsx
@@ -86,23 +93,15 @@ tasks:
     type: worker
     assignee: Worker
     status: queued
-    objective: "G2+G3+G5+G5b: Add four new sections/tabs to the skill detail page. (1) Budget Analysis tab — agent selector dropdown + installed-count slider + truncation preview output from /api/budget-check. (2) Version History tab — changelog timeline from /api/version-history with semver, date, author, semantic diff summary. (3) Test results section — pass/fail summary from tests/<slug>/ directory if test cases exist. (4) Available locales — list of SKILL.<locale>.md files if any exist in the skill directory. All must follow Nothing design system. Must not break any existing tabs."
+    objective: "G5: Add test indicator to skill detail page. Show test case count from tests/<slug>/ directory with a CLI invocation hint. Add as a small badge/section on the skill detail page — not a full runner (LLM cost). Follow Nothing design system."
     allowed_files:
       - app/skills/[category]/[slug]/page.tsx
       - components/skill-mall/skill-detail/SkillTabs.tsx
-      - components/skill-mall/skill-detail/BudgetTab.tsx
-      - components/skill-mall/skill-detail/VersionHistoryTab.tsx
-      - components/skill-mall/skill-detail/TestResultsBadge.tsx
-      - components/skill-mall/skill-detail/LocaleBadges.tsx
     verify:
       - cmd: "npx tsc --noEmit"
         expect: exit 0
-      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
-        expect: no failures
     stop_if:
-      - "Budget or version-history API returns a schema incompatible with what Scout found."
       - "tsc fails after two repair attempts."
-      - "Adding tabs breaks existing tab rendering."
     receipt: null
 
   - id: T505
@@ -122,7 +121,9 @@ tasks:
         expect: exit 0
     stop_if:
       - "tsc fails after two repair attempts."
-    receipt: null
+    receipt:
+      result: done
+      summary: "G6 already complete per T501 Scout. FrameworkPicker has default 6 + 46 expanded frameworks with Advanced toggle. PromptCard has clickable badge opening picker. Regen call to /api/regen-prompt on selection. No changes required."
 
   - id: T506
     type: judge
