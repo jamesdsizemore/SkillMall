@@ -299,72 +299,63 @@ function PromptsPanel({ category, slug }: { category: string; slug: string }) {
   );
 }
 
+const AGENT_OPTIONS = [
+  { value: 'claude-code', label: 'Claude Code' },
+  { value: 'cursor',      label: 'Cursor' },
+  { value: 'gemini-cli',  label: 'Gemini CLI' },
+  { value: 'copilot',     label: 'GitHub Copilot' },
+  { value: 'codex',       label: 'Codex' },
+  { value: 'other',       label: 'Other / Unknown' },
+];
+
 function BudgetPanel({ category, slug }: { category: string; slug: string }) {
-  const [charsAvailable, setCharsAvailable] = React.useState(200);
-  const [result, setResult] = React.useState<import('@/lib/budget-analyzer').BudgetCheckResult | null>(null);
+  const [agent, setAgent] = React.useState('claude-code');
+  const [result, setResult] = React.useState<import('@/lib/budget-analyzer').AgentBudgetAnalysis | null>(null);
   const [loading, setLoading] = React.useState(false);
 
-  const run = async (chars: number) => {
+  const fetchAnalysis = React.useCallback(async (selectedAgent: string) => {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/budget-check?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}&charsAvailable=${chars}`
+        `/api/budget-check?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}&agent=${encodeURIComponent(selectedAgent)}`
       );
-      if (res.ok) setResult(await res.json());
+      if (res.ok) setResult(await res.json() as import('@/lib/budget-analyzer').AgentBudgetAnalysis);
     } finally {
       setLoading(false);
     }
-  };
+  }, [category, slug]);
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseInt(e.target.value, 10);
-    setCharsAvailable(v);
-    run(v);
-  };
+  React.useEffect(() => { fetchAnalysis('claude-code'); }, [fetchAnalysis]);
 
-  // Initial load without triggering loading state (avoids cascading renders in effect)
-  React.useEffect(() => {
-    fetch(`/api/budget-check?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}&charsAvailable=${charsAvailable}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setResult(d as import('@/lib/budget-analyzer').BudgetCheckResult); })
-      .catch(() => undefined);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleAgentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = e.target.value;
+    setAgent(v);
+    fetchAnalysis(v);
+  };
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-sm-secondary">
-        Simulate how much of this skill&apos;s description an agent sees at different context budgets.
-        Set <span className="font-mono">--chars-available</span> to match your agent&apos;s actual skill listing budget.
+        Simulate how much of this skill&apos;s description each agent sees as more skills are installed alongside it.
       </p>
 
+      {/* Agent selector */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label
-            className="text-[9px] tracking-widest text-sm-secondary"
-            style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-          >
-            [ CHARS AVAILABLE ]
-          </label>
-          <span
-            className="text-sm font-black text-sm-display"
-            style={{ fontFamily: '"Doto", monospace' }}
-          >
-            {charsAvailable}
-          </span>
-        </div>
-        <input
-          type="range"
-          min={50}
-          max={500}
-          step={10}
-          value={charsAvailable}
-          onChange={handleSliderChange}
-          className="w-full accent-sm-display"
-        />
-        <div className="flex justify-between text-[9px] text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
-          <span>50</span>
-          <span>500</span>
-        </div>
+        <label
+          className="block text-[9px] tracking-widest text-sm-secondary"
+          style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+        >
+          [ TARGET AGENT ]
+        </label>
+        <select
+          value={agent}
+          onChange={handleAgentChange}
+          className="w-full border border-sm-border bg-sm-surface px-3 py-2 text-sm text-sm-primary outline-none focus:border-sm-display transition-colors"
+        >
+          {AGENT_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       {loading && (
@@ -375,61 +366,67 @@ function BudgetPanel({ category, slug }: { category: string; slug: string }) {
 
       {result && !loading && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {[
-              ['VISIBLE', result.visible ? 'YES' : 'NO'],
-              ['DESC LENGTH', String(result.descriptionLength)],
-              ['TRIGGER', result.triggerPreserved ? 'PRESERVED' : 'LOST'],
-            ].map(([label, value]) => (
-              <div key={label} className="border border-sm-border p-3">
-                <p
-                  className="text-[9px] tracking-widest text-sm-disabled mb-1"
-                  style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-                >
-                  {label}
-                </p>
-                <p
-                  className={`text-xl font-black ${value === 'YES' || value === 'PRESERVED' ? 'text-green-500' : value === 'NO' || value === 'LOST' ? 'text-sm-accent' : 'text-sm-display'}`}
-                  style={{ fontFamily: '"Doto", monospace' }}
-                >
-                  {value}
-                </p>
+          {/* Description length stat */}
+          <div className="flex items-center gap-3">
+            <span className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+              [ DESC LENGTH ]
+            </span>
+            <span className="text-xl font-black text-sm-display" style={{ fontFamily: '"Doto", monospace' }}>
+              {result.descriptionLength}
+            </span>
+            {result.triggerPhrase && (
+              <>
+                <span className="text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                  [ TRIGGER ]
+                </span>
+                <span className="text-xs text-sm-secondary">&ldquo;{result.triggerPhrase}&rdquo;</span>
+              </>
+            )}
+          </div>
+
+          {/* 4-level table */}
+          <div className="border border-sm-border">
+            <div className="grid grid-cols-4 border-b border-sm-border bg-sm-bg px-4 py-2 text-[9px] tracking-widest text-sm-disabled"
+              style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+              <span>INSTALLED</span>
+              <span>CHARS</span>
+              <span>VISIBLE</span>
+              <span>TRIGGER</span>
+            </div>
+            {result.levels.map(level => (
+              <div key={level.installedCount}
+                className="grid grid-cols-4 border-b border-sm-border px-4 py-2.5 last:border-b-0">
+                <span className="text-sm font-black text-sm-display" style={{ fontFamily: '"Doto", monospace' }}>
+                  {level.installedCount}
+                </span>
+                <span className="text-xs text-sm-secondary">{level.charsAvailable}</span>
+                <span className={`text-[10px] tracking-widest ${level.visible ? 'text-sm-blue' : 'text-sm-accent'}`}
+                  style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                  {level.visible ? '[ FULL ]' : '[ TRUNCATED ]'}
+                </span>
+                <span className={`text-[10px] tracking-widest ${level.triggerPreserved ? 'text-sm-blue' : 'text-sm-accent'}`}
+                  style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                  {level.triggerPreserved ? '[ OK ]' : '[ LOST ]'}
+                </span>
               </div>
             ))}
           </div>
 
-          <div className="border border-sm-border">
-            <div
-              className="border-b border-sm-border px-4 py-2 text-[9px] tracking-widest text-sm-secondary"
-              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-            >
-              [ VISIBLE TEXT ]
-            </div>
-            <pre className="p-4 text-xs leading-relaxed text-sm-primary whitespace-pre-wrap">
-              {result.visibleText}
-            </pre>
-          </div>
-
-          {result.truncatedText && (
-            <div className="border border-sm-accent">
-              <div
-                className="border-b border-sm-accent px-4 py-2 text-[9px] tracking-widest text-sm-accent"
-                style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-              >
-                [ TRUNCATED ]
+          {/* Worst-case visible text */}
+          {result.levels[result.levels.length - 1] && (
+            <div className="border border-sm-border">
+              <div className="border-b border-sm-border px-4 py-2 text-[9px] tracking-widest text-sm-secondary"
+                style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+                [ AT 50 INSTALLED SKILLS ]
               </div>
-              <pre className="p-4 text-xs leading-relaxed text-sm-secondary whitespace-pre-wrap opacity-60">
-                {result.truncatedText}
+              <pre className="p-4 text-xs leading-relaxed text-sm-primary whitespace-pre-wrap">
+                {result.levels[result.levels.length - 1].visibleText}
               </pre>
-            </div>
-          )}
-
-          {result.triggerPhrase && (
-            <div className="border border-sm-border p-3">
-              <p className="text-[9px] tracking-widest text-sm-disabled mb-1" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
-                [ TRIGGER PHRASE ]
-              </p>
-              <p className="text-sm text-sm-primary">&ldquo;{result.triggerPhrase}&rdquo;</p>
+              {result.levels[result.levels.length - 1].truncatedText && (
+                <pre className="border-t border-sm-accent px-4 py-2 text-xs leading-relaxed text-sm-secondary opacity-50 whitespace-pre-wrap">
+                  {result.levels[result.levels.length - 1].truncatedText}
+                </pre>
+              )}
             </div>
           )}
 
@@ -439,15 +436,15 @@ function BudgetPanel({ category, slug }: { category: string; slug: string }) {
                 [ SUGGESTIONS ]
               </p>
               {result.rewriteSuggestions.map((s, i) => (
-                <div key={i} className="border border-sm-border p-3 text-sm text-sm-secondary">
-                  {s}
-                </div>
+                <div key={i} className="border border-sm-border p-3 text-sm text-sm-secondary">{s}</div>
               ))}
             </div>
           )}
 
           {result.rewriteSuggestions.length === 0 && (
-            <p className="text-sm text-green-500">Description fits within {charsAvailable} chars. No rewrite needed.</p>
+            <p className="text-[9px] tracking-widest text-sm-blue" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
+              [ PASSES ALL LOAD LEVELS — NO REWRITE NEEDED ]
+            </p>
           )}
         </div>
       )}

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type FileEntry = { path: string; content: string };
 
 type Props = {
@@ -11,6 +13,17 @@ type Props = {
 };
 
 export function Step6Confirm({ files, isLoading, error, onConfirm, onBack }: Props) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-6">
       <p
@@ -20,17 +33,38 @@ export function Step6Confirm({ files, isLoading, error, onConfirm, onBack }: Pro
         [ DIRECTORY PREVIEW — {files.length} FILES ]
       </p>
 
-      <div className="border border-sm-border bg-sm-surface max-h-96 overflow-y-auto">
-        {files.map((file) => (
-          <div key={file.path} className="border-b border-sm-border last:border-b-0 px-4 py-2">
-            <span
-              className="text-[10px] tracking-wide text-sm-secondary"
-              style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-            >
-              {file.path}
-            </span>
-          </div>
-        ))}
+      <div className="border border-sm-border bg-sm-surface">
+        {files.map((file) => {
+          const isExpanded = expanded.has(file.path);
+          return (
+            <div key={file.path} className="border-b border-sm-border last:border-b-0">
+              <button
+                className="flex w-full items-center justify-between px-4 py-2 text-left hover:bg-sm-bg transition-colors"
+                onClick={() => toggleExpanded(file.path)}
+              >
+                <span
+                  className="text-[10px] tracking-wide text-sm-secondary"
+                  style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                >
+                  {file.path}
+                </span>
+                <span
+                  className="ml-4 shrink-0 text-[9px] tracking-widest text-sm-disabled hover:text-sm-secondary transition-colors"
+                  style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                >
+                  {isExpanded ? "[ HIDE ]" : "[ PREVIEW ]"}
+                </span>
+              </button>
+              {isExpanded && (
+                <div className="border-t border-sm-border bg-sm-bg">
+                  <pre className="max-h-64 overflow-y-auto p-4 text-xs leading-relaxed text-sm-secondary whitespace-pre-wrap">
+                    {file.content || "(empty file)"}
+                  </pre>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {error && (

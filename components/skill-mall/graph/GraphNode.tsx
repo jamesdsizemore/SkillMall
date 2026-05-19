@@ -17,9 +17,11 @@ const CATEGORY_COLORS: Record<string, string> = {
 type GraphNodeData = {
   label: string;
   category: string;
+  description: string;
   isHub: boolean;
   isOrphan: boolean;
   connectionCount: number;
+  clusterId: number | null;
 };
 
 function GraphNodeComponent({ data }: { data: GraphNodeData }) {
@@ -30,10 +32,17 @@ function GraphNodeComponent({ data }: { data: GraphNodeData }) {
     ? `2px solid ${color}`
     : `1px solid ${color}40`;
 
+  const clusterRing = data.clusterId != null
+    ? `0 0 0 3px #f59e0b60, ${data.isHub ? `0 0 12px ${color}40` : "none"}`
+    : data.isHub
+    ? `0 0 12px ${color}40`
+    : "none";
+
   return (
     <>
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <div
+        title={data.description}   // Native tooltip — no extra dependency
         style={{
           border: borderStyle,
           backgroundColor: data.isHub ? `${color}20` : "#111",
@@ -45,8 +54,9 @@ function GraphNodeComponent({ data }: { data: GraphNodeData }) {
           minWidth: 100,
           maxWidth: 160,
           textAlign: "center",
-          boxShadow: data.isHub ? `0 0 12px ${color}40` : "none",
+          boxShadow: clusterRing,
           opacity: data.isOrphan ? 0.6 : 1,
+          cursor: "pointer",
         }}
       >
         <div style={{ color, fontSize: 9, letterSpacing: 2, marginBottom: 2 }}>
@@ -58,6 +68,11 @@ function GraphNodeComponent({ data }: { data: GraphNodeData }) {
         {data.connectionCount > 0 && (
           <div style={{ color: "#6b7280", fontSize: 9, marginTop: 2 }}>
             {data.connectionCount} link{data.connectionCount !== 1 ? "s" : ""}
+          </div>
+        )}
+        {data.clusterId != null && (
+          <div style={{ color: "#f59e0b", fontSize: 9, marginTop: 2, letterSpacing: 1 }}>
+            CLUSTER {data.clusterId}
           </div>
         )}
       </div>

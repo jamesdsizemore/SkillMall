@@ -26,7 +26,8 @@ export default function GraphPage() {
         <p className="mt-1 text-sm text-sm-secondary">
           {graph.edges.length} connection{graph.edges.length !== 1 ? "s" : ""} via linked-skills.
           Hub skills (4+ connections) are highlighted. Orphans (0 connections) are dashed.
-          Click any node to open the skill.
+          {graph.clusterCount > 0 && ` ${graph.clusterCount} cluster${graph.clusterCount !== 1 ? "s" : ""} detected — candidates for Skill Collections.`}
+          Hover any node for description. Click to open.
         </p>
       </div>
 
@@ -35,7 +36,8 @@ export default function GraphPage() {
       <div className="mt-4 flex flex-wrap gap-4 text-[9px] tracking-widest text-sm-disabled" style={{ fontFamily: "var(--font-space-mono, monospace)" }}>
         <span>HUB: solid border + glow (4+ connections)</span>
         <span>ORPHAN: dashed border (0 connections)</span>
-        <span>Colors: category</span>
+        {graph.clusterCount > 0 && <span>CLUSTER: amber ring — Collection candidate</span>}
+        <span>Colors: category — use filter buttons to isolate</span>
       </div>
     </div>
   );

@@ -194,12 +194,22 @@ export default async function SkillPage({ params }: Props) {
                   >
                     [ COMMUNITY ]
                   </p>
-                  <p
-                    className="text-xs text-sm-secondary"
-                    style={{ fontFamily: "var(--font-space-mono, monospace)" }}
-                  >
-                    Forked {forkCount} time{forkCount !== 1 ? "s" : ""}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p
+                      className="text-xs text-sm-secondary"
+                      style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                    >
+                      Forked {forkCount} time{forkCount !== 1 ? "s" : ""}
+                    </p>
+                    {forkCount >= 5 && (
+                      <span
+                        className="border border-sm-blue px-1.5 py-0.5 text-[9px] tracking-widest text-sm-blue"
+                        style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+                      >
+                        [ MOST FORKED ]
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 

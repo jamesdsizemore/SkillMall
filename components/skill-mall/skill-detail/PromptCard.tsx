@@ -4,6 +4,18 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { FrameworkPicker } from "./FrameworkPicker";
 
+// Infer artifact type from the produces filenames for FrameworkPicker defaults
+function inferArtifactType(produces: string[]): string | undefined {
+  const combined = produces.join(' ').toLowerCase();
+  if (combined.includes('matrix')) return 'matrix';
+  if (combined.includes('canvas')) return 'canvas';
+  if (combined.includes('grid')) return 'grid';
+  if (combined.includes('flowchart') || combined.includes('flow')) return 'flowchart';
+  if (combined.includes('analysis') || combined.includes('report')) return 'analysis';
+  if (combined.includes('list') || combined.includes('profile')) return 'list';
+  return undefined;
+}
+
 const COMPLEXITY_COLORS: Record<string, string> = {
   quick: "bg-blue-500",
   thorough: "bg-gray-500",
@@ -110,6 +122,7 @@ export function PromptCard({
           {pickerOpen && (
             <FrameworkPicker
               currentFramework={framework}
+              artifactType={inferArtifactType(produces)}
               onSelect={handleFrameworkSelect}
               onClose={() => setPickerOpen(false)}
             />
