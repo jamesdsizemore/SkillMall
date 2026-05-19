@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Props = {
   skillSlug: string;
   isAuthenticated: boolean;
-  onSubmitted: () => void;
 };
 
-export function ReviewForm({ skillSlug, isAuthenticated, onSubmitted }: Props) {
+export function ReviewForm({ skillSlug, isAuthenticated }: Props) {
+  const router = useRouter();
   const [rating, setRating] = useState<number>(0);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -51,7 +52,7 @@ export function ReviewForm({ skillSlug, isAuthenticated, onSubmitted }: Props) {
         );
       }
 
-      onSubmitted();
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
     } finally {

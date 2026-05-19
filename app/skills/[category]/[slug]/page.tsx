@@ -280,7 +280,7 @@ export default async function SkillPage({ params }: Props) {
             >
               [ REVIEWS ]
             </p>
-            <ReviewFormWrapper
+            <ReviewForm
               skillSlug={skill.slug}
               isAuthenticated={!!session}
             />
@@ -300,25 +300,6 @@ export default async function SkillPage({ params }: Props) {
         </div>
       </div>
     </div>
-  );
-}
-
-function ReviewFormWrapper({
-  skillSlug,
-  isAuthenticated,
-}: {
-  skillSlug: string;
-  isAuthenticated: boolean;
-}) {
-  "use client";
-  // This wrapper allows the server page to pass isAuthenticated down
-  // The actual form handles submission client-side
-  return (
-    <ReviewForm
-      skillSlug={skillSlug}
-      isAuthenticated={isAuthenticated}
-      onSubmitted={() => window.location.reload()}
-    />
   );
 }
 
