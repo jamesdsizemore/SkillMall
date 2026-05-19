@@ -68,17 +68,16 @@ export default function ProvidersPage() {
   const activeProvider = data?.providers.find((p) => p.id === selectedProvider);
 
   return (
-    <div className="bg-sm-bg min-h-screen px-4 py-12 sm:px-6">
-      <div className="mx-auto max-w-2xl">
+    <div>
         <p
           className="mb-2 text-[9px] tracking-widest text-sm-secondary"
           style={{ fontFamily: "var(--font-space-mono, monospace)" }}
         >
-          [ SETTINGS / PROVIDERS ]
+          [ PROVIDERS ]
         </p>
-        <h1 className="mb-8 text-2xl font-bold text-sm-display">
+        <h2 className="mb-8 text-xl font-bold text-sm-display">
           LLM Provider Configuration
-        </h1>
+        </h2>
 
         {data?.configured && (
           <div
@@ -229,7 +228,6 @@ export default function ProvidersPage() {
         >
           {saving ? "[ SAVING... ]" : saved ? "[ SAVED ]" : "[ SAVE CONFIGURATION ]"}
         </button>
-      </div>
     </div>
   );
 }

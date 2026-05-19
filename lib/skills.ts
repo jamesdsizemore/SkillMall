@@ -87,8 +87,9 @@ function parseSkill(filePath: string): Skill | null {
 
     return {
       slug,
-      // Use metadata.category if present, fall back to directory name
-      category: String(meta.category ?? data.category ?? dirCategory),
+      // dirCategory is the filesystem truth and the canonical URL segment.
+      // metadata.category is informational only — it may differ from the directory name.
+      category: dirCategory,
       name: String(data.name ?? slug),
       description: String(data.description ?? ""),
       version: String(meta.version ?? data.version ?? "1.0.0"),

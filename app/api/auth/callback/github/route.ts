@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const sessionId = createSession(String(user.id), user.login);
 
     const response = NextResponse.redirect(
-      new URL("/", req.nextUrl.origin)
+      new URL("/dashboard", req.nextUrl.origin)
     );
 
     // Set session cookie

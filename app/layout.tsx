@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/github";
 import { AuthButton } from "@/components/skill-mall/auth-button";
+import { ThemeProvider } from "@/components/skill-mall/theme-provider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -45,6 +46,8 @@ export default async function RootLayout({
       className={`${spaceGrotesk.variable} ${spaceMono.variable} h-full antialiased`}
     >
       <head>
+        {/* Prevent flash of wrong theme — runs synchronously before paint */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t=localStorage.getItem('sm-theme')||'system';var d=t==='system'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;document.documentElement.setAttribute('data-theme',d);})();` }} />
         {/* Doto variable font — dot-matrix display style for stats and counters */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -81,6 +84,14 @@ export default async function RootLayout({
               >
                 Contribute
               </Link>
+              {session && (
+                <Link
+                  href="/settings"
+                  className="text-sm text-sm-secondary transition-colors hover:text-sm-primary"
+                >
+                  Settings
+                </Link>
+              )}
               <a
                 href="https://github.com/jamesdsizemore/SkillMall"
                 target="_blank"
@@ -106,7 +117,9 @@ export default async function RootLayout({
           </div>
         </header>
 
+        <ThemeProvider>
         <main className="flex-1">{children}</main>
+        </ThemeProvider>
 
         <footer className="border-t border-sm-border py-8">
           <div className="mx-auto max-w-7xl px-4 sm:px-6">

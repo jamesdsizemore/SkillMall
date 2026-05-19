@@ -22,6 +22,8 @@ type Props = {
   params: Promise<{ category: string; slug: string }>;
 };
 
+export const dynamicParams = true;
+
 export async function generateStaticParams() {
   const skills = getAllSkills();
   return skills.map((s) => ({ category: s.category, slug: s.slug }));
