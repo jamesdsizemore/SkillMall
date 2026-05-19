@@ -1,7 +1,7 @@
 goal:
   title: "UI & Auth Fixes"
   slug: ui-auth-fixes
-  status: active
+  status: done
   created_at: "2026-05-18"
   goal_file: docs/goals/ui-auth-fixes/goal.md
   intake:
@@ -17,7 +17,12 @@ tasks:
   - id: T001
     type: worker
     assignee: Worker
-    status: queued
+    status: done
+    receipt:
+      result: done
+      changed_files: [app/api/auth/callback/github/route.ts, lib/skills.ts, app/skills/[category]/[slug]/page.tsx, lib/db/client.ts]
+      commands: [{cmd: "npx tsc --noEmit", status: pass}, {cmd: "npm test", status: "pass (211/211)"}]
+      summary: "Auth redirects to /dashboard. dirCategory is canonical URL segment. dynamicParams=true. Migration runner auto-applies all pending SQL migrations at DB init."
     objective: "F1: redirect to /dashboard after OAuth callback. F2: use dirCategory as canonical URL category in parseSkill. F3: add dynamicParams=true to skill page. F4: apply pending DB migrations at getDb() init."
     allowed_files:
       - app/api/auth/callback/github/route.ts
@@ -37,7 +42,11 @@ tasks:
   - id: T002
     type: worker
     assignee: Worker
-    status: queued
+    status: done
+    receipt:
+      result: done
+      changed_files: [app/settings/layout.tsx, app/settings/page.tsx, app/settings/providers/page.tsx, app/layout.tsx]
+      summary: "Settings layout auth-gates all /settings/* routes. Hub page with section cards. Settings nav link visible when logged in."
     objective: "F5+F7+F8: build /settings hub page with sidebar nav, auth-gate all /settings/* routes, add Settings link to nav header when user is logged in."
     allowed_files:
       - app/settings/page.tsx
@@ -53,7 +62,11 @@ tasks:
   - id: T003
     type: worker
     assignee: Worker
-    status: queued
+    status: done
+    receipt:
+      result: done
+      changed_files: [app/settings/appearance/page.tsx, components/skill-mall/theme-provider.tsx, app/layout.tsx]
+      summary: "ThemeProvider client component persists theme to localStorage. Anti-flash inline script. /settings/appearance page with light/dark/system toggle using existing CSS tokens."
     objective: "F6+F9: build /settings/appearance page with dark/light/system theme toggle. Build ThemeProvider client component that persists preference to localStorage and applies data-theme attribute to html element."
     allowed_files:
       - app/settings/appearance/page.tsx
@@ -70,7 +83,12 @@ tasks:
   - id: T004
     type: judge
     assignee: Judge
-    status: queued
+    status: done
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      rationale: "All three user-reported issues addressed in commit 4714d98. Auth lands on /dashboard. Skill cards use dirCategory so URLs match filesystem. /settings hub exists, auth-gated, includes theme toggle. tsc clean, 211/211 tests."
     objective: "Audit: all three user-reported issues fixed. Login redirects to /dashboard. Skill cards navigate correctly. /settings hub exists and is auth-gated. Theme toggle works. tsc clean, tests green, committed."
     inputs:
       - "All T001-T003 receipts"
