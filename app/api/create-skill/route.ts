@@ -3,7 +3,7 @@ import { ApiCreateSkillBodySchema } from "@/lib/validators";
 import { resolveProviderConfig, createLLMClient, ConfigError } from "@/lib/providers";
 import { buildSkillDirectory } from "@/lib/skill-builder";
 import { generatePrompts } from "@/lib/prompt-engine";
-import { validateSkillDirectory, atomicWrite } from "@/lib/pipeline";
+import { validateSkillDirectory, atomicWrite, replaceSkillMdContent } from "@/lib/pipeline";
 import { logInstallEvent } from "@/lib/analytics";
 import path from "path";
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
 
   const client = createLLMClient(config);
-  const { researchResult, metadata, selectedToolNames, selectedMetaTypes } = parsed.data;
+  const { researchResult, metadata, selectedToolNames, selectedMetaTypes, skillMdContent } = parsed.data;
 
   const filteredResult =
     selectedToolNames && selectedToolNames.length > 0
@@ -45,10 +45,14 @@ export async function POST(req: NextRequest) {
       generatePrompts(filteredResult, metadata, client, selectedMetaTypes),
     ]);
 
-    const completeDirectory = {
+    let completeDirectory = {
       ...skillDirectory,
       files: [...skillDirectory.files, ...promptFiles],
     };
+
+    if (skillMdContent !== undefined) {
+      completeDirectory = replaceSkillMdContent(completeDirectory, skillMdContent);
+    }
 
     const validation = validateSkillDirectory(completeDirectory);
     if (!validation.valid) {

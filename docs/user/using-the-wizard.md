@@ -52,13 +52,15 @@ Select the catalog category for this skill. Tags are pre-populated from the rese
 - **Category:** choose the most specific applicable category
 - **Tags:** 3-6 tags, lowercase-hyphenated. These appear on skill cards and power search.
 
-Click `[ PREVIEW SKILL → ]` to continue.
+Click `[ PREVIEW SKILL → ]` to generate the `SKILL.md` preview. This runs the Skill Builder without writing files to disk. If preview generation fails or does not produce a valid `SKILL.md`, the wizard stays on Step 3 and shows the error.
 
 ---
 
 ## Step 4: SKILL.md Preview
 
-A preview of the generated SKILL.md content. The `description` field is automatically generated from the research summary. The character count is shown.
+A preview of the generated `SKILL.md` content. This is the actual generated file, shown as editable text. The `description` field is automatically generated from the research summary. The character count is shown.
+
+You can edit the content directly in the text area. Edits are saved in wizard state, survive back/next navigation, and are sent to the later prompt preview and final create steps. If the edited `SKILL.md` fails validation, final creation stops before writing files.
 
 Click `[ SELECT PROMPTS → ]` to continue.
 
@@ -78,7 +80,7 @@ Select which meta prompt types to include. All 5 standard types are pre-selected
 
 Uncheck any you don't need. The estimated total prompt count updates as you adjust.
 
-Click `[ PREVIEW DIRECTORY → ]` to run the full Skill Builder and Prompt Engine (this triggers LLM calls for each tool).
+Click `[ PREVIEW DIRECTORY → ]` to run the full Skill Builder and Prompt Engine (this triggers LLM calls for each tool). The reviewed `SKILL.md` content from Step 4 is included in this request, so the directory preview reflects your edited skill file.
 
 ---
 
@@ -86,7 +88,7 @@ Click `[ PREVIEW DIRECTORY → ]` to run the full Skill Builder and Prompt Engin
 
 A complete file list shows every file that will be written. Expand any file to preview its content.
 
-Click `[ CREATE SKILL ]` to write all files atomically. If validation fails, the wizard returns to the relevant step with the specific error highlighted.
+Click `[ CREATE SKILL ]` to write all files atomically. The reviewed `SKILL.md` content from Step 4 is used for the final write. If validation fails, the wizard returns to the relevant step with the specific error highlighted and no partial files are written.
 
 On success, you are redirected to the new skill's detail page.
 
@@ -105,3 +107,5 @@ The wizard state is saved to `sessionStorage` on every step. If you refresh the 
 **Research fails** — Check that your source URLs are accessible. If all URLs fail, the wizard shows an error; provide different URLs or proceed without them.
 
 **Step 2 Continue stays disabled** — Expand the DETAILS section on at least one tool card.
+
+**Step 4 preview is blank or fails to load** — The wizard only advances from Step 3 after the server generates a valid `SKILL.md`. If it stays on Step 3, read the error shown there and check the development server logs for the `/api/preview-skill` request.

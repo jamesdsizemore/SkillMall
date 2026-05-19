@@ -8,6 +8,7 @@ All API routes use `Content-Type: application/json`. No authentication is requir
 |---|---|---|
 | 400 | `invalid_input` | Request body failed Zod validation |
 | 503 | `provider_not_configured` | No LLM provider is configured |
+| 422 | `invalid_skill_preview` | Preview generation did not produce a valid `SKILL.md` |
 | 422 | `pipeline_failed` | LLM pipeline failed after retry |
 | 500 | `internal_error` | Unexpected server error |
 
@@ -112,6 +113,7 @@ Run Stages 3–4 (Skill Builder + Prompt Engine) without writing to disk. Return
   }
   selectedToolNames?: string[]        // subset of tool names; omit to include all
   selectedMetaTypes?: string[]        // subset of meta prompt IDs; omit to include all 5
+  skillMdContent?: string             // reviewed SKILL.md content from /api/preview-skill
 }
 ```
 
@@ -128,6 +130,38 @@ Run Stages 3–4 (Skill Builder + Prompt Engine) without writing to disk. Return
     warnings: Array<{ field: string; message: string }>
   }
 }
+```
+
+---
+
+## POST /api/preview-skill
+
+Run Stage 3 (Skill Builder) without prompt generation or disk write. Returns the generated in-memory skill directory so the wizard can show and edit the actual `SKILL.md` before prompt selection.
+
+**Request body:** same as `/api/confirm-research`, except `selectedMetaTypes` is ignored and prompt files are not generated.
+
+**Response:**
+
+```typescript
+{
+  skillDirectory: InMemorySkillDirectory
+  fileCount: number
+  validation: {
+    valid: boolean
+    errors: Array<{ field: string; message: string; value?: string }>
+    warnings: Array<{ field: string; message: string }>
+  }
+}
+```
+
+**Error responses:**
+
+```typescript
+// 422 — generated preview did not include a valid SKILL.md
+{ error: 'invalid_skill_preview', message: string, validation: ValidationResult }
+
+// 422 — pipeline error
+{ error: 'pipeline_failed', message: string }
 ```
 
 ---

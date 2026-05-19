@@ -60,6 +60,7 @@ export type WizardAction =
   | { type: "SET_METADATA"; category: string; tags: string[]; targetAgents: string[] }
   | { type: "TOGGLE_META_TYPE"; metaType: string }
   | { type: "SET_PREVIEW"; directory: InMemorySkillDirectory; skillMd: string }
+  | { type: "SET_SKILL_MD_PREVIEW"; skillMd: string }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_ERROR"; error: string | null }
   | { type: "NEXT_STEP" }
@@ -122,6 +123,19 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       };
     case "SET_PREVIEW":
       return { ...state, previewDirectory: action.directory, skillMdPreview: action.skillMd };
+    case "SET_SKILL_MD_PREVIEW":
+      return {
+        ...state,
+        skillMdPreview: action.skillMd,
+        previewDirectory: state.previewDirectory
+          ? {
+              ...state.previewDirectory,
+              files: state.previewDirectory.files.map((file) =>
+                file.path === "SKILL.md" ? { ...file, content: action.skillMd } : file
+              ),
+            }
+          : state.previewDirectory,
+      };
     case "SET_LOADING":
       return { ...state, isLoading: action.loading };
     case "SET_ERROR":

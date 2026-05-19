@@ -13,9 +13,20 @@ type Props = {
   onTagsChange: (tags: string[]) => void;
   onNext: () => void;
   onBack: () => void;
+  isLoading?: boolean;
+  error?: string | null;
 };
 
-export function Step3Metadata({ category, tags, onCategoryChange, onTagsChange, onNext, onBack }: Props) {
+export function Step3Metadata({
+  category,
+  tags,
+  onCategoryChange,
+  onTagsChange,
+  onNext,
+  onBack,
+  isLoading = false,
+  error,
+}: Props) {
   const tagString = tags.join(", ");
 
   return (
@@ -62,9 +73,19 @@ export function Step3Metadata({ category, tags, onCategoryChange, onTagsChange, 
         </div>
       </div>
 
+      {error && (
+        <p
+          className="text-[10px] tracking-widest text-sm-accent"
+          style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+        >
+          [ ERROR: {error.toUpperCase()} ]
+        </p>
+      )}
+
       <div className="flex gap-3">
         <button
           onClick={onBack}
+          disabled={isLoading}
           className="border border-sm-border px-5 py-2.5 text-[10px] tracking-widest text-sm-secondary hover:border-sm-primary hover:text-sm-primary transition-colors"
           style={{ fontFamily: "var(--font-space-mono, monospace)" }}
         >
@@ -72,10 +93,11 @@ export function Step3Metadata({ category, tags, onCategoryChange, onTagsChange, 
         </button>
         <button
           onClick={onNext}
-          className="bg-sm-display px-6 py-2.5 text-[10px] tracking-widest text-sm-bg hover:opacity-80 transition-opacity"
+          disabled={isLoading}
+          className="bg-sm-display px-6 py-2.5 text-[10px] tracking-widest text-sm-bg hover:opacity-80 transition-opacity disabled:opacity-30"
           style={{ fontFamily: "var(--font-space-mono, monospace)" }}
         >
-          [ PREVIEW SKILL → ]
+          {isLoading ? "[ GENERATING SKILL.MD... ]" : "[ PREVIEW SKILL → ]"}
         </button>
       </div>
     </div>
