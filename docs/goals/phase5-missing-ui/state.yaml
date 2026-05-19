@@ -1,0 +1,142 @@
+version: 2
+active_task: T501
+
+goal:
+  title: "Phase 5 — Missing UI Surfaces"
+  slug: phase5-missing-ui
+  status: active
+  created_at: "2026-05-18"
+  goal_file: docs/goals/phase5-missing-ui/goal.md
+  intake:
+    input_shape: existing_plan
+    authority: approved
+    proof_type: demo
+    existing_plan_facts:
+      - "6 inventory gaps, all with working backend/lib counterparts"
+      - "G6 (Framework Override) status unknown — Scout must verify before queuing fix"
+      - "G2+G3+G5+G5b all touch the same skill detail page — must be one Worker"
+      - "G1 and G4 are self-contained new pages/sections — safe to sequence"
+      - "Spec §§3.3, 4.2, 4.5, 5.2, 7.3, 7.6, 2.3 are the implementation source of truth"
+agents:
+  scout: unknown
+  worker: unknown
+  judge: unknown
+
+tasks:
+  - id: T501
+    type: scout
+    assignee: Scout
+    status: active
+    objective: "Verify G6 (Framework Override UI): read SkillTabs, PromptCard, FrameworkPicker components and confirm whether spec §2.3 dropdown+regen flow is complete or missing. Map current skill detail tab list to confirm which tabs exist. Read collections/ directory for G4 data shape. Read _starters/ config files for G1 data shape."
+    inputs:
+      - "components/skill-mall/skill-detail/SkillTabs.tsx"
+      - "components/skill-mall/skill-detail/PromptCard.tsx"
+      - "components/skill-mall/skill-detail/FrameworkPicker.tsx (if exists)"
+      - "app/skills/[category]/[slug]/page.tsx (tabs section)"
+      - "collections/ directory"
+      - "skills/_starters/ (one config file)"
+      - "lib/version-history.ts (public API)"
+      - "app/api/budget-check/route.ts"
+      - "app/api/version-history/route.ts"
+    expected_output:
+      - "G6 status: complete | partial | missing — with specific gap if partial/missing"
+      - "Current tabs on skill detail page (list)"
+      - "collections/ data shape (fields available)"
+      - "_starters config shape (fields available for template browser)"
+      - "version-history and budget-check API response shapes"
+    receipt: null
+
+  - id: T502
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "G4: Build Skill Collections UI. A /collections page listing all collections from collections/ directory with name, description, skill count. A /collections/[slug] page showing the full collection with ordered skills, deployment notes, and a 'Deploy Pack' CTA. Follow spec §5.2 and Nothing design system."
+    allowed_files:
+      - app/collections/page.tsx
+      - app/collections/[slug]/page.tsx
+      - lib/collections.ts
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "collections/ directory is empty — no data to display."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T503
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "G1: Build Starter Template Browser on the Create page (/skills/create). Add a 'Start from Template' section below the main create form that lists all 20 starters from skills/_starters/ with name, description, and a 'Use this starter' button. Clicking a starter populates the create wizard pre-loaded at Step 3 (metadata). Follow spec §3.3."
+    allowed_files:
+      - app/skills/create/page.tsx
+      - components/skill-mall/templates/TemplateBrowser.tsx
+      - components/skill-mall/templates/TemplateCard.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "Starter config files are missing required fields for display."
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T504
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "G2+G3+G5+G5b: Add four new sections/tabs to the skill detail page. (1) Budget Analysis tab — agent selector dropdown + installed-count slider + truncation preview output from /api/budget-check. (2) Version History tab — changelog timeline from /api/version-history with semver, date, author, semantic diff summary. (3) Test results section — pass/fail summary from tests/<slug>/ directory if test cases exist. (4) Available locales — list of SKILL.<locale>.md files if any exist in the skill directory. All must follow Nothing design system. Must not break any existing tabs."
+    allowed_files:
+      - app/skills/[category]/[slug]/page.tsx
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - components/skill-mall/skill-detail/BudgetTab.tsx
+      - components/skill-mall/skill-detail/VersionHistoryTab.tsx
+      - components/skill-mall/skill-detail/TestResultsBadge.tsx
+      - components/skill-mall/skill-detail/LocaleBadges.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+      - cmd: "npm test -- --passWithNoTests 2>&1 | tail -5"
+        expect: no failures
+    stop_if:
+      - "Budget or version-history API returns a schema incompatible with what Scout found."
+      - "tsc fails after two repair attempts."
+      - "Adding tabs breaks existing tab rendering."
+    receipt: null
+
+  - id: T505
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "G6: Complete Framework Override UI on Prompts tab per Scout findings. If Scout found it complete, mark done with no changes. If partial/missing: implement spec §2.3 — framework badge on each prompt card that opens a dropdown of framework options (default: artifact-appropriate subset; Advanced toggle: full 40+ library), selecting a framework triggers /api/regen-prompt POST and updates the card body inline."
+    constraints:
+      - "Only activate if T501 Scout found G6 partial or missing."
+      - "If T501 found G6 complete, receipt this task as done with 'no changes required'."
+    allowed_files:
+      - components/skill-mall/skill-detail/SkillTabs.tsx
+      - components/skill-mall/skill-detail/PromptCard.tsx
+      - components/skill-mall/skill-detail/FrameworkPicker.tsx
+    verify:
+      - cmd: "npx tsc --noEmit"
+        expect: exit 0
+    stop_if:
+      - "tsc fails after two repair attempts."
+    receipt: null
+
+  - id: T506
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: "Final audit: verify all 6 inventory gaps (G1–G6) are closed. Check that the app runs, all new pages/tabs are reachable, nothing design system is followed, tsc clean, tests green, changes committed. full_outcome_complete."
+    inputs:
+      - "All T502–T505 receipts"
+      - "npx tsc --noEmit"
+      - "npm test output"
+      - "git diff --stat"
+      - "feature inventory gap list from goal.md"
+    expected_output:
+      - "complete | not_complete per gap"
+      - "full_outcome_complete: true | false"
+      - "any remaining gaps"
+    receipt: null
