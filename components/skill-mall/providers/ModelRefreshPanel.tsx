@@ -51,6 +51,8 @@ export function ModelRefreshPanel({
   const models = provider.modelStatus.models.slice(0, 8);
   const activeModel = provider.configStatus.activeModel ?? "model pending";
   const modelCount = provider.modelStatus.modelCount ?? provider.modelStatus.models.length;
+  const capabilityBlockers = provider.modelStatus.capabilityStatus.blockers.slice(0, 3);
+  const capabilityConfidence = provider.modelStatus.capabilityStatus.confidences.join(", ") || "unknown";
 
   return (
     <section className="border border-sm-border bg-sm-surface p-4">
@@ -103,6 +105,25 @@ export function ModelRefreshPanel({
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ BLOCKER ]</p>
           <p className="truncate text-sm text-sm-primary">{provider.modelStatus.blocker ?? "none recorded"}</p>
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ CAPABLE MODELS ]</p>
+          <p className="truncate text-sm text-sm-primary">
+            {provider.modelStatus.capabilityStatus.capableModelCount} / {modelCount}
+          </p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ CAPABILITY CONFIDENCE ]</p>
+          <p className="truncate text-sm text-sm-primary">{capabilityConfidence}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ CAPABILITY BLOCKERS ]</p>
+          <p className="truncate text-sm text-sm-primary">
+            {capabilityBlockers.length > 0 ? capabilityBlockers.join(", ") : "none recorded"}
+          </p>
         </div>
       </div>
 

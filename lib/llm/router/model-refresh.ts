@@ -10,6 +10,12 @@ import {
 import type { ProviderConfig, ProviderRegistryEntry, ProviderRegistryID } from '../../providers/types'
 import type { SecretRef } from './types'
 import { resolveEnvSecret } from './secret-refs'
+import {
+  modelCapabilityContextWindow,
+  modelCapabilityMaxOutputTokens,
+  normalizeProviderModelCapabilities,
+  type ModelCapabilityMetadata,
+} from './model-capabilities'
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -29,6 +35,7 @@ export interface RefreshedModel {
     | 'manual'
     | 'fallback'
   raw: Record<string, unknown>
+  capabilities?: ModelCapabilityMetadata
 }
 
 export interface ModelRefreshResult {
@@ -61,21 +68,34 @@ function rawHash(value: Record<string, unknown>): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
+function isSecretLikeRawKey(key: string): boolean {
+  const normalized = key.toLowerCase()
+  const compact = normalized.replace(/[_-]/g, '')
+  if (normalized.includes('key')) return true
+  if (/(authorization|bearer|credential|secret|session)/.test(normalized)) return true
+  if (compact.includes('token')) {
+    return !new Set([
+      'inputtokenlimit',
+      'outputtokenlimit',
+      'maxtokens',
+      'maxinputtokens',
+      'maxoutputtokens',
+      'inputtokens',
+      'outputtokens',
+      'prompttokens',
+      'completiontokens',
+      'cachedinputtokens',
+      'reasoningtokens',
+      'tokenizerurl',
+    ]).has(compact)
+  }
+  return false
+}
+
 function sanitizeRawModel(raw: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(raw)) {
-    const normalized = key.toLowerCase()
-    if (
-      normalized.includes('key') ||
-      normalized.includes('token') ||
-      normalized.includes('secret') ||
-      normalized.includes('credential') ||
-      normalized.includes('session') ||
-      normalized.includes('authorization') ||
-      normalized.includes('bearer')
-    ) {
-      continue
-    }
+    if (isSecretLikeRawKey(key)) continue
     sanitized[key] = value && typeof value === 'object' && !Array.isArray(value)
       ? sanitizeRawModel(value as Record<string, unknown>)
       : value
@@ -85,6 +105,9 @@ function sanitizeRawModel(raw: Record<string, unknown>): Record<string, unknown>
 
 function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: string): void {
   const raw = sanitizeRawModel(model.raw)
+  const capabilitiesJson = JSON.stringify(model.capabilities ?? {})
+  const contextWindow = model.capabilities ? modelCapabilityContextWindow(model.capabilities) : undefined
+  const maxOutputTokens = model.capabilities ? modelCapabilityMaxOutputTokens(model.capabilities) : undefined
   db.prepare(`
     INSERT INTO llm_models (
       id,
@@ -94,6 +117,9 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
       model_id,
       display_name,
       source,
+      capabilities_json,
+      context_window,
+      max_output_tokens,
       last_checked_at,
       raw_json,
       updated_at
@@ -105,6 +131,9 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
       @modelId,
       @displayName,
       @source,
+      @capabilitiesJson,
+      @contextWindow,
+      @maxOutputTokens,
       @checkedAt,
       @rawJson,
       @checkedAt
@@ -114,6 +143,9 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
       execution_kind = excluded.execution_kind,
       display_name = excluded.display_name,
       source = excluded.source,
+      capabilities_json = excluded.capabilities_json,
+      context_window = excluded.context_window,
+      max_output_tokens = excluded.max_output_tokens,
       last_checked_at = excluded.last_checked_at,
       raw_json = excluded.raw_json,
       updated_at = excluded.updated_at
@@ -125,9 +157,45 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
     modelId: model.modelId,
     displayName: model.displayName ?? (typeof raw.name === 'string' ? raw.name : model.modelId),
     source: model.source,
+    capabilitiesJson,
+    contextWindow: contextWindow ?? null,
+    maxOutputTokens: maxOutputTokens ?? null,
     checkedAt,
     rawJson: JSON.stringify(raw),
   })
+}
+
+function modelSourceLabel(source: RefreshedModel['source']): 'live' | 'source_backed_static' | 'manual' | 'fallback' {
+  if (source === 'source_backed_static') return 'source_backed_static'
+  if (source === 'manual') return 'manual'
+  if (source === 'fallback') return 'fallback'
+  return 'live'
+}
+
+function withCapabilities(
+  model: Omit<RefreshedModel, 'capabilities'>,
+  input: {
+    sourceName: string
+    sourceUrl?: string
+    fetchedAt: string
+    authoritative: boolean
+    blocker?: string
+  }
+): RefreshedModel {
+  return {
+    ...model,
+    capabilities: normalizeProviderModelCapabilities({
+      providerRegistryId: model.providerRegistryId,
+      modelId: model.modelId,
+      source: modelSourceLabel(model.source),
+      authoritative: input.authoritative,
+      sourceName: input.sourceName,
+      sourceUrl: input.sourceUrl,
+      fetchedAt: input.fetchedAt,
+      raw: model.raw,
+      blocker: input.blocker,
+    }),
+  }
 }
 
 function resolveGatewayVirtualKey(config: ProviderConfig): string {
@@ -188,14 +256,24 @@ export async function fetchBifrostModels(
   const data = (await response.json()) as OpenAICompatibleModelList
   return (data.data ?? [])
     .filter((model): model is Record<string, unknown> & { id: string } => typeof model.id === 'string')
-    .map((model) => ({
-      providerId: config.provider,
-      providerRegistryId: providerRegistryIdForExecutableProvider(config.provider),
-      executionKind: 'bifrost_local',
-      modelId: model.id,
-      source: 'live:bifrost_local',
-      raw: model,
-    }))
+    .map((model) =>
+      withCapabilities(
+        {
+          providerId: config.provider,
+          providerRegistryId: providerRegistryIdForExecutableProvider(config.provider),
+          executionKind: 'bifrost_local',
+          modelId: model.id,
+          source: 'live:bifrost_local',
+          raw: model,
+        },
+        {
+          sourceName: 'Bifrost local OpenAI-compatible models endpoint',
+          sourceUrl: `${baseURL}/models`,
+          fetchedAt: nowIso(),
+          authoritative: true,
+        }
+      )
+    )
 }
 
 export async function refreshProviderModels(
@@ -209,14 +287,23 @@ export async function refreshProviderModels(
   const models =
     config.gatewayBackend === 'bifrost_local'
       ? await fetchBifrostModels(config, fetchFn)
-      : (await fetchProviderModels(config)).map((modelId) => ({
-          providerId: config.provider,
-          providerRegistryId,
-          executionKind,
-          modelId,
-          source: 'live:direct' as const,
-          raw: { id: modelId },
-        }))
+      : (await fetchProviderModels(config)).map((modelId) =>
+          withCapabilities(
+            {
+              providerId: config.provider,
+              providerRegistryId,
+              executionKind,
+              modelId,
+              source: 'live:direct' as const,
+              raw: { id: modelId },
+            },
+            {
+              sourceName: `${config.provider} direct model list`,
+              fetchedAt: checkedAt,
+              authoritative: true,
+            }
+          )
+        )
 
   for (const model of models) {
     upsertModel(db, model, checkedAt)
@@ -267,19 +354,30 @@ export async function refreshRegistryProviderModels(
   const executionKind = sourceExecutionKind(entry, source)
   const providerId = entry.executableProviderId ?? entry.id
   const models = result.models.map((model) => ({
-    providerId,
-    providerRegistryId: entry.id,
-    executionKind,
-    modelId: model.modelId,
-    displayName: model.displayName,
-    source,
-    raw: {
-      id: model.modelId,
-      displayName: model.displayName,
-      sourceName: model.sourceName,
-      sourceUrl: model.sourceUrl,
-      ...(model.raw ?? {}),
-    },
+    ...withCapabilities(
+      {
+        providerId,
+        providerRegistryId: entry.id,
+        executionKind,
+        modelId: model.modelId,
+        displayName: model.displayName,
+        source,
+        raw: {
+          id: model.modelId,
+          displayName: model.displayName,
+          sourceName: model.sourceName,
+          sourceUrl: model.sourceUrl,
+          ...(model.raw ?? {}),
+        },
+      },
+      {
+        sourceName: model.sourceName,
+        sourceUrl: model.sourceUrl,
+        fetchedAt: model.fetchedAt,
+        authoritative: model.authoritative,
+        blocker: model.blocker,
+      }
+    ),
   }))
 
   for (const model of models) {

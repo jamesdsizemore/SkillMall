@@ -63,6 +63,12 @@ export type ProviderRow = {
     lastCheckedAt?: string | null;
     blocker?: string | null;
     models: string[];
+    capabilityStatus: {
+      capableModelCount: number;
+      sources: string[];
+      confidences: string[];
+      blockers: string[];
+    };
     refresh: {
       strategy: string;
       canRefreshNow: boolean;
@@ -134,6 +140,18 @@ export type RoutingPoliciesResponse = {
   policies: RoutingPolicyRow[];
   supportedModes: string[];
   unsupportedModes: string[];
+};
+
+export type RoutingSimulationResult = {
+  blocked: boolean;
+  selected: { candidateId: string; providerId: string; modelId: string; routeBackend: string } | null;
+  eligibility: Array<{
+    candidateId: string;
+    capabilityStatus: string;
+    pricingStatus: string;
+    blockerCodes: string[];
+    explanation: string;
+  }>;
 };
 
 export type UsageResponse = {
@@ -266,6 +284,17 @@ function actionMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+export function buildPolicySimulationBody(payload: unknown) {
+  if (!payload || typeof payload !== "object") return payload;
+  const { estimatedCostUsd, operation, requirePricing, ...policy } = payload as {
+    estimatedCostUsd?: number;
+    operation?: string;
+    requirePricing?: boolean;
+    [key: string]: unknown;
+  };
+  return { policy, estimatedCostUsd, operation, requirePricing };
+}
+
 function canRefreshProviderWithDraft(provider: ProviderRow | null, draft: ProviderDraft): boolean {
   if (!provider || provider.status === "planned_source_review") return false;
   const requiresEndpoint = provider.modelStatus.refresh.requiresEndpoint;
@@ -298,6 +327,7 @@ export function ProviderCenter({
   const [pricingState, setPricingState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [testState, setTestState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [policyState, setPolicyState] = useState<ProviderActionState>({ status: "idle", message: null });
+  const [policySimulation, setPolicySimulation] = useState<RoutingSimulationResult | null>(null);
 
   const selectedProvider = useMemo(
     () => data?.providers.find((provider) => provider.id === selectedProviderId) ?? null,
@@ -419,6 +449,7 @@ export function ProviderCenter({
     setPricingState({ status: "idle", message: null });
     setTestState({ status: "idle", message: null });
     setPolicyState({ status: "idle", message: null });
+    setPolicySimulation(null);
   };
 
   const configureProvider = async () => {
@@ -618,12 +649,7 @@ export function ProviderCenter({
   };
 
   const simulatePolicy = async (payload: unknown) => {
-    const body = payload && typeof payload === "object"
-      ? (() => {
-          const { estimatedCostUsd, ...policy } = payload as { estimatedCostUsd?: number; [key: string]: unknown };
-          return { policy, estimatedCostUsd };
-        })()
-      : payload;
+    const body = buildPolicySimulationBody(payload);
     setPolicyState({ status: "running", message: "Simulating routing policy" });
     try {
       const response = await fetch("/api/providers/policies/simulate", {
@@ -633,7 +659,13 @@ export function ProviderCenter({
       });
       const result = await response.json();
       if (!response.ok) throw new Error(actionMessage(result, "Routing policy simulation failed"));
-      const outcome = result.blocked ? "blocked" : `selected ${result.selected?.modelId ?? "candidate"}`;
+      setPolicySimulation(result as RoutingSimulationResult);
+      const blockers = Array.isArray(result.eligibility)
+        ? result.eligibility.flatMap((item: { blockerCodes?: string[] }) => item.blockerCodes ?? [])
+        : [];
+      const outcome = result.blocked
+        ? `blocked${blockers.length > 0 ? `: ${blockers.slice(0, 3).join(", ")}` : ""}`
+        : `selected ${result.selected?.modelId ?? "candidate"}`;
       setPolicyState({ status: "success", message: `Simulation ${outcome}` });
     } catch (error) {
       setPolicyState({
@@ -706,6 +738,7 @@ export function ProviderCenter({
             onActivatePolicy={activatePolicy}
             onTogglePolicy={togglePolicy}
             onSimulatePolicy={simulatePolicy}
+            simulationResult={policySimulation}
           />
           <UsageCostPanel
             usage={usage ?? emptyUsage}

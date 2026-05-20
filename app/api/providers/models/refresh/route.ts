@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
         source: refreshed.source,
         executionKind: refreshed.executionKind,
         blocker: refreshed.blocker ?? null,
+        capabilityCount: refreshed.models.filter((model) => model.capabilities && Object.keys(model.capabilities.capabilities).length > 0).length,
+        capabilityBlockers: [...new Set(refreshed.models.flatMap((model) => model.capabilities?.blockers ?? []))],
       },
       discovery: {
         strategy: entry.discoveryStrategy,
@@ -85,6 +87,14 @@ export async function POST(req: NextRequest) {
         source: refreshed.source.startsWith('live:') ? 'live' : refreshed.source,
         authoritative: Boolean(refreshed.authoritative),
         models: refreshed.models.map((model) => model.modelId),
+        capabilities: refreshed.models.map((model) => ({
+          modelId: model.modelId,
+          source: model.capabilities?.source ?? 'unknown',
+          confidence: model.capabilities?.confidence ?? 'unknown',
+          capabilities: model.capabilities?.capabilities ?? {},
+          limits: model.capabilities?.limits ?? {},
+          blockers: model.capabilities?.blockers ?? ['missing_metadata'],
+        })),
         networkCalled: Boolean(refreshed.networkCalled),
         ...(refreshed.status === 'planned_source_review' ? { liveCallable: false } : {}),
         ...(refreshed.blocker ? { message: refreshed.blocker } : {}),

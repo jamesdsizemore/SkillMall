@@ -152,9 +152,9 @@ Planned-source-review rows are visible but not live-callable until official evid
 
 `providers list` prints all shared registry rows with Provider Center status, access label, and the active configured row marker.
 
-`providers status` shows the active provider status, or a selected row when `--provider` / `--provider-registry-id` is supplied. It includes the row's model source, cached model count, last checked timestamp, stale status, and source/discovery blocker.
+`providers status` shows the active provider status, or a selected row when `--provider` / `--provider-registry-id` is supplied. It includes the row's model source, cached model count, last checked timestamp, stale status, source/discovery blocker, capable model count, capability confidence, and capability blockers.
 
-`providers refresh-models` uses the shared model-discovery contract. OpenAI-compatible rows can probe the active configured endpoint or an explicitly supplied `--base-url`; unconfigured registry rows return `endpoint_required` without probing public default endpoints. Provider-specific, cloud/project, local-runtime, static, manual, and planned-source-review rows return the correct status labels without assuming generic `/v1/models` support.
+`providers refresh-models` uses the shared model-discovery contract. OpenAI-compatible rows can probe the active configured endpoint or an explicitly supplied `--base-url`; unconfigured registry rows return `endpoint_required` without probing public default endpoints. Provider-specific, cloud/project, local-runtime, static, manual, and planned-source-review rows return the correct status labels without assuming generic `/v1/models` support. Refresh stores normalized capability metadata when the source exposes it and labels source confidence separately from live account availability.
 
 `providers refresh-pricing` uses the same source-backed pricing normalization as the Provider Center API. The default source is Portkey Models for provider rows with a configured public pricing file. `--source litellm_model_prices` refreshes from LiteLLM's public model pricing file. Source license and source URL are printed with the snapshot count. Arbitrary source URL overrides are not accepted.
 
@@ -212,9 +212,13 @@ Supported modes are:
 | `--remaining-usd <n>` | No | Remaining budget used by budget checks |
 | `--limit-usd <n>` | No | Budget limit metadata |
 | `--estimated-cost-usd <n>` | No | Numeric estimate for candidate metadata or simulation |
+| `--operation <name>` | No | Operation requirement for simulation, default `chat.text` |
+| `--require-pricing` | No | Require usable pricing in simulation eligibility |
 | `--json` | No | Print JSON |
 
 Policy commands reject raw keys, tokens, credential paths, prompts, messages, responses, and outputs. Use configured provider references and numeric estimates.
+
+`policies simulate` prints route eligibility for each candidate when metadata is available. Eligibility reports capability status, pricing status, and blocker codes. Unknown capability and missing or stale pricing are blockers for automatic cost-aware routing; they are not treated as compatible or free. `cheapest_compatible` remains unsupported unless a later approved phase changes the shared mode list.
 
 **Examples:**
 
@@ -234,7 +238,7 @@ npx skill-mall policies upsert \
 
 ```bash
 npx skill-mall policies activate --id budget-openai
-npx skill-mall policies simulate --id budget-openai --estimated-cost-usd 0.02
+npx skill-mall policies simulate --id budget-openai --estimated-cost-usd 0.02 --operation chat.text --require-pricing
 npx skill-mall policies disable --id budget-openai
 ```
 

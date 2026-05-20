@@ -58,6 +58,12 @@ interface CachedModelStatus {
   modelCount: number;
   lastCheckedAt: string | null;
   stale: boolean;
+  capabilityStatus: {
+    capableModelCount: number;
+    sources: string[];
+    confidences: string[];
+    blockers: string[];
+  };
 }
 
 function localDbPath(): string {
@@ -142,11 +148,32 @@ function isStale(lastCheckedAt: string | null): boolean {
   return Date.now() - checked > 24 * 60 * 60 * 1000;
 }
 
+const blockingCapabilityStatusCodes = new Set([
+  "account_scoped_source",
+  "fallback_only",
+  "manual_only",
+  "missing_metadata",
+  "provider_specific_source_required",
+  "reference_only",
+  "stale_metadata",
+  "unknown_source",
+]);
+
+function hasEligibleCapabilityMetadata(parsed: {
+  capabilities?: Record<string, unknown>;
+  blockers?: string[];
+}): boolean {
+  if (!parsed.capabilities || Object.keys(parsed.capabilities).length === 0) return false;
+  const blockers = Array.isArray(parsed.blockers) ? parsed.blockers : [];
+  return !blockers.some((blocker) => blockingCapabilityStatusCodes.has(blocker));
+}
+
 function loadCachedModelStatuses(): Map<ProviderRegistryID, CachedModelStatus> {
   if (!fs.existsSync(localDbPath())) return new Map();
   try {
     const rows = getDb().prepare(`
       SELECT provider_registry_id, model_id, source, last_checked_at
+        , capabilities_json
       FROM llm_models
       WHERE provider_registry_id IS NOT NULL
       ORDER BY provider_registry_id, model_id
@@ -155,6 +182,7 @@ function loadCachedModelStatuses(): Map<ProviderRegistryID, CachedModelStatus> {
       model_id: string;
       source: string;
       last_checked_at: string | null;
+      capabilities_json: string;
     }>;
 
     const statuses = new Map<ProviderRegistryID, CachedModelStatus>();
@@ -164,8 +192,28 @@ function loadCachedModelStatuses(): Map<ProviderRegistryID, CachedModelStatus> {
         modelCount: 0,
         lastCheckedAt: row.last_checked_at,
         stale: isStale(row.last_checked_at),
+        capabilityStatus: {
+          capableModelCount: 0,
+          sources: [],
+          confidences: [],
+          blockers: [],
+        },
       };
       current.modelCount += 1;
+      try {
+        const parsed = JSON.parse(row.capabilities_json) as {
+          source?: string;
+          confidence?: string;
+          capabilities?: Record<string, unknown>;
+          blockers?: string[];
+        };
+        if (hasEligibleCapabilityMetadata(parsed)) {
+          current.capabilityStatus.capableModelCount += 1;
+        }
+        if (parsed.source) current.capabilityStatus.sources.push(parsed.source);
+        if (parsed.confidence) current.capabilityStatus.confidences.push(parsed.confidence);
+        if (Array.isArray(parsed.blockers)) current.capabilityStatus.blockers.push(...parsed.blockers);
+      } catch {}
       if (
         row.last_checked_at &&
         (!current.lastCheckedAt || Date.parse(row.last_checked_at) > Date.parse(current.lastCheckedAt))
@@ -174,6 +222,9 @@ function loadCachedModelStatuses(): Map<ProviderRegistryID, CachedModelStatus> {
         current.source = row.source;
         current.stale = isStale(row.last_checked_at);
       }
+      current.capabilityStatus.sources = [...new Set(current.capabilityStatus.sources)];
+      current.capabilityStatus.confidences = [...new Set(current.capabilityStatus.confidences)];
+      current.capabilityStatus.blockers = [...new Set(current.capabilityStatus.blockers)];
       statuses.set(row.provider_registry_id, current);
     }
     return statuses;
@@ -277,6 +328,12 @@ function rowStatus(
       lastCheckedAt: cachedModelStatus?.lastCheckedAt ?? null,
       stale: cachedModelStatus?.stale ?? true,
       blocker: cachedModelStatus ? null : refresh.message,
+      capabilityStatus: cachedModelStatus?.capabilityStatus ?? {
+        capableModelCount: 0,
+        sources: entry.fallbackModels.length > 0 ? ["fallback"] : [],
+        confidences: entry.fallbackModels.length > 0 ? ["fallback"] : [],
+        blockers: entry.fallbackModels.length > 0 ? ["fallback_only", "missing_metadata"] : ["missing_metadata"],
+      },
     },
     modelRefresh: refresh,
     setupUrl: entry.setupUrl,
@@ -359,6 +416,9 @@ async function statusCommand(flags: ProviderFlags): Promise<void> {
   console.log(`  Last checked: ${status.modelStatus.lastCheckedAt ?? "never"}`);
   console.log(`  Stale: ${status.modelStatus.stale ? "yes" : "no"}`);
   console.log(`  Blocker: ${status.modelStatus.blocker ?? "none"}`);
+  console.log(`  Capable models: ${status.modelStatus.capabilityStatus.capableModelCount} / ${status.modelStatus.modelCount}`);
+  console.log(`  Capability confidence: ${status.modelStatus.capabilityStatus.confidences.join(", ") || "unknown"}`);
+  console.log(`  Capability blockers: ${status.modelStatus.capabilityStatus.blockers.join(", ") || "none"}`);
   console.log(`  Configured: ${status.configured ? "yes" : "no"}`);
   if (status.configured) {
     console.log(`  Active model: ${status.activeModel}`);

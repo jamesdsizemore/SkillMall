@@ -160,6 +160,8 @@ The migration also enforces auth/secret pairing: `env_key` requires an env secre
 
 Caches model metadata by provider. Phase 4 model refresh follows each Provider Center row's declared `discoveryStrategy`. OpenAI-compatible rows may probe configured endpoints, implemented provider-specific rows use official provider adapters, cloud-project rows require project/resource context, local runtime rows require local runtime endpoints, source-backed static rows use documented/static labels, manual rows use manual labels, and planned-source-review rows are visible but not live-callable. Static provider defaults remain fallbacks only.
 
+Phase 6 populates `capabilities_json`, `context_window`, and `max_output_tokens` from normalized capability metadata when a source exposes those fields. `capabilities_json` includes source, source URL, fetched timestamp, confidence, capability flags, token limits, mode/endpoint family when known, and blocker codes. Unknown, reference-only, manual-only, fallback-only, stale, missing-price, or missing-metadata states are represented as blockers; they are not silently treated as eligible for automatic cost-aware routing.
+
 ```sql
 CREATE TABLE IF NOT EXISTS llm_models (
   id TEXT PRIMARY KEY,
@@ -179,6 +181,8 @@ CREATE TABLE IF NOT EXISTS llm_models (
   UNIQUE(provider_registry_id, model_id)
 );
 ```
+
+`raw_json` remains sanitized model metadata and must not contain raw API keys, auth headers, tokens, sessions, credential paths, prompts, or responses. Token-limit fields such as `inputTokenLimit`, `outputTokenLimit`, `max_input_tokens`, and `max_output_tokens` are metadata and may be preserved.
 
 ---
 

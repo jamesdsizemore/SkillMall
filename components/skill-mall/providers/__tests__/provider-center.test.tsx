@@ -1,7 +1,14 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ProviderCenter, type ProviderDraft, type ProviderRow, type ProvidersResponse, type UsageResponse } from "../ProviderCenter";
+import {
+  ProviderCenter,
+  buildPolicySimulationBody,
+  type ProviderDraft,
+  type ProviderRow,
+  type ProvidersResponse,
+  type UsageResponse,
+} from "../ProviderCenter";
 import { ProviderConfigPanel } from "../ProviderConfigPanel";
 import { UsageCostPanel } from "../UsageCostPanel";
 
@@ -47,6 +54,12 @@ function provider(overrides: Partial<ProviderRow>): ProviderRow {
       lastCheckedAt: null,
       blocker: "Refresh by probing the configured models endpoint.",
       models: ["model-a"],
+      capabilityStatus: {
+        capableModelCount: 0,
+        sources: ["fallback"],
+        confidences: ["fallback"],
+        blockers: ["fallback_only", "missing_metadata"],
+      },
       refresh: {
         strategy: "openai_compatible_models",
         canRefreshNow: true,
@@ -281,8 +294,36 @@ describe("Provider Center UI", () => {
     expect(html).toContain("budget_guarded_manual");
     expect(html).toContain("SAVE POLICY");
     expect(html).toContain("SIMULATE");
+    expect(html).toContain("OPERATION");
+    expect(html).toContain("REQUIRE PRICING");
     expect(html).not.toContain("quality_first");
     expect(html).not.toContain("semantic_router");
+  });
+
+  it("keeps operation and requirePricing as top-level simulation fields", () => {
+    const body = buildPolicySimulationBody({
+      id: "budget-openai",
+      name: "Budget OpenAI",
+      mode: "budget_guarded_manual",
+      rules: { candidates: [] },
+      budget: { remainingUsd: 1 },
+      estimatedCostUsd: 0.02,
+      operation: "chat.text",
+      requirePricing: true,
+    });
+
+    expect(body).toEqual({
+      policy: {
+        id: "budget-openai",
+        name: "Budget OpenAI",
+        mode: "budget_guarded_manual",
+        rules: { candidates: [] },
+        budget: { remainingUsd: 1 },
+      },
+      estimatedCostUsd: 0.02,
+      operation: "chat.text",
+      requirePricing: true,
+    });
   });
 
   it("uses the configured active model instead of the routing policy or fallback model", () => {

@@ -227,6 +227,8 @@ Evaluates a routing policy locally without sending a provider request.
     enabled?: boolean
   }
   estimatedCostUsd?: number
+  operation?: 'chat.text' | 'skill.generate' | 'skill.preview' | 'skill.optimize_prompt' | 'provider.test' | 'embedding'
+  requirePricing?: boolean
 }
 ```
 
@@ -255,11 +257,33 @@ Evaluates a routing policy locally without sending a provider request.
     status: 'selected' | 'skipped' | 'blocked'
     reason?: string
   }>
+  eligibility: Array<{
+    candidateId: string
+    providerRegistryId: string
+    executableProviderId: string
+    modelId: string
+    enabled: boolean
+    capabilityStatus: 'eligible' | 'blocked' | 'unknown'
+    pricingStatus: 'available' | 'missing' | 'stale' | 'not_required'
+    blockerCodes: string[]
+    explanation: string
+    evidence: {
+      capabilitySource?: string
+      capabilityConfidence?: string
+      capabilitySourceUrl?: string
+      capabilityFetchedAt?: string
+      pricingSource?: string
+      pricingSourceUrl?: string
+      pricingSnapshotAt?: string
+    }
+  }>
   estimatedCostUsd: number | null
 }
 ```
 
-Inline policy drafts are normalized for simulation but are not written to `llm_routing_policies`. Simulation accepts numeric estimates only; prompt, response, message, output, raw key, token, session, and credential-file fields are rejected.
+Inline policy drafts are normalized for simulation but are not written to `llm_routing_policies`. Simulation accepts numeric estimates and optional operation/price-check flags only; prompt, response, message, output, raw key, token, session, and credential-file fields are rejected.
+
+Capability and pricing eligibility is advisory for supported Phase 2 routing modes and blocking for automatic cost-aware routing. Unknown capability is not treated as eligible. Missing or stale pricing is not treated as free or cheapest. `cheapest_compatible` remains unsupported.
 
 ---
 
@@ -293,6 +317,8 @@ When discovery produces source-backed, manual, fallback, or live records, the ro
     source: string
     executionKind: string
     blocker: string | null
+    capabilityCount: number
+    capabilityBlockers: string[]
   }
   discovery: {
     strategy: string
@@ -311,6 +337,18 @@ When discovery produces source-backed, manual, fallback, or live records, the ro
     source: 'live' | 'source_backed_static' | 'manual' | 'fallback' | 'none'
     authoritative: boolean
     models: string[]
+    capabilities: Array<{
+      modelId: string
+      source: string
+      confidence: string
+      capabilities: Record<string, boolean>
+      limits: {
+        contextWindow?: number
+        maxInputTokens?: number
+        maxOutputTokens?: number
+      }
+      blockers: string[]
+    }>
     networkCalled: boolean
   }
   secretStatus: object | null
@@ -318,6 +356,8 @@ When discovery produces source-backed, manual, fallback, or live records, the ro
 ```
 
 Planned-source-review rows return `planned_source_review` without probing or writing snapshots. Provider-specific, account-scoped, cloud-project-scoped, local-runtime, static fallback, source-backed static, and manual rows return their status contract unless a current adapter/configuration supports live discovery.
+
+Capability metadata is stored with source confidence. Official APIs/docs are authoritative only for fields they explicitly expose. OpenRouter capability metadata applies to OpenRouter-routed models, not direct provider account availability. Portkey and LiteLLM metadata are reference data, not live account availability; reference-only metadata is reported with a blocker and does not by itself make a route candidate eligible.
 
 ---
 

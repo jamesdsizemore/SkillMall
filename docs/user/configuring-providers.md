@@ -107,6 +107,8 @@ Model refresh follows each provider row's declared `discoveryStrategy`. SkillMal
 
 Provider tests are safe readiness/status checks. They report configuration, secret-reference presence, local runtime/tool availability, or planned-source-review status without sending prompts or echoing secrets.
 
+Model refresh also records capability metadata when the current source exposes it. Provider Center and `npx skill-mall providers status` show capable model count, capability source confidence, and blockers such as missing metadata, fallback-only labels, manual-only labels, reference-only metadata, stale metadata, or missing price. Reference metadata from Portkey or LiteLLM is useful for local explanation and planning, but it is not shown as live account availability and does not by itself make a route candidate eligible.
+
 ```bash
 npx skill-mall providers list
 npx skill-mall providers status --provider openrouter
@@ -125,7 +127,9 @@ Supported policy modes:
 - `local_first`
 - `budget_guarded_manual`
 
-`budget_guarded_manual` can block a request from local numeric cost estimates before a provider client is created. Simulation is local-only: it evaluates the selected policy and budget metadata without sending a provider request and without storing prompts or responses.
+`budget_guarded_manual` can block a request from local numeric cost estimates before a provider client is created. Simulation is local-only: it evaluates the selected policy, budget metadata, capability metadata, and pricing availability without sending a provider request and without storing prompts or responses.
+
+Simulation reports selected and rejected candidates with capability and pricing blockers. Unknown capability is not compatible for automatic cost-aware routing. Missing or stale pricing is not free and is not eligible to rank as cheapest.
 
 CLI examples:
 
@@ -141,10 +145,10 @@ npx skill-mall policies upsert \
 
 ```bash
 npx skill-mall policies activate --id budget-openai
-npx skill-mall policies simulate --id budget-openai --estimated-cost-usd 0.02
+npx skill-mall policies simulate --id budget-openai --estimated-cost-usd 0.02 --operation chat.text --require-pricing
 ```
 
-Future modes such as `cheapest_compatible`, `quality_first`, semantic routing, learned routing, and complexity routing are not active. They require additional pricing, capability, or evaluation evidence before implementation.
+Future modes such as `cheapest_compatible`, `quality_first`, semantic routing, learned routing, and complexity routing are not active. `cheapest_compatible` remains blocked until capability matching, usable pricing coverage, deterministic missing-data blockers, deterministic tie-breaks, no-provider-call simulation, and Provider Center/API/CLI/docs parity are all approved in a later Judge gate.
 
 ## Optional Local Gateway
 

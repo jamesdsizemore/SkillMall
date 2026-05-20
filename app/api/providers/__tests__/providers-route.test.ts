@@ -144,12 +144,13 @@ describe('provider API routes', () => {
         provider_id,
         provider_registry_id,
         execution_kind,
-        model_id,
-        display_name,
-        source,
-        last_checked_at,
-        raw_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      model_id,
+      display_name,
+      capabilities_json,
+      source,
+      last_checked_at,
+      raw_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       'zai:glm-5.1:test',
       'zai',
@@ -157,6 +158,44 @@ describe('provider API routes', () => {
       'source_backed_static',
       'glm-5.1',
       'GLM 5.1',
+      JSON.stringify({
+        source: 'source_backed_static',
+        confidence: 'source_backed',
+        capabilities: { text_input: true, text_output: true },
+        limits: {},
+        blockers: [],
+      }),
+      'source_backed_static',
+      new Date().toISOString(),
+      '{}'
+    )
+    db.prepare(`
+      INSERT INTO llm_models (
+        id,
+        provider_id,
+        provider_registry_id,
+        execution_kind,
+        model_id,
+        display_name,
+        capabilities_json,
+        source,
+        last_checked_at,
+        raw_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'zai:glm-reference:test',
+      'zai',
+      'zai',
+      'source_backed_static',
+      'glm-reference',
+      'GLM Reference',
+      JSON.stringify({
+        source: 'litellm_reference',
+        confidence: 'reference',
+        capabilities: { text_input: true, text_output: true },
+        limits: {},
+        blockers: ['reference_only'],
+      }),
       'source_backed_static',
       new Date().toISOString(),
       '{}'
@@ -173,8 +212,12 @@ describe('provider API routes', () => {
         source: 'source_backed_static',
         authoritative: true,
         stale: false,
-        modelCount: 1,
-        models: ['glm-5.1'],
+        modelCount: 2,
+        models: ['glm-5.1', 'glm-reference'],
+        capabilityStatus: {
+          capableModelCount: 1,
+          blockers: ['reference_only'],
+        },
       },
     })
     expect(zai.modelStatus.lastCheckedAt).toBeTruthy()

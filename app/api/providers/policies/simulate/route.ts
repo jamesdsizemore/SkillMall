@@ -24,6 +24,8 @@ const SimulationBodySchema = z.object({
     })
     .optional(),
   estimatedCostUsd: z.number().finite().optional(),
+  operation: z.enum(['skill.generate', 'skill.preview', 'skill.optimize_prompt', 'provider.test', 'chat.text', 'embedding']).optional(),
+  requirePricing: z.boolean().optional(),
 }).strict()
 
 export async function POST(req: NextRequest) {
@@ -74,6 +76,8 @@ export async function POST(req: NextRequest) {
       baseConfig,
       policy,
       estimatedCostUsd: parsed.data.estimatedCostUsd,
+      operation: parsed.data.operation,
+      requirePricing: parsed.data.requirePricing,
     })
 
     return NextResponse.json(result)
