@@ -44,6 +44,15 @@ describe('router Phase 1 config helpers', () => {
     expect(() => sanitizeSecretRef(null)).toThrow('Secret ref must be an object')
   })
 
+  it('rejects path-like secret reference names', () => {
+    expect(() =>
+      sanitizeSecretRef({ type: 'env', name: '/Users/test/.codex/auth.json' })
+    ).toThrow('reference name')
+    expect(() =>
+      sanitizeSecretRef({ type: 'gateway_virtual_key_ref', name: '../claude/credentials.json' })
+    ).toThrow('reference name')
+  })
+
   it('sanitizes gateway virtual key refs without returning key values', () => {
     const ref = sanitizeSecretRef({
       type: 'gateway_virtual_key_ref',

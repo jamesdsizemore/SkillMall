@@ -331,7 +331,11 @@ Every environment variable SkillMall reads, what it does, whether it is required
 
 ### Variable notes
 
-**`SKILL_MALL_PROVIDER` valid values:** `openai`, `claude-code`, `gemini`, `groq`, `ollama`. The `claude-code` provider spawns `claude -p` subprocesses using the authenticated Claude Code CLI session — it does not require an API key but does require Claude Code to be installed and authenticated on the server.
+**`SKILL_MALL_PROVIDER` executable values:** `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`. This environment variable is intentionally narrower than the broad Provider Center registry. Registry-only rows such as OpenRouter, cloud-project providers, and custom OpenAI-compatible metadata rows are visible in Provider Center but do not become runnable direct providers until an executable adapter is implemented and tested.
+
+The `claude-code` provider spawns `claude -p` subprocesses using the authenticated Claude Code CLI local tool session. It does not require Anthropic API-key access, but it does require Claude Code to be installed and authenticated on the server. Claude account/Max auth is separate from Anthropic API access; ChatGPT Pro/Codex subscription auth is separate from OpenAI API access.
+
+Bifrost local is optional local gateway infrastructure for `bifrost_local` routing. It is not a required hosted gateway and is not the source of truth for Provider Center settings, model status, or usage/cost summaries.
 
 **`SKILL_MALL_EMBEDDING_PROVIDER`:** Can differ from `SKILL_MALL_PROVIDER`. A common pattern is `SKILL_MALL_PROVIDER=groq` (fast, cheap text generation) with `SKILL_MALL_EMBEDDING_PROVIDER=openai` (best embedding quality). The `claude-code` provider does not support embeddings — setting `SKILL_MALL_EMBEDDING_PROVIDER=claude-code` will cause RAG commands to fail with a descriptive error.
 
@@ -633,7 +637,7 @@ npx skill-mall create "Kubernetes pod scheduling" --urls https://kubernetes.io/d
 npx skill-mall validate
 ```
 
-The CLI resolves `SKILL_MALL_PROVIDER`, provider-specific API variables such as `OPENAI_API_KEY`, and all other variables from the process environment. On Railway, variables set in the dashboard are available automatically. On VPS, they come from `.env.local` or the shell environment.
+The CLI resolves `SKILL_MALL_PROVIDER`, provider-specific API variables such as `OPENAI_API_KEY`, and all other variables from the process environment. It stores only secret references in `~/.skill-mall/config.json`; API key values remain in the environment. On Railway, variables set in the dashboard are available automatically. On VPS, they come from `.env.local` or the shell environment.
 
 **Important:** The CLI writes files to the `skills/` directory on the server. For these changes to survive a Railway deploy, either:
 1. Commit the new skills to git and push — the next deploy picks them up from the repository

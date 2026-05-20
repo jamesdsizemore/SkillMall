@@ -66,20 +66,62 @@ The central insight is that the web wizard and the CLI are two UIs for the same 
 
 ## The Provider Abstraction
 
-SkillMall supports five LLM providers through a single interface. Every feature that calls an LLM goes through this abstraction — there is no provider-specific code outside `lib/providers/`.
+SkillMall separates the broad Provider Center catalog from executable LLM clients. The Provider Center uses `ProviderRegistryID` rows for API providers, local tools, local runtimes, cloud-project providers, gateway-compatible providers, and custom OpenAI-compatible endpoints. The executable router still uses a narrower `ProviderID` set for clients that are implemented and tested today.
+
+Current executable direct/router providers are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows such as OpenRouter, Hugging Face, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, Cerebras, and custom OpenAI-compatible endpoints can appear in Provider Center without becoming executable direct clients.
+
+Planned-source-review rows are visible but not live-callable until primary-source evidence and adapter support are added: Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
 
 ### The LLMClient Interface
 
 ```typescript
 // lib/providers/types.ts
 
-export type ProviderID = 'openai' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
+export type ProviderID =
+  | 'openai'
+  | 'anthropic'
+  | 'claude-code'
+  | 'gemini'
+  | 'groq'
+  | 'ollama'
+
+export type ProviderRegistryID =
+  | 'openai'
+  | 'anthropic'
+  | 'claude_code'
+  | 'gemini'
+  | 'groq'
+  | 'ollama'
+  | 'openrouter'
+  | 'alibaba_dashscope_qwen'
+  | 'huggingface'
+  | 'zai'
+  | 'minimax'
+  | 'kimi_moonshot'
+  | 'deepseek'
+  | 'mistral'
+  | 'cohere'
+  | 'xai'
+  | 'aws_bedrock'
+  | 'azure_openai'
+  | 'google_vertex_ai'
+  | 'together_ai'
+  | 'fireworks'
+  | 'replicate'
+  | 'nvidia_nim'
+  | 'perplexity'
+  | 'deepinfra'
+  | 'cerebras'
+  | 'custom_openai_compatible'
 
 export interface ProviderConfig {
   provider: ProviderID
-  apiKey?: string
   model: string
   baseURL?: string
+  authMode?: LLMAuthMode
+  secretRef?: SecretRef
+  gatewayBackend?: GatewayBackend
+  routingPolicyId?: string
 }
 
 export interface CompletionOptions {
@@ -100,12 +142,14 @@ Every provider implements `LLMClient`. The `provider` field is used in places th
 
 ### Resolution Order
 
-`resolveProviderConfig()` in `lib/providers/index.ts` resolves configuration in this order:
+`resolveProviderConfig()` and `resolveRouterProviderConfig()` resolve configuration in this order:
 
-1. Environment variables (`SKILL_MALL_PROVIDER`, `SKILL_MALL_MODEL`, plus provider-specific API keys such as `OPENAI_API_KEY`)
+1. Environment variables (`SKILL_MALL_PROVIDER`, `SKILL_MALL_MODEL`, plus provider-specific API variables such as `OPENAI_API_KEY`)
 2. `~/.skill-mall/config.json` (written by `npx skill-mall configure`)
 
 If neither source has a provider, it throws `ConfigError: "No LLM provider configured. Run: npx skill-mall configure"`.
+
+The config file stores secret references, not secret values. API access uses `env_key`; Claude Code uses `local_cli_session`; Ollama uses `none_local`; optional local Bifrost gateway routing uses `gateway_virtual_key` with a gateway virtual-key reference.
 
 ### Factory Function
 
@@ -113,6 +157,7 @@ If neither source has a provider, it throws `ConfigError: "No LLM provider confi
 export function createLLMClient(config: ProviderConfig): LLMClient {
   switch (config.provider) {
     case 'openai':    return new OpenAIClient(config)
+    case 'anthropic': return new AnthropicClient(config)
     case 'claude-code': return new ClaudeCodeClient(config)
     case 'gemini':    return new GeminiClient(config)
     case 'groq':      return new GroqClient(config)
@@ -125,27 +170,33 @@ export function createLLMClient(config: ProviderConfig): LLMClient {
 }
 ```
 
-The `_exhaustive: never` pattern ensures TypeScript will produce a compile error if a new `ProviderID` is added without a corresponding `case` in the factory.
+The `_exhaustive: never` pattern ensures TypeScript will produce a compile error if a new executable `ProviderID` is added without a corresponding `case` in the factory. Do not add broad registry-only rows to `ProviderID` unless an executable adapter is implemented and tested.
+
+### Provider Center Registry
+
+`lib/providers/registry.ts` owns the broad Provider Center rows. Each row declares access labels, auth labels, setup/source URLs, `discoveryStrategy`, status/classification, `liveCallable`, optional executable mapping, optional gateway profile, fallback model labels, and evidence notes.
+
+Model refresh uses the row's declared `discoveryStrategy`: OpenAI-compatible rows can probe configured endpoints, provider-specific rows require adapters, cloud rows require project/resource/region/deployment context, local rows require local runtime/tool status, manual rows use manual labels, static rows display fallback labels only, and planned-source-review rows do not make live calls. This prevents generic `/v1/models` drift.
 
 ### Claude Code: Subprocess, Not SDK
 
 `ClaudeCodeClient` does not use the Anthropic SDK (`@anthropic-ai/sdk`). It spawns `claude -p "<prompt>"` as a child process and reads stdout. This is because:
 
 - Claude Code CLI users are already authenticated — no API key to manage
-- The Anthropic SDK requires an API key that Claude Code users may not have
+- Anthropic API access uses a separate API key and billing path from Claude account or Max subscription auth
 - The CLI uses the same model versioning as the user's installed Claude Code
 
 This means `claude` must be in `$PATH` for the claude-code provider to work.
 
 ### Adding a New Provider
 
-1. Create `lib/providers/<name>.ts` implementing `LLMClient`
-2. Add the provider ID to `ProviderID` in `types.ts`
-3. Add a `case` in `createLLMClient()` in `index.ts`
-4. Add default model to `DEFAULT_MODELS` in `defaults.ts`
-5. Add setup instructions to `PROVIDER_CATALOG` in `defaults.ts`
+1. Add or update the `ProviderRegistryID` row in `lib/providers/registry.ts`.
+2. Choose the correct `discoveryStrategy` in `lib/providers/model-discovery.ts`; do not assume `/v1/models`.
+3. If the provider is executable, add the narrow `ProviderID`, client implementation, factory case, tests, and config-store support.
+4. If the provider is registry-only, keep it metadata/status-only until an adapter exists.
+5. Update Provider Center docs, API docs, and CLI examples with the secret-reference boundary.
 
-The entire addition is ~50 lines and one new file.
+Broad catalog support is not the same as executable direct-client support.
 
 ---
 

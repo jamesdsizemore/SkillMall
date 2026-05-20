@@ -270,6 +270,78 @@ describe('router provider config resolution', () => {
     ).rejects.toThrow('bifrost_local baseURL must point to localhost')
   })
 
+  it('clears stale gateway base URL when switching back to direct config', async () => {
+    vi.spyOn(fsPromises, 'readFile').mockResolvedValue(
+      JSON.stringify({
+        provider: 'openai',
+        model: 'openai/gpt-4o-mini',
+        providers: {
+          openai: {
+            model: 'openai/gpt-4o-mini',
+            authMode: 'gateway_virtual_key',
+            secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+            gatewayBackend: 'bifrost_local',
+            baseURL: 'http://localhost:8080/v1',
+          },
+        },
+      })
+    )
+    vi.spyOn(fsPromises, 'mkdir').mockResolvedValue(undefined)
+    const writeFile = vi.spyOn(fsPromises, 'writeFile').mockResolvedValue(undefined)
+
+    const result = await writeProviderConfig({
+      provider: 'openai',
+      model: 'gpt-5-mini',
+      authMode: 'env_key',
+      secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
+      gatewayBackend: 'direct',
+    })
+
+    expect(result).toMatchObject({
+      provider: 'openai',
+      model: 'gpt-5-mini',
+      authMode: 'env_key',
+      gatewayBackend: 'direct',
+      baseURL: undefined,
+    })
+    const written = String(writeFile.mock.calls[0]?.[1])
+    expect(written).toContain('"gatewayBackend": "direct"')
+    expect(written).not.toContain('http://localhost:8080/v1')
+    expect(written).not.toContain('"baseURL"')
+  })
+
+  it('preserves existing local gateway base URL when updating a bifrost config', async () => {
+    vi.spyOn(fsPromises, 'readFile').mockResolvedValue(
+      JSON.stringify({
+        provider: 'openai',
+        model: 'openai/gpt-4o-mini',
+        providers: {
+          openai: {
+            model: 'openai/gpt-4o-mini',
+            authMode: 'gateway_virtual_key',
+            secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+            gatewayBackend: 'bifrost_local',
+            baseURL: 'http://localhost:8080/v1',
+          },
+        },
+      })
+    )
+    vi.spyOn(fsPromises, 'mkdir').mockResolvedValue(undefined)
+    const writeFile = vi.spyOn(fsPromises, 'writeFile').mockResolvedValue(undefined)
+
+    const result = await writeProviderConfig({
+      provider: 'openai',
+      model: 'openai/gpt-5-mini',
+      authMode: 'gateway_virtual_key',
+      secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+      gatewayBackend: 'bifrost_local',
+    })
+
+    expect(result.baseURL).toBe('http://localhost:8080/v1')
+    const written = String(writeFile.mock.calls[0]?.[1])
+    expect(written).toContain('"baseURL": "http://localhost:8080/v1"')
+  })
+
   it('refuses to write raw API keys to config JSON', async () => {
     await expect(
       writeProviderConfig({

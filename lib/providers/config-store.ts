@@ -13,6 +13,11 @@ import {
   defaultSecretRefForProvider,
   type StoredRouterProviderConfig,
 } from '../llm/router/config'
+import {
+  assertAuthModeAllowedForProvider,
+  getProviderRegistryEntry,
+  providerRegistryIdForExecutableProvider,
+} from './registry'
 import type { GatewayBackend, LLMAuthMode, SecretRef } from '../llm/router/types'
 import { DEFAULT_MODELS } from './defaults'
 import type { ProviderID } from './types'
@@ -63,8 +68,13 @@ export async function writeProviderConfig(input: {
   const previousProviderConfig = providers[input.provider] ?? {}
   const model = input.model ?? previousProviderConfig.model ?? DEFAULT_MODELS[input.provider]
   const authMode = assertRouterAuthMode(input.authMode ?? defaultAuthModeForProvider(input.provider))
+  const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(input.provider))
+  if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
   const gatewayBackend = assertRouterGatewayBackend(input.gatewayBackend ?? previousProviderConfig.gatewayBackend)
-  if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(input.baseURL)
+  const baseURL =
+    input.baseURL ??
+    (gatewayBackend === 'bifrost_local' ? previousProviderConfig.baseURL : undefined)
+  if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(baseURL)
   const rawSecretRef =
     input.secretRef ??
     (input.keyEnv ? { type: 'env', name: input.keyEnv } : previousProviderConfig.secretRef) ??
@@ -83,8 +93,8 @@ export async function writeProviderConfig(input: {
     model,
     authMode,
     secretRef,
-    ...(input.baseURL ? { baseURL: input.baseURL } : {}),
     gatewayBackend,
+    ...(baseURL ? { baseURL } : { baseURL: undefined }),
     ...(input.routingPolicyId ? { routingPolicyId: input.routingPolicyId } : {}),
   }
 
@@ -102,7 +112,7 @@ export async function writeProviderConfig(input: {
     apiKey: undefined,
     model,
     gatewayBackend,
-    baseURL: input.baseURL,
+    baseURL,
     routingPolicyId: input.routingPolicyId,
     path: USER_CONFIG_PATH,
   }

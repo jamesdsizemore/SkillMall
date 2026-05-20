@@ -1,197 +1,150 @@
 # Provider Catalog
 
-SkillMall supports 6 direct LLM providers plus the Phase 2 `bifrost_local` gateway backend. All providers implement the same `LLMClient` interface (`lib/providers/types.ts`) and are called through the router wrapper.
+SkillMall now separates the broad Provider Center catalog from executable router
+clients.
 
-## Interface
+- `ProviderRegistryID` is the Provider Center row ID. It covers API providers,
+  local tools, local runtimes, cloud-project providers, and custom endpoints.
+- `ProviderID` remains the narrow executable client ID for current direct/router
+  clients: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`.
+- Registry inclusion does not imply direct router execution.
+- Planned-source-review rows are visible in the catalog but are not live-callable.
+
+The registry lives in `lib/providers/registry.ts`. Model discovery contracts live
+in `lib/providers/model-discovery.ts`.
+
+The broad catalog intentionally covers OpenAI, Anthropic, Claude Code, Gemini,
+Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax,
+Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI,
+Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity,
+DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.
+
+## Executable Client Contract
 
 ```typescript
 interface LLMClient {
   complete(prompt: string, options?: CompletionOptions): Promise<string>
   readonly provider: ProviderID
 }
-
-interface CompletionOptions {
-  maxTokens?: number
-  temperature?: number
-  responseFormat?: 'text' | 'json_object'
-  systemPrompt?: string
-  timeoutMs?: number
-  operation?: string
-  metadata?: Record<string, unknown>
-}
 ```
 
-## Router Auth Contract
+Current executable providers:
 
-The router stores secret references, not raw secrets. API access is separate from subscription, gateway, local runtime, or local tool-session auth:
+| ProviderID | Registry row | Auth mode |
+| --- | --- | --- |
+| `openai` | `openai` | `env_key` API access |
+| `anthropic` | `anthropic` | `env_key` API access |
+| `claude-code` | `claude_code` | `local_cli_session` |
+| `gemini` | `gemini` | `env_key` API access |
+| `groq` | `groq` | `env_key` API access |
+| `ollama` | `ollama` | `none_local` |
 
-- `env_key`: API access through an environment variable reference such as `OPENAI_API_KEY`. SkillMall stores the variable name only.
-- `local_cli_session`: local provider tooling owns credentials, such as Claude Code CLI auth. SkillMall does not copy Claude Code credential files.
-- `none_local`: local runtimes that require no credential, such as Ollama.
-- `gateway_virtual_key`: local gateway access through an environment variable reference such as `BIFROST_VIRTUAL_KEY`. SkillMall stores the variable name only.
+Do not add a broad Provider Center row to `ProviderID` unless an executable
+adapter is implemented and tested for that provider.
 
-Executable gateway backends:
+## Registry Row Contract
 
-- `direct`: direct provider client execution.
-- `bifrost_local`: local Bifrost gateway execution through SkillMall's router contract.
+Every provider row declares:
 
-GoModel, LiteLLM, Portkey, TensorZero, new-api, aiproxy, GPT-Load, external hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, and `file_ref` are not implemented runtime behavior in Phase 2.
+- `id`: broad `ProviderRegistryID`.
+- `accessLabel` and `authLabel`: user-facing access/auth labels.
+- `setupUrl`: provider setup or documentation URL.
+- `discoveryStrategy`: how model refresh behaves.
+- `status` and `classification`: Provider Center state.
+- `liveCallable`: whether SkillMall may attempt live discovery/test actions.
+- `executableProviderId`: optional current direct/router mapping.
+- `gatewayProfile`: optional OpenAI-compatible or local Bifrost execution hint.
 
-## Phase 2 Model Refresh Contract
+Discovery strategies:
 
-Phase 2 promotes model lists from static defaults to refreshable local metadata:
+| Strategy | Meaning |
+| --- | --- |
+| `openai_compatible_models` | Probe the configured OpenAI-compatible models endpoint and normalize `data[].id`. |
+| `official_provider_models` | Requires a provider-specific official models adapter. |
+| `account_scoped_models` | Requires account/provider context before discovery. |
+| `cloud_project_scoped_models` | Requires project, resource, region, or deployment context before discovery. |
+| `local_runtime_models` | Requires a configured local runtime endpoint. |
+| `manual_custom_models` | Uses manual model labels by default; endpoint probing is optional. |
+| `static_fallback_only` | Displays fallback labels only; not authoritative. |
+| `planned_provider_source_review` | Visible catalog row; live discovery/test disabled until primary-source evidence is recorded. |
 
-- Static provider defaults remain fallback labels only.
-- Refreshed models are stored in `llm_models` with `provider_id`, `model_id`, `source`, `last_checked_at`, and sanitized raw metadata.
-- Direct provider refresh uses official provider model-list endpoints where SkillMall already has API access.
-- `bifrost_local` refresh uses the local Bifrost OpenAI-compatible `/v1/models` endpoint through a gateway virtual-key reference.
-- Model refresh must not store provider API keys, gateway virtual keys, request headers, prompt bodies, or response bodies.
-- Missing live model refresh does not remove static fallback models; it leaves the fallback catalog available with `modelSource: "fallback"`.
+Static fallback models are display labels only. They are not authoritative live
+provider catalogs.
 
-## Providers
+Planned-source-review rows are visible so users can see intended coverage, but
+they must not become live-callable until official evidence and adapter support
+are added. This covers Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra
+until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM
+variants.
 
-### openai
+## Provider Rows
 
-- **Implementation:** `lib/providers/openai.ts`
-- **SDK:** `openai` npm package
-- **JSON mode:** supported via `response_format: { type: 'json_object' }`
-- **Default model:** `gpt-5.1`
-- **Available models:** `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1`
-- **Auth:** `env_key` API access using `OPENAI_API_KEY`
+| Registry ID | Status/classification | Discovery strategy | Executable mapping |
+| --- | --- | --- | --- |
+| `openai` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | `openai` |
+| `anthropic` | `active_configurable` / `active_configurable` | `official_provider_models` | `anthropic` |
+| `claude_code` | `status_only` / `local_tool_session` | `static_fallback_only` | `claude-code` |
+| `gemini` | `active_configurable` / `active_configurable` | `official_provider_models` | `gemini` |
+| `groq` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | `groq` |
+| `ollama` | `active_configurable` / `local_runtime` | `local_runtime_models` | `ollama` |
+| `openrouter` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `alibaba_dashscope_qwen` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `huggingface` | `active_configurable` / `active_configurable` | `official_provider_models` | none |
+| `zai` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `minimax` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `kimi_moonshot` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `deepseek` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `mistral` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `cohere` | `active_configurable` / `active_configurable` | `official_provider_models` | none |
+| `xai` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `aws_bedrock` | `active_configurable` / `cloud_project_required` | `cloud_project_scoped_models` | none |
+| `azure_openai` | `active_configurable` / `cloud_project_required` | `cloud_project_scoped_models` | none |
+| `google_vertex_ai` | `active_configurable` / `cloud_project_required` | `cloud_project_scoped_models` | none |
+| `together_ai` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `fireworks` | `active_configurable` / `active_configurable` | `account_scoped_models` | none |
+| `replicate` | `active_configurable` / `active_configurable` | `official_provider_models` | none |
+| `nvidia_nim` | `status_only` / `local_runtime` | `local_runtime_models` | none |
+| `perplexity` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `deepinfra` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `cerebras` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
+| `custom_openai_compatible` | `active_configurable` / `custom_openai_compatible` | `manual_custom_models` | none |
 
-### anthropic
+## Model Discovery Behavior
 
-- **Implementation:** `lib/providers/anthropic.ts`
-- **SDK:** direct HTTP call to `https://api.anthropic.com/v1/messages`
-- **JSON mode:** prompt-enforced
-- **Default model:** `claude-sonnet-4-20250514`
-- **Available models:** `claude-sonnet-4-20250514`, `claude-opus-4-1-20250805`
-- **Auth:** `env_key` API access using `ANTHROPIC_API_KEY`
+`discoverProviderModels()` is intentionally conservative:
 
-### claude-code
+- OpenAI-compatible rows call only the configured base URL's `/models` endpoint.
+- Official-provider rows return `provider_specific_required` until a dedicated
+  adapter is implemented.
+- Account-scoped, cloud-project-scoped, local-runtime, manual, static fallback,
+  and planned-source-review strategies do not make network calls by default.
+- Planned-source-review rows return `planned_source_review`, `liveCallable:
+  false`, and an evidence note.
 
-- **Implementation:** `lib/providers/claude-code.ts`
-- **SDK:** none — invokes `claude` CLI binary as a child process via `execFile`
-- **No Anthropic SDK. No HTTP calls to api.anthropic.com.**
-- **JSON mode:** not natively supported — system prompt instructs JSON-only output
-- **Default model:** `claude-sonnet-4-6`
-- **Available models:** `claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5-20251001`
-- **Auth:** `local_cli_session`; existing Claude Code CLI authentication owns credentials
-- **Implementation detail:** `claude --print --model <model> <prompt>` — system prompt is prepended to user prompt since no separate flag exists
+This prevents the Provider Center from pretending every provider or custom
+endpoint supports `/v1/models`.
 
-### gemini
+## Secret And Auth Boundary
 
-- **Implementation:** `lib/providers/gemini.ts`
-- **SDK:** `@google/generative-ai`
-- **JSON mode:** supported via `responseMimeType: 'application/json'`
-- **Default model:** `gemini-2.0-flash-exp`
-- **Available models:** `gemini-2.0-flash-exp`, `gemini-1.5-pro`
-- **Auth:** `env_key` API access using `GEMINI_API_KEY`
+SkillMall stores secret references, not raw secrets:
 
-### groq
+- API providers use env var references such as `OPENAI_API_KEY`.
+- Env var and gateway virtual-key reference names must be
+  environment-variable-style names, not filesystem paths or credential-file
+  locations.
+- Local tool/session rows rely on the official local tool authentication.
+- Local runtimes such as Ollama do not require a credential.
+- Gateway rows use local gateway virtual-key references.
+- Cloud rows require project/resource metadata plus safe secret references.
+- Claude Code is `local_tool_session`; Claude account/Max auth is not
+  Anthropic API-key access.
+- ChatGPT Pro/Codex subscription auth is not OpenAI API-key access.
 
-- **Implementation:** `lib/providers/groq.ts`
-- **SDK:** `openai` npm package with Groq's base URL (`https://api.groq.com/openai/v1`)
-- **JSON mode:** supported
-- **Default model:** `llama-3.3-70b-versatile`
-- **Available models:** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`
-- **Auth:** `env_key` API access using `GROQ_API_KEY`
+SkillMall must not ask users to paste raw ChatGPT browser/session tokens,
+Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, or
+provider credential-file contents.
 
-### ollama
-
-- **Implementation:** `lib/providers/ollama.ts`
-- **SDK:** `openai` npm package with Ollama's base URL (`http://localhost:11434/v1`)
-- **JSON mode:** supported (model-dependent)
-- **Default model:** `llama3.1`
-- **Available models:** any model pulled via `ollama pull`
-- **Auth:** `none_local`; none required
-
-## Config Resolution
-
-```
-process.env.SKILL_MALL_PROVIDER  (env var)
-  ↓ fallback
-~/.skill-mall/config.json         (CLI config file)
-  ↓ fallback
-ConfigError thrown
-```
-
-Config file format:
-```json
-{
-  "provider": "claude-code",
-  "model": "claude-sonnet-4-6",
-  "providers": {
-    "claude-code": {
-      "model": "claude-sonnet-4-6",
-      "authMode": "local_cli_session",
-      "secretRef": { "type": "none" },
-      "gatewayBackend": "direct"
-    }
-  }
-}
-```
-
-With per-provider sections:
-```json
-{
-  "provider": "openai",
-  "model": "openai/gpt-4o-mini",
-  "providers": {
-    "openai": {
-      "model": "openai/gpt-4o-mini",
-      "authMode": "gateway_virtual_key",
-      "secretRef": { "type": "gateway_virtual_key_ref", "name": "BIFROST_VIRTUAL_KEY" },
-      "gatewayBackend": "bifrost_local",
-      "baseURL": "http://localhost:8080/v1",
-      "routingPolicyId": "policy-1"
-    },
-    "claude-code": {
-      "model": "claude-sonnet-4-6",
-      "authMode": "local_cli_session",
-      "secretRef": { "type": "none" },
-      "gatewayBackend": "direct"
-    }
-  }
-}
-```
-
-Legacy `apiKey` fields in config JSON are ignored by the router config resolver. Configure API access with an environment variable reference instead.
-
-## Adding a New Provider
-
-Implement the `LLMClient` interface in `lib/providers/<name>.ts`:
-
-```typescript
-export class MyProviderClient implements LLMClient {
-  readonly provider = 'my-provider' as const  // extend ProviderID union
-
-  constructor(config: ProviderConfig) { /* ... */ }
-
-  async complete(prompt: string, options?: CompletionOptions): Promise<string> {
-    // Call your provider's API
-    // Return the text response as a string
-  }
-}
-```
-
-Then:
-1. Add the provider ID to the `ProviderID` union in `lib/providers/types.ts`
-2. Add a default model to `DEFAULT_MODELS` in `lib/providers/defaults.ts`
-3. Add a case to `createLLMClient` in `lib/providers/index.ts`
-4. Add setup instructions to `FALLBACK_PROVIDER_CATALOG` in `lib/providers/catalog.ts`
-5. Choose one implemented router auth mode: `env_key`, `local_cli_session`, `none_local`, or `gateway_virtual_key`
-
-The rest of the system (research engine, prompt engine, pipeline) works unchanged — all LLM calls go through the `LLMClient` interface.
-
-## JSON Mode Handling
-
-The pipeline uses `responseFormat: 'json_object'` for all structured extraction calls (research, framework selection, prompt optimization). Providers that don't natively support JSON mode (like `claude-code`) must handle this via the system prompt — the `ClaudeCodeClient` prepends the system prompt to the user prompt and relies on the prompt instructions to enforce JSON-only output.
-
-If your provider doesn't support JSON mode natively, prepend `"You must return only valid JSON with no markdown fences or explanation."` to the system prompt in your `complete` implementation when `options?.responseFormat === 'json_object'`.
-
-## Error Handling
-
-All providers should throw a native `Error` on failure. The pipeline's retry logic catches these and retries once on JSON/Zod validation failures. For network errors or auth failures, the pipeline surfaces the error to the caller without retry — fix the configuration and retry the whole pipeline call.
-
-Timeouts: the `ClaudeCodeClient` defaults to 120 seconds via `execFile`'s `timeout` option. API-based providers inherit the fetch timeout from the underlying SDK. If your provider consistently times out on large prompts, reduce `maxTokens` in the `CompletionOptions` defaults.
+Provider rows must also enforce auth-mode compatibility. A row that only
+declares `api_access` must not accept `local_cli_session`, a local runtime row
+must not accept API-key refs, and gateway virtual-key auth is valid only for rows
+that declare `gateway_virtual_key`.

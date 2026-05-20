@@ -2,7 +2,9 @@
 
 SkillMall Phase 2 uses SQLite via `better-sqlite3`. No cloud database. No Supabase. The database file lives at `data/skillmall.db` (gitignored) and is created automatically on first run.
 
-Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. Phase 2 expands those tables for local Bifrost gateway execution, model refresh, pricing snapshots, and routing-policy evaluation. These tables are local-only and do not introduce a hosted gateway, hosted observability service, or cloud database.
+Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. Phase 2 expands those tables for local Bifrost gateway execution, model refresh, pricing snapshots, and routing-policy evaluation. Phase 3 exposes those records through the Provider Center, model refresh/status actions, safe provider tests, and grouped usage/cost summaries. These tables are local-only and do not introduce a hosted gateway, hosted observability service, or cloud database.
+
+The database stores provider IDs, auth modes, secret references, model snapshots, pricing snapshots, request metadata, and routing/budget state. It must not store raw ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, raw API key values, or credential-file paths.
 
 ## Setup
 
@@ -154,7 +156,7 @@ The migration also enforces auth/secret pairing: `env_key` requires an env secre
 
 ### llm_models
 
-Caches model metadata by provider. Phase 2 refreshes configured direct providers where model-list APIs are available and refreshes `bifrost_local` through the local OpenAI-compatible `/v1/models` endpoint. Static provider defaults remain fallbacks only.
+Caches model metadata by provider. Phase 3 model refresh follows each Provider Center row's declared `discoveryStrategy`. OpenAI-compatible rows may probe configured endpoints, provider-specific rows require dedicated adapters, cloud-project rows require project/resource context, local runtime rows require local runtime status, manual rows use manual labels, and planned-source-review rows are visible but not live-callable. Static provider defaults remain fallbacks only.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_models (
@@ -229,6 +231,12 @@ CREATE TABLE IF NOT EXISTS llm_routing_policies (
 ### llm_requests
 
 Records local LLM request lifecycle rows. Prompt and response bodies are not stored by default.
+Provider/auth usage visibility reads this ledger through `lib/llm/router/usage-summary.ts`.
+The helper and `/api/providers/usage` summarize request counts, success/failure counts, per-provider
+usage, per-model usage, per-operation usage, auth modes, route backends, routing-policy usage, token
+counts, latency, and cost. `actual_cost_usd` and `estimated_cost_usd` remain separate fields with
+separate API labels: `provider_or_gateway_reported_actual_cost` and `locally_estimated_cost`.
+Estimated cost is a local estimate and must not be presented as exact spend.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_requests (
@@ -273,6 +281,23 @@ CREATE TABLE IF NOT EXISTS llm_request_events (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
+
+---
+
+### Provider usage summary API
+
+`GET /api/providers/usage` is backed by `lib/llm/router/usage-summary.ts` and returns:
+
+- `summary`: total request, success, failure, started, token, latency, actual-cost, and estimated-cost metrics.
+- `byProvider`: the same metrics grouped by `provider_id`.
+- `byModel`: the same metrics grouped by `provider_id` and `model_id` when the ledger has model IDs.
+- `byOperation`: the same metrics grouped by operation.
+- `byAuthMode` and `byRouteBackend`: the same metrics grouped by `auth_mode` and `route_backend`.
+- `byRoutingPolicy`: the same metrics grouped by `routing_policy_id`.
+- `budgetPolicies`: routing-policy budget status derived from `llm_routing_policies.budget_json` when numeric budget fields are present.
+- `costLabels`: labels that preserve the distinction between exact provider/gateway-reported actual cost and local estimated cost.
+
+Budget visibility currently recognizes numeric `remainingUsd` or `remaining_usd` as a remaining-budget signal, and numeric `limitUsd`, `limit_usd`, `monthlyLimitUsd`, `monthly_limit_usd`, `monthlyBudgetUsd`, or `monthly_budget_usd` as budget-limit signals. If a budget object exists but those numeric fields are unavailable, the API reports the policy budget status as `unknown` instead of inventing a spend interpretation.
 
 ---
 

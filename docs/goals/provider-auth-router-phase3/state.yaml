@@ -1,0 +1,713 @@
+version: 2
+active_task: null
+
+goal:
+  title: "Provider/Auth Router Phase 3"
+  slug: provider-auth-router-phase3
+  status: done
+  created_at: "2026-05-20"
+  goal_file: docs/goals/provider-auth-router-phase3/goal.md
+  plan_file: docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+  intake:
+    input_shape: existing_plan
+    authority: needs_approval
+    proof_type: test_review_artifact_source_backed_decision
+    original_request: "Let's go"
+    interpreted_outcome: "Prepare Phase 3 plan and GoalBuddy board for Provider Center, broad provider catalog, model refresh/status/test actions, and usage/cost visibility on top of the Phase 1/2 router."
+    existing_plan_facts:
+      - "PR #8 contains Provider/Auth Router Phases 1 and 2 and is open against main."
+      - "Phase 2 commit is ff37711."
+      - "Phase 3 must not be implemented on the Phase 1/2 PR branch."
+      - "Origin main does not necessarily contain the Phase 1/2 router files until PR #8 is merged."
+      - "No hosted gateway/router/proxy/observability service may be required."
+      - "No extra paid gateway app may be required."
+      - "SkillMall remains the provider/settings/model/cost source of truth."
+      - "Broad provider support and per-provider model refresh are core product requirements."
+      - "Usage/cost visibility is core product behavior."
+      - "Development workflow must include git containment, testing, lint/typecheck, review, review fixes, docs, blocker documentation, final verification, and no partial handoff."
+  oracle:
+    signal: "GoalBuddy receipts plus final verification prove working Provider Center, broad provider catalog, sanitized configuration flows, model refresh/status/test flows, usage/cost visibility, docs, review fixes, and diff/secret containment."
+    final_proof: "T911 receipt reports final verification results, completed work, incomplete work if any, blocker evidence if any, and next safe action; no stage/commit/push occurs unless the user explicitly approves commit-prep."
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+tasks:
+  - id: T901
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Branch, PR #8, and scope gate. Confirm implementation may start only from a source tree that includes the Phase 1/2 router contract."
+    allowed_files:
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "git status -sb"
+        expect: "clean or only approved Phase 3 planning files before implementation"
+      - cmd: "git branch --show-current"
+        expect: "implementation branch recorded"
+      - cmd: "gh pr view 8 --json state,mergeStateStatus,headRefOid,url"
+        expect: "PR #8 state recorded"
+      - cmd: "git merge-base --is-ancestor ff37711 HEAD"
+        expect: "true if stacked on Phase 2; otherwise PR #8 must be merged into main"
+      - cmd: "git diff --cached --name-only"
+        expect: "empty unless user explicitly approved staging"
+    stop_if:
+      - "PR #8 is unavailable and current branch does not contain the Phase 2 router contract."
+      - "Implementation would start from origin/main without Phase 1/2 router files."
+      - "Staged files exist without explicit user approval."
+      - "User has not approved implementation."
+    receipt:
+      result: done
+      decision: phase2_source_available
+      full_outcome_complete: false
+      summary: "Phase 3 source gate passed after merging PR #8. PR #8 is merged into main at merge commit 3bb440b, the implementation branch is codex/provider-auth-router-phase3 based on updated origin/main, Phase 2 commit ff37711 is an ancestor of HEAD, and Phase 2 router files are present. Implementation may proceed to T902 scouting."
+      evidence:
+        - "gh pr merge 8 --merge => success; PR #8 state MERGED."
+        - "gh pr view 8 --json state,mergedAt,mergeCommit,url,title => MERGED at 2026-05-20T05:23:19Z, merge commit 3bb440b819481d0be36493527509b9fcc66fb7dc."
+        - "git switch -c codex/provider-auth-router-phase3 origin/main => new implementation branch based on updated main."
+        - "git merge-base --is-ancestor ff37711 HEAD => exit 0."
+        - "test -f lib/llm/router/gateway-adapter.ts => exit 0."
+        - "test -f db/migrations/007_llm_router_phase2.sql => exit 0."
+        - "git diff --cached --name-only => empty."
+      changed_files:
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      next_safe_actions:
+        - "Activate T902 for source and official provider-doc scouting."
+
+  - id: T902
+    type: scout
+    assignee: Scout
+    status: done
+    objective: "Read current source and refresh official provider/model-discovery docs before any coding."
+    inputs:
+      - AGENTS.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+      - docs/goals/provider-auth-router-phase3/goal.md
+      - docs/goals/provider-auth-router-phase3/state.yaml
+      - PR_8_PHASE_1_2_ARTIFACTS
+      - lib/providers
+      - lib/llm/router
+      - app/api/providers
+      - app/settings/providers
+      - cli/src
+    expected_output:
+      - "Current source map."
+      - "Provider evidence matrix with official source URL, auth/access mode, model discovery strategy, pricing availability, gateway compatibility, and implementation risk."
+      - "Hard blocker list."
+      - "Provider rows that must be active, gateway-only, local-runtime, cloud-project-required, or planned-source-review."
+    verify:
+      - cmd: "rg -n \"ProviderID|ProviderConfig|model-refresh|pricing|llm_requests|providers/configure|settings/providers\" lib app cli docs db"
+        expect: "current call sites and contracts identified"
+      - cmd: "git status --short"
+        expect: "dirty tree recorded without cleanup"
+    stop_if:
+      - "Any provider row would be implemented from stale or unofficial evidence only."
+      - "Official docs contradict planned auth/session support."
+      - "Source checkout lacks PR #8 Phase 1/2 router files."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T902 source and official-provider scouting completed. Current checkout contains the Phase 1/2 router contract from PR #8, but Phase 3 must correct several narrow-provider and raw-key UI gaps before it can satisfy the broad Provider Center goal. Official docs support a registry split by access/discovery shape, not a single generic /v1/models assumption."
+      source_map:
+        - "lib/providers/types.ts, defaults.ts, catalog.ts, config-store.ts, index.ts: current provider layer is narrow and still centers six provider IDs."
+        - "lib/llm/router/types.ts, config.ts, secret-refs.ts, gateway-adapter.ts, gateway-client.ts, model-refresh.ts, pricing-refresh.ts, costing.ts, request-ledger.ts, routing-policy.ts, create-client.ts: PR #8 router/auth/gateway/ledger foundation is present."
+        - "app/api/providers/route.ts and app/api/providers/configure/route.ts: sanitized provider GET/configure routes exist, but only for the narrow provider set."
+        - "app/settings/providers/page.tsx: current settings UI still holds apiKey state and attempts to POST apiKey, contradicting the sanitized configure route."
+        - "cli/src/commands/configure.ts and cli/src/index.ts: CLI supports configure only and duplicates provider/default logic."
+      provider_evidence_matrix_summary:
+        - "Low-risk official model discovery: OpenAI, Groq, OpenRouter, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Together AI, Cerebras."
+        - "Native/provider-specific discovery required: Anthropic, Gemini, Cohere, Hugging Face, Fireworks, AWS Bedrock, Azure OpenAI, Google Vertex AI, Replicate."
+        - "Local runtime/session rows: Claude Code and Ollama must be labeled local-tool/local-runtime access; no raw session-token ingestion."
+        - "Source-review-before-active rows or constrained adapters required: Alibaba/DashScope/Qwen, Z.AI, Perplexity, custom OpenAI-compatible endpoints, NVIDIA NIM depending deployment."
+        - "Pricing refresh is not uniform: some catalogs expose prices, many require separate docs or estimated/user-supplied cost rows."
+      blockers_or_drift_risks:
+        - "ProviderID, DEFAULT_MODELS, fallback catalog, configure route enum, and CLI defaults only cover six providers."
+        - "Provider Center routes for model refresh, test, and usage do not exist yet."
+        - "Provider Center components do not exist yet."
+        - "Usage/cost ledger exists, but no provider API/UI summary exposes it."
+        - "A generic OpenAI-compatible implementation would drift for Bedrock, Azure OpenAI, Vertex AI, Replicate, Cohere, Anthropic, and Claude Code."
+      contradictions:
+        - "The plan must not imply every provider has a refreshable /v1/models endpoint; model refresh must mean official discovery where available and status/manual/planned-source-review where not."
+        - "Current UI's raw apiKey POST conflicts with the Phase 1/2 sanitized API/config-store contract."
+        - "Current CLI lacks provider list/status/test/refresh parity."
+      ambiguity_for_t903:
+        - "Decide whether to widen ProviderID globally or introduce a broad registry ID while keeping executable direct clients narrow."
+        - "Decide exact classifications for Alibaba/DashScope, Z.AI, Perplexity, Claude Code, and Replicate before Worker implementation."
+        - "Decide GET response secret-status shape so UI shows useful configuration status without exposing raw secret values."
+        - "Decide whether CLI must use shared provider/config contracts instead of duplicated local defaults."
+      evidence:
+        - "Source Scout 019e43d7-bdf7-7031-b7c4-de501ac632fc completed T902 with current source map and drift risks."
+        - "Provider-doc Scout 019e43d7-d4ea-7122-a8cf-737a7b2e24bb completed T902 with official provider docs and model discovery matrix."
+        - "git status --short recorded only Phase 3 planning/board files as untracked."
+        - "rg -n \"ProviderID|ProviderConfig|model-refresh|pricing|llm_requests|providers/configure|settings/providers\" lib app cli docs db was used to map call sites."
+      changed_files:
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      next_safe_actions:
+        - "Activate T903 Judge to approve the registry/UI/API/CLI contract and patch the plan where the scouting evidence found semantic drift."
+
+  - id: T903
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Approve the Phase 3 registry/UI/API contract and prevent semantic drift before implementation."
+    inputs:
+      - T902
+      - docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+    allowed_files:
+      - docs/goals/provider-auth-router-phase3/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+    verify:
+      - cmd: "rg -n \"Provider Center|broad provider|model refresh|actual|estimated|hosted gateway|raw\" docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md docs/goals/provider-auth-router-phase3/state.yaml"
+        expect: "contract and drift guards present"
+    stop_if:
+      - "Plan collapses back to the narrow provider set."
+      - "Plan requires hosted gateway infrastructure."
+      - "Plan requires bespoke SDK clients for every provider in one phase."
+      - "Plan allows raw browser/session token paste fields."
+    receipt:
+      result: done
+      decision: approved_after_plan_patch
+      full_outcome_complete: false
+      summary: "T903 Judge initially rejected implementation because the plan still implied broad refreshability without exact provider classifications. The plan was patched with the approved ProviderRegistryID/executable ProviderID split, row classifications, discoveryStrategy semantics, API secret-status contract, configure rejection rules, CLI shared-contract requirement, and added stop conditions. T904 may now begin."
+      approved_contract:
+        provider_identity: "Introduce a broad ProviderRegistryID or ProviderCatalogID for Provider Center rows while keeping executable ProviderID narrow for currently implemented direct/router clients. Registry inclusion does not imply a direct router client."
+        model_refresh: "Every row declares discoveryStrategy: openai_compatible_models, official_provider_models, account_scoped_models, cloud_project_scoped_models, local_runtime_models, manual_custom_models, static_fallback_only, or planned_provider_source_review. Refresh only calls supported/configured strategies."
+        api_secret_status: "GET exposes configured status, access mode, secret ref type/name, presence/test/stale/model status, and missing project fields; never raw secrets, credential paths, browser/session tokens, or copied credentials."
+        configure_contract: "Configure accepts env_key, gateway_virtual_key_ref, local_cli_session, none_local, cloud/project fields, local endpoint/baseUrl, and custom OpenAI-compatible baseUrl; rejects apiKey/rawKey/token/sessionToken/credentialPath-style fields."
+        cli_contract: "CLI must use shared provider registry, discovery, config-store, and secret-ref contracts; no duplicated provider defaults or separate provider enum."
+      row_classification:
+        active_configurable:
+          - openai
+          - anthropic
+          - gemini
+          - groq
+          - openrouter
+          - huggingface
+          - minimax
+          - kimi_moonshot
+          - deepseek
+          - mistral
+          - cohere
+          - xai
+          - together_ai
+          - fireworks
+          - replicate
+          - cerebras
+        gateway_configurable_openai_compatible:
+          - openai
+          - groq
+          - openrouter
+          - minimax
+          - kimi_moonshot
+          - deepseek
+          - mistral
+          - xai
+          - together_ai
+          - fireworks_when_endpoint_verified
+          - cerebras
+          - deepinfra_only_after_primary_source_verification
+        local_runtime_local_tool_session:
+          claude_code: "local_tool_session only; no raw Claude.ai or Claude Code credential ingestion"
+          ollama: "local_runtime"
+          nvidia_nim: "local_runtime/openai_compatible_deployment when user supplies local/container endpoint; managed/remote variants require source review"
+        cloud_project_required:
+          - aws_bedrock
+          - azure_openai
+          - google_vertex_ai
+        custom_openai_compatible:
+          - "custom_openai_compatible endpoint with baseUrl plus env/gateway secret ref; /v1/models is optional and must be probed, not assumed"
+        planned_provider_source_review:
+          - alibaba_dashscope_qwen
+          - zai
+          - perplexity
+          - deepinfra_until_primary_source_is_recorded
+          - nvidia_nim_managed_or_ambiguous_variants
+      plan_edits_applied:
+        - "Patched Non-Negotiables to make model refresh per declared discoveryStrategy."
+        - "Added Approved Phase 3 Contract section to docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md."
+        - "Added row classification table and planned-source-review handling."
+        - "Added API secret-status/configure contract and CLI shared-contract requirement."
+        - "Added extra stop conditions for ProviderID widening, stale evidence, generic /v1/models assumptions, raw secret ingestion, duplicate CLI catalog, and hosted gateway drift."
+      evidence:
+        - "Goal Judge 019e43dc-ef81-7020-89a4-6db1167c5ecb completed T903 and named required plan edits before implementation."
+        - "docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md now contains ProviderRegistryID, discoveryStrategy, planned_provider_source_review, env var name, raw secret, shared provider registry, and /v1/models drift guards."
+      changed_files:
+        - docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      next_safe_actions:
+        - "Activate T904 Worker for broad provider registry and model-discovery contracts."
+
+  - id: T904
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Implement broad provider registry and model-discovery contracts."
+    allowed_files:
+      - lib/providers/registry.ts
+      - lib/providers/model-discovery.ts
+      - lib/providers/types.ts
+      - lib/providers/__tests__/registry.test.ts
+      - lib/providers/__tests__/model-discovery.test.ts
+      - docs/reference/provider-catalog.md
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "npm test -- lib/providers/__tests__/registry.test.ts lib/providers/__tests__/model-discovery.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved receipts"
+    stop_if:
+      - "Provider registry omits Alicloud/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, or DeepSeek."
+      - "Static default models are treated as authoritative provider catalog."
+      - "Provider rows lack model-discovery strategies."
+      - "Executable ProviderID is widened globally to cover registry-only rows."
+      - "Any provider row is implemented from stale/unofficial evidence instead of planned_provider_source_review."
+      - "Model refresh assumes every provider or custom endpoint supports /v1/models."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T904 implemented the broad Provider Center registry and conservative model-discovery contracts while keeping executable ProviderID narrow for the existing direct/router clients."
+      implementation:
+        - "Added ProviderRegistryID, ProviderDiscoveryStrategy, ProviderRegistryEntry, access-mode/status/classification, and gateway-profile types in lib/providers/types.ts without widening ProviderID."
+        - "Created lib/providers/registry.ts with required provider coverage, including Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, and DeepSeek."
+        - "Marked planned-source-review rows visible but not live-callable: alibaba_dashscope_qwen, zai, perplexity, and deepinfra."
+        - "Created lib/providers/model-discovery.ts with OpenAI-compatible data[].id normalization and non-network status handling for official-provider, account-scoped, cloud-project-scoped, local-runtime, manual, static-fallback, and planned-source-review strategies."
+        - "Updated docs/reference/provider-catalog.md to document the ProviderRegistryID/ProviderID split, required row fields, provider rows, model-discovery behavior, and secret/auth boundary."
+      evidence:
+        - "npm test -- lib/providers/__tests__/registry.test.ts lib/providers/__tests__/model-discovery.test.ts => exit 0; 2 test files passed, 7 tests passed."
+        - "registry.test.ts verifies required provider IDs, required metadata fields, ProviderRegistryID versus ProviderID split, executable ID containment, and planned-source-review visibility/non-callability."
+        - "model-discovery.test.ts verifies OpenAI-compatible data[].id normalization and confirms unsupported strategies return status contracts without network calls."
+        - "git diff --name-only => docs/reference/provider-catalog.md, lib/providers/types.ts."
+        - "git ls-files --others --exclude-standard includes the new allowed T904 files plus existing Phase 3 goal/plan artifacts."
+      changed_files:
+        - lib/providers/registry.ts
+        - lib/providers/model-discovery.ts
+        - lib/providers/types.ts
+        - lib/providers/__tests__/registry.test.ts
+        - lib/providers/__tests__/model-discovery.test.ts
+        - docs/reference/provider-catalog.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      blockers: []
+      next_safe_actions:
+        - "Activate T905 to expand provider API routes against the shared registry/discovery contracts."
+
+  - id: T905
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Expand provider API routes for sanitized catalog, configuration, model refresh, test, and usage flows."
+    allowed_files:
+      - app/api/providers/route.ts
+      - app/api/providers/configure/route.ts
+      - app/api/providers/models/refresh/route.ts
+      - app/api/providers/test/route.ts
+      - app/api/providers/usage/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - docs/reference/api-routes.md
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "npm test -- app/api/providers/__tests__/providers-route.test.ts"
+        expect: "exit 0"
+    stop_if:
+      - "Routes accept raw apiKey/browser-token/session-token/credential-file bodies."
+      - "Routes return raw secret values."
+      - "Routes present estimated cost as exact cost."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T905 expanded Provider Center API routes for broad sanitized catalog/status output, executable-only persisted configuration, metadata-only registry/custom configuration responses, model refresh/status, safe provider test, and usage/cost summaries."
+      implementation:
+        - "GET /api/providers now returns broad ProviderRegistryID rows from lib/providers/registry.ts with sanitized configStatus, secretStatus, modelStatus, gateway profile, and costStatus fields."
+        - "POST /api/providers/configure now rejects raw apiKey/rawKey/token/sessionToken/browser-token/credential-file fields before validation or writes."
+        - "Configure route persists only existing executable ProviderID rows through writeProviderConfig and returns metadata-only responses for registry-only/custom OpenAI-compatible rows without widening ProviderID."
+        - "Added POST /api/providers/models/refresh with live OpenAI-compatible discovery only when supported/configured and status-only responses for planned-source-review, manual, static fallback, provider-adapter, account, cloud, and local-runtime rows."
+        - "Added POST /api/providers/test with safe readiness/status checks that do not echo prompt/response bodies or call live providers."
+        - "Added GET /api/providers/usage with ledger-backed request/token/cost summaries, distinct actual_cost_usd and estimated_cost_usd labels, and graceful unavailable-ledger fallback."
+        - "Updated docs/reference/api-routes.md for the expanded provider routes and secret-boundary behavior."
+      evidence:
+        - "npm test -- app/api/providers/__tests__/providers-route.test.ts => exit 0; 1 test file passed, 17 tests passed."
+        - "providers-route.test.ts covers broad registry catalog/status output, raw apiKey/rawKey/browser-token/session-token/credential-file rejection, env_key, gateway_virtual_key_ref, local_cli_session, none_local, custom OpenAI-compatible metadata config, model refresh live/status-only/manual/planned behavior, safe provider test redaction, and actual-vs-estimated usage labels."
+        - "git diff --cached --name-only => empty; no staging occurred."
+        - "git diff --name-only shows T905 modified files plus pre-existing T904 files; new T905 route files are untracked and inside the allowed file list."
+      changed_files:
+        - app/api/providers/route.ts
+        - app/api/providers/configure/route.ts
+        - app/api/providers/models/refresh/route.ts
+        - app/api/providers/test/route.ts
+        - app/api/providers/usage/route.ts
+        - app/api/providers/__tests__/providers-route.test.ts
+        - docs/reference/api-routes.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      blockers: []
+      next_safe_actions:
+        - "Activate T906 to build the Provider Center UI against the new sanitized API route contracts."
+
+  - id: T906
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Build Provider Center UI as the app-facing configuration and status surface."
+    allowed_files:
+      - app/settings/providers/page.tsx
+      - components/skill-mall/providers/ProviderCenter.tsx
+      - components/skill-mall/providers/ProviderCatalogList.tsx
+      - components/skill-mall/providers/ProviderConfigPanel.tsx
+      - components/skill-mall/providers/ModelRefreshPanel.tsx
+      - components/skill-mall/providers/UsageCostPanel.tsx
+      - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "npm test -- components/skill-mall/providers/__tests__/provider-center.test.tsx app/api/providers/__tests__/providers-route.test.ts"
+        expect: "exit 0"
+      - cmd: "npm run dev"
+        expect: "manual/browser verification possible for /settings/providers"
+    stop_if:
+      - "UI is a marketing/landing page instead of the actual Provider Center."
+      - "UI conflates API keys, local sessions, local runtime, and gateway access."
+      - "UI asks for raw ChatGPT/Claude browser/session tokens or credential file contents."
+      - "UI hides model refresh/test/status/cost behavior."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T906 replaced the raw-key provider settings page with a compact Provider Center UI that uses the T905 sanitized API routes for provider catalog/status, secret-reference configuration, model refresh, provider status tests, and usage/cost visibility."
+      implementation:
+        - "app/settings/providers/page.tsx now renders ProviderCenter instead of holding apiKey state or raw secret fields."
+        - "ProviderCenter loads GET /api/providers and GET /api/providers/usage, maintains selected provider/config draft state, and calls POST /api/providers/configure, POST /api/providers/models/refresh, and POST /api/providers/test for actions."
+        - "ProviderCatalogList groups rows into API providers, local tools/sessions, local runtimes, gateway/OpenAI-compatible/custom, cloud/project providers, and planned/source-review rows."
+        - "ProviderConfigPanel exposes env-var reference, gateway virtual-key reference, local endpoint/base URL, model/manual model labels, and routing policy controls without password/raw-secret inputs."
+        - "ModelRefreshPanel shows refresh strategy, active model/status, model labels, secret-reference status, and refresh/test actions."
+        - "UsageCostPanel renders actual_cost_usd and estimated_cost_usd labels distinctly with ledger summary values."
+      evidence:
+        - "npm test -- components/skill-mall/providers/__tests__/provider-center.test.tsx app/api/providers/__tests__/providers-route.test.ts initially exposed that repo Vitest config did not include components/**/*.test.tsx."
+        - "vitest.config.ts was updated to include components/**/*.test.tsx; rerun command => exit 0; 2 test files passed, 21 tests passed."
+        - "npx vitest run --config <temporary config including components/**/*.test.tsx> components/skill-mall/providers/__tests__/provider-center.test.tsx => exit 0; 1 test file passed, 4 tests passed."
+        - "provider-center.test.tsx verifies broad Provider Center groups/access labels, absence of raw apiKey/sk/password/browser-token/session-token/credential-path UI, distinct actual/estimated cost labels, and reference/manual/endpoint config fields."
+        - "rg -n raw-secret UI terms against app/settings/providers/page.tsx and components/skill-mall/providers excluding tests => no matches."
+        - "npx tsc --noEmit --pretty false --incremental false | rg components/skill-mall/providers|app/settings/providers => no T906 component/page type errors."
+        - "Post-worker verification found PR-owned nullable activeConfig errors in app/api/providers/models/refresh/route.ts and app/api/providers/test/route.ts; fixed them and reran npx tsc --noEmit --pretty false => exit 0."
+      changed_files:
+        - app/settings/providers/page.tsx
+        - components/skill-mall/providers/ProviderCenter.tsx
+        - components/skill-mall/providers/ProviderCatalogList.tsx
+        - components/skill-mall/providers/ProviderConfigPanel.tsx
+        - components/skill-mall/providers/ModelRefreshPanel.tsx
+        - components/skill-mall/providers/UsageCostPanel.tsx
+        - components/skill-mall/providers/__tests__/provider-center.test.tsx
+        - app/api/providers/models/refresh/route.ts
+        - app/api/providers/test/route.ts
+        - vitest.config.ts
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      blockers: []
+      next_safe_actions:
+        - "Activate T907 for CLI parity, with no stage/commit/push from the T906 worker."
+
+  - id: T907
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Add CLI parity for provider list, status, configure, model refresh, and test flows."
+    allowed_files:
+      - cli/src/commands/configure.ts
+      - cli/src/commands/providers.ts
+      - cli/src/index.ts
+      - docs/developer/cli-reference.md
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "npm test -- lib/providers"
+        expect: "exit 0"
+      - cmd: "npx tsc --noEmit --pretty false"
+        expect: "exit 0"
+    stop_if:
+      - "CLI writes raw provider secrets into config JSON."
+      - "CLI lacks parity for Provider Center status/test/refresh concepts."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T907 added CLI Provider Center parity for list, status, refresh-models, test, and configure compatibility while moving configure off duplicated CLI provider/default catalogs and onto shared registry/config/secret-ref contracts."
+      implementation:
+        - "Refactored cli/src/commands/configure.ts to use lib/providers/registry.ts, lib/providers/model-discovery.ts, lib/providers/config-store.ts, lib/llm/router/config.ts, and lib/llm/router/secret-refs.ts."
+        - "Removed duplicated CLI DEFAULT_MODELS, provider env map, and provider enum logic; interactive configure now derives executable providers and fallback labels from the shared registry."
+        - "Added cli/src/commands/providers.ts with providers list, status, refresh-models, and test subcommands."
+        - "Providers list/status output uses shared Provider Center labels for access, auth, registry status, classification, discovery strategy, model-refresh plan, and active config status."
+        - "Providers refresh-models uses shared discoverProviderModels behavior, resolves only env/gateway secret references, and returns status-only/manual/planned/provider-specific/cloud/local labels without assuming generic /v1/models support."
+        - "Providers test performs safe readiness/status checks only and reports metadata_only, not_configured, ready, missing_secret, or planned_source_review without echoing prompts/responses/secrets."
+        - "Configure rejects raw --key input, persists only executable ProviderID rows through writeProviderConfig, and returns metadata/status for registry-only/custom OpenAI-compatible rows without widening ProviderID."
+        - "Updated cli/src/index.ts command help and docs/developer/cli-reference.md for provider commands, secret-reference flags, gateway/local/custom OpenAI-compatible flags, and registry-only behavior."
+      evidence:
+        - "npm test -- lib/providers => exit 0; 5 test files passed, 38 tests passed."
+        - "npx tsc --noEmit --pretty false => exit 0."
+        - "cd cli && npm run type-check => exit 0."
+        - "cd cli && npm run dev -- providers list --json => exit 0; returned shared registry rows and active/configured status without writes."
+        - "cd cli && npm run dev -- providers status --provider openrouter => exit 0; returned active_configurable, gateway_configurable_openai_compatible, OpenAI-compatible discovery, and configured=no."
+        - "cd cli && npm run dev -- providers refresh-models --provider-registry-id custom_openai_compatible --manual-models local-a,local-b --json => exit 0; returned manual_models with networkCalled=false."
+        - "cd cli && npm run dev -- providers test --provider openrouter => exit 0; returned metadata_only and safe status-test message."
+        - "cd cli && npm run dev -- configure --provider-registry-id custom_openai_compatible --base-url http://localhost:1234/v1 --manual-models local-a,local-b => exit 0; returned metadata accepted/no executable config written."
+        - "cd cli && npm run dev -- configure --provider openai --key sk-test-not-real => exit 1; raw provider secret rejected before any write."
+        - "git diff --cached --name-only => empty; no staging occurred."
+      changed_files:
+        - cli/src/commands/configure.ts
+        - cli/src/commands/providers.ts
+        - cli/src/index.ts
+        - docs/developer/cli-reference.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      blockers: []
+      next_safe_actions:
+        - "Activate T908 to implement usage, cost, budget, and health visibility helpers and surface them in API/UI."
+
+  - id: T908
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: "Implement usage, cost, budget, and health visibility helpers and surface them in API/UI."
+    allowed_files:
+      - lib/llm/router/usage-summary.ts
+      - lib/llm/router/request-ledger.ts
+      - lib/llm/router/__tests__/usage-summary.test.ts
+      - app/api/providers/usage/route.ts
+      - components/skill-mall/providers/UsageCostPanel.tsx
+      - docs/reference/database-schema.md
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/usage-summary.test.ts app/api/providers/__tests__/providers-route.test.ts"
+        expect: "exit 0"
+    stop_if:
+      - "Prompt or response bodies are stored."
+      - "Estimated cost is labeled as actual cost."
+      - "Usage/cost visibility is deferred despite being a core requirement."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T908 added ledger-backed usage summary helpers and routed /api/providers/usage through them, preserving distinct actual-vs-estimated cost labels while surfacing provider/model/operation/auth/backend/routing-policy, token, latency, failure, and budget-policy visibility."
+      implementation:
+        - "Created lib/llm/router/usage-summary.ts with aggregate metrics, per-provider, per-model, per-operation, per-auth-mode, per-route-backend, per-routing-policy, and budget-policy summaries derived from llm_requests and llm_routing_policies."
+        - "Kept actual_cost_usd and estimated_cost_usd separate with explicit costLabels; estimated cost remains labeled as locally_estimated_cost rather than exact spend."
+        - "Updated app/api/providers/usage/route.ts to delegate to getUsageSummary and return a structured unavailable response when the usage ledger is unavailable."
+        - "Expanded UsageCostPanel to compactly show failures, token details, latency, top operations, selected-provider health, and configured budget-policy status."
+        - "Updated docs/reference/database-schema.md to document the usage summary API behavior, grouped metrics, cost labels, and recognized budget_json fields."
+      evidence:
+        - "npm test -- lib/llm/router/__tests__/usage-summary.test.ts app/api/providers/__tests__/providers-route.test.ts => exit 0; 2 test files passed, 21 tests passed."
+        - "npx tsc --noEmit --pretty false => exit 0."
+      changed_files:
+        - lib/llm/router/usage-summary.ts
+        - lib/llm/router/__tests__/usage-summary.test.ts
+        - app/api/providers/usage/route.ts
+        - components/skill-mall/providers/UsageCostPanel.tsx
+        - docs/reference/database-schema.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      blockers: []
+      next_safe_actions:
+        - "Run T909 to update the remaining user, developer, API, provider, and schema docs against the implemented Phase 3 behavior."
+
+  - id: T909
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Update user, developer, API, provider, and schema docs to match implemented Phase 3 behavior."
+    allowed_files:
+      - docs/reference/provider-catalog.md
+      - docs/reference/api-routes.md
+      - docs/reference/database-schema.md
+      - docs/user/configuring-providers.md
+      - docs/user/using-the-cli.md
+      - docs/developer/cli-reference.md
+      - docs/developer/deployment.md
+      - docs/developer/faq.md
+      - docs/developer/getting-started.md
+      - docs/developer/architecture.md
+      - docs/reference/pipeline-architecture.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "rg -n \"raw ChatGPT|paste.*token|apiKey.*sk-|future-only|TODO|TBD\" docs/reference docs/user docs/developer docs/goals/provider-auth-router-phase3 docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md"
+        expect: "no stale or unsafe docs language; false positives classified"
+    stop_if:
+      - "Docs contradict app/API/CLI behavior."
+      - "Docs omit known blockers or incomplete provider mechanisms."
+    receipt:
+      result: done
+      full_outcome_complete: false
+      summary: "T909 updated Provider/Auth Router Phase 3 documentation to match implemented Provider Center behavior, including the ProviderRegistryID versus ProviderID split, broad catalog coverage, planned-source-review visibility/non-callability, discoveryStrategy-based model refresh, secret-reference-only API/CLI/UI contracts, Claude Code and ChatGPT/Codex auth boundaries, optional Bifrost local gateway behavior, and actual-versus-estimated usage/cost semantics."
+      docs_changed:
+        - docs/reference/provider-catalog.md
+        - docs/reference/api-routes.md
+        - docs/reference/database-schema.md
+        - docs/user/configuring-providers.md
+        - docs/user/using-the-cli.md
+        - docs/developer/cli-reference.md
+        - docs/developer/deployment.md
+        - docs/developer/faq.md
+        - docs/developer/getting-started.md
+        - docs/developer/architecture.md
+        - docs/reference/pipeline-architecture.md
+        - docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      evidence:
+        - "Updated user docs to make `/settings/providers` the Provider Center settings surface and to separate broad ProviderRegistryID rows from executable ProviderID values."
+        - "Updated CLI docs to cover `providers list`, `providers status`, `providers refresh-models`, `providers test`, and `configure` shared registry/config/secret-reference behavior."
+        - "Updated developer/reference docs to document broad provider rows, planned-source-review rows, discoveryStrategy model refresh, optional Bifrost local gateway behavior, and actual-vs-estimated usage/cost labels."
+        - "rg -n \"raw ChatGPT|paste.*token|apiKey.*sk-|future-only|TODO|TBD\" docs/reference docs/user docs/developer docs/goals/provider-auth-router-phase3 docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md => exit 0 with intentional safety-language/verification-command false positives only."
+        - "rg -n \"supports 6 direct|five providers|old Phase|SKILL_MALL_PROVIDER.*valid values|OpenAI, Claude Code CLI, Gemini, Groq, Ollama|Anthropic SDK requires an API key that Claude Code\" docs/reference docs/user docs/developer => exit 1; no stale narrow-provider-only claims found."
+      false_positives:
+        - "docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md:39 is an intentional non-negotiable forbidding browser/session token handling."
+        - "docs/recovery/2026-05-20-provider-auth-router-phase-3-implementation-plan.md:492 is the required verification command itself."
+        - "docs/goals/provider-auth-router-phase3/goal.md:29 is an intentional goal constraint forbidding browser/session token handling."
+        - "docs/reference/database-schema.md:7 is an intentional database secret-storage prohibition."
+        - "docs/reference/provider-catalog.md:140 is an intentional provider catalog secret/auth boundary."
+        - "docs/goals/provider-auth-router-phase3/state.yaml:368 is an intentional T906 stop condition."
+        - "docs/goals/provider-auth-router-phase3/state.yaml:522 is the T909 verification command string."
+        - "docs/goals/provider-auth-router-phase3/state.yaml:549 is the T909 receipt evidence string for the required verification command."
+      blockers: []
+      next_safe_actions:
+        - "Activate T910 for semantic-drift/code-review and review-fix gate without staging, committing, pushing, or cleaning unrelated files."
+
+  - id: T910
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Code review, semantic-drift review, and review-fix gate."
+    allowed_files:
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "git diff --name-only"
+        expect: "diff containment reviewed"
+      - cmd: "git diff --stat"
+        expect: "blast radius reviewed"
+    stop_if:
+      - "Implementation deviates from selected Phase 3 scope."
+      - "Implementation adds hosted dependency or paid gateway requirement."
+      - "Implementation leaks secrets or raw tokens."
+      - "Implementation changes excluded wizard/preview files."
+      - "Review findings are not fixed or explicitly blocked."
+    receipt:
+      result: done
+      decision: approved_after_review_fixes
+      full_outcome_complete: false
+      summary: "T910 approved after multiple strict review passes and review-fix patches. Initial review rejected credential-file-shaped secret reference names, provider/auth-mode mismatch, active-model substitution, unconfigured model-refresh network calls, and missing focused tests. Follow-up review rejected CLI `providers refresh-models` parity because `--key-env` could still trigger default hosted endpoint probing for unconfigured rows and was not sanitized. Final review approved after CLI refresh-models sanitized `--key-env`, removed `--key-env`-only default endpoint fallback, and focused verification passed."
+      review_findings_fixed:
+        - "Shared `sanitizeSecretRef` now rejects path-like and credential-file-looking reference names by requiring environment-variable-style names."
+        - "Shared registry auth compatibility helpers validate that selected auth/config mode matches the selected Provider Center row."
+        - "API configure and CLI configure validate provider/access-mode compatibility before writes."
+        - "Provider API rows expose `configStatus.activeModel`; Provider Center and model refresh panel render the configured active model instead of routing policy ID or fallback labels."
+        - "API and CLI model refresh no longer use registry default endpoints for unconfigured rows unless an explicit endpoint is supplied; unconfigured OpenAI-compatible rows return `endpoint_required` with no network call."
+        - "Focused tests cover path-like secret ref rejection, provider/auth mismatch rejection, active-model preservation, unconfigured refresh suppression, registry auth compatibility, and secret-ref validation."
+      evidence:
+        - "Goal Judge 019e441c-a80f-7c11-ad52-7e919cc7db53 initially rejected T910 with five blocking findings."
+        - "Goal Judge 019e4420-8aa8-79b3-bb0c-be61cd727e71 rejected the first review-fix pass for CLI `providers refresh-models` parity."
+        - "Goal Judge 019e4424-357b-7e21-95d9-68a68b16f6b5 approved T910 after the CLI parity follow-up."
+        - "`npm test -- lib/llm/router/__tests__/config.test.ts lib/providers/__tests__/registry.test.ts app/api/providers/__tests__/providers-route.test.ts components/skill-mall/providers/__tests__/provider-center.test.tsx` => 4 files, 48 tests passed."
+        - "`npx tsc --noEmit --pretty false` => exit 0."
+        - "`cd cli && npm run type-check` => exit 0."
+        - "CLI probe with path-like `--key-env /Users/test/.codex/auth.json` exits 1 with the expected secret-reference-name rejection."
+        - "CLI probe with unconfigured OpenRouter and valid `--key-env OPENROUTER_API_KEY --json` exits 0 with `configured: false`, `discovery.status: endpoint_required`, and `networkCalled: false`."
+        - "`git diff --cached --name-only` => empty."
+        - "Changed/untracked wizard/preview path scan => no matches."
+        - "Changed/untracked real-secret scan => no matches."
+      changed_files:
+        - lib/llm/router/secret-refs.ts
+        - lib/llm/router/config.ts
+        - lib/llm/router/__tests__/config.test.ts
+        - lib/providers/registry.ts
+        - lib/providers/config-store.ts
+        - lib/providers/__tests__/registry.test.ts
+        - app/api/providers/configure/route.ts
+        - app/api/providers/route.ts
+        - app/api/providers/models/refresh/route.ts
+        - app/api/providers/__tests__/providers-route.test.ts
+        - cli/src/commands/configure.ts
+        - cli/src/commands/providers.ts
+        - components/skill-mall/providers/ProviderCenter.tsx
+        - components/skill-mall/providers/ModelRefreshPanel.tsx
+        - components/skill-mall/providers/__tests__/provider-center.test.tsx
+        - docs/reference/api-routes.md
+        - docs/reference/provider-catalog.md
+        - docs/user/configuring-providers.md
+        - docs/developer/cli-reference.md
+        - docs/goals/provider-auth-router-phase3/state.yaml
+      blockers: []
+      next_safe_actions:
+        - "Activate T911 for final verification, blocker documentation, and commit-prep readiness audit without staging, committing, pushing, or cleaning unrelated files."
+
+  - id: T911
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Final verification, blocker documentation, and commit-prep readiness audit. Stop before stage/commit/push unless user explicitly approves."
+    allowed_files:
+      - docs/goals/provider-auth-router-phase3/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router lib/providers app/api/providers"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npm test -- components/skill-mall/providers app/settings/providers"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npm test"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npx tsc --noEmit --pretty false"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npm run lint"
+        expect: "exit 0 or failures classified as PR-owned/pre-existing"
+      - cmd: "git diff --name-only"
+        expect: "no excluded files changed"
+      - cmd: "git diff --cached --name-only"
+        expect: "empty unless user explicitly approved staging"
+      - cmd: "(git diff --name-only; git ls-files --others --exclude-standard) | xargs rg --pcre2 -n \"sk-(proj|live|ant-api)[A-Za-z0-9_-]+|OPENAI_API_KEY=(?!your-|sk-test)[A-Za-z0-9_-]+|ANTHROPIC_API_KEY=(?!your-)[A-Za-z0-9_-]+|CLAUDE_CODE_OAUTH_TOKEN=[A-Za-z0-9_-]+|CODEX_ACCESS_TOKEN=[A-Za-z0-9_-]+\""
+        expect: "no real secrets in changed files; false positives classified"
+    stop_if:
+      - "Any PR-owned verification failure remains."
+      - "Any incomplete work lacks blocker evidence and next safe action."
+      - "Any stage/commit/push action is attempted without explicit user approval."
+    receipt:
+      result: done
+      decision: ready_for_commit_prep
+      full_outcome_complete: true
+      summary: "Final verification completed. Provider/Auth Router Phase 3 implementation is ready for commit-prep review. Scoped provider/router/API/UI tests, full tests, root TypeScript, and CLI TypeScript passed. `npm run lint` still exits 1 only from pre-existing unrelated errors outside the Phase 3 implementation after PR-owned Provider Center lint errors were fixed. Staged diff remains empty, no stage/commit/push was performed, no wizard/preview paths are changed, and changed-file secret scans found no real keys or session tokens."
+      verification:
+        - "`npm test -- lib/llm/router lib/providers app/api/providers` => 15 files, 123 tests passed."
+        - "`npm test -- components/skill-mall/providers app/settings/providers` => 1 file, 6 tests passed."
+        - "`npm test` => 42 files, 332 tests passed."
+        - "`npx tsc --noEmit --pretty false` => exit 0."
+        - "`cd cli && npm run type-check` => exit 0."
+        - "`npm run lint` => exit 1 after fixing PR-owned Provider Center lint errors; remaining errors are pre-existing unrelated files: `components/skill-mall/skill-detail/SkillTabs.tsx`, `components/skill-mall/theme-provider.tsx`, and `scripts/migrate.js`, plus unrelated warnings."
+        - "`git diff --cached --name-only` => empty."
+        - "Changed/untracked wizard/preview/DS_Store scan => no matches."
+        - "Changed/untracked strict real-secret scan => no matches."
+        - "Dev server smoke: `npm run dev -- --hostname 127.0.0.1 --port 3007` started successfully."
+        - "Runtime API smoke: `GET /api/providers` on the dev server returned 200 with 27 provider rows, including `openrouter` and `custom_openai_compatible`, and no raw secret value."
+        - "Runtime page smoke: unauthenticated `GET /settings/providers` returned the expected settings auth redirect to `/api/auth/login`; full authenticated page render was not performed because no session was created for verification."
+      review_fixes_completed:
+        - "Rejected path-like and credential-file-looking secret reference names in shared secret-ref validation."
+        - "Enforced provider/access-mode compatibility in shared registry helpers, API configure, CLI configure, config resolution, and config writes."
+        - "Preserved active configured model through Provider Center rows and UI panels."
+        - "Suppressed unconfigured OpenAI-compatible model-refresh network probes unless an explicit endpoint/manual model input is provided."
+        - "Patched CLI `providers refresh-models` to sanitize `--key-env` and avoid `--key-env`-only default endpoint probing."
+        - "Fixed PR-owned React lint errors in `ProviderCenter` by removing synchronous draft syncing from effects."
+      lint_classification:
+        pr_owned_errors_fixed:
+          - "components/skill-mall/providers/ProviderCenter.tsx no longer reports `react-hooks/set-state-in-effect` errors."
+          - "app/api/providers/configure/route.ts and app/api/providers/models/refresh/route.ts no longer report unused Phase 3 imports."
+        pre_existing_unrelated_errors:
+          - "components/skill-mall/skill-detail/SkillTabs.tsx: existing `react-hooks/set-state-in-effect` error."
+          - "components/skill-mall/theme-provider.tsx: existing `react-hooks/set-state-in-effect` error."
+          - "scripts/migrate.js: existing CommonJS `require()` import errors."
+      incomplete_work:
+        - "No Phase 3 implementation work remains incomplete."
+        - "Authenticated browser rendering of `/settings/providers` was not performed; unauthenticated runtime smoke confirmed the protected settings redirect and provider API health."
+      blockers: []
+      next_safe_actions:
+        - "Run commit-prep/diff review if desired, then stage/commit/push only after explicit user approval."
+      commit_prep_review_after_user_approval:
+        summary: "User approved code review, review fixes, and commit. Commit-prep review found and fixed three additional PR-owned edge cases before staging: endpoint-required UI refresh gating, stale gateway baseURL preservation when switching back to direct config, and model refresh authentication for gateway virtual-key refs."
+        review_findings_fixed:
+          - "Provider Center no longer treats fallback/manual labels as sufficient to enable live model refresh for unconfigured endpoint-required OpenAI-compatible rows; a configured row or explicit draft base URL is required."
+          - "`writeProviderConfig` now clears stale gateway `baseURL` when switching an executable provider back to direct config, while preserving an existing local Bifrost base URL for model-only updates."
+          - "`POST /api/providers/models/refresh` now resolves active `gateway_virtual_key_ref` env names as Bearer credentials for local gateway discovery, not only direct provider `env` secret refs."
+        verification:
+          - "`npm test -- lib/llm/router lib/providers app/api/providers components/skill-mall/providers` => 16 files, 132 tests passed."
+          - "`npm test` => 42 files, 335 tests passed."
+          - "`npx tsc --noEmit --pretty false` => exit 0."
+          - "`cd cli && npm run type-check` => exit 0."
+          - "`npm run lint` => exit 1 from pre-existing unrelated errors in `components/skill-mall/skill-detail/SkillTabs.tsx`, `components/skill-mall/theme-provider.tsx`, and `scripts/migrate.js`; no PR-owned Phase 3 lint errors remain."
+          - "`git diff --cached --name-only` => empty before staging."
+          - "Changed/untracked strict real-secret scan => no matches."
+          - "Changed/untracked wizard/preview/DS_Store scan => no matches."
+        blockers: []
