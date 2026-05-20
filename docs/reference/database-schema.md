@@ -2,6 +2,8 @@
 
 SkillMall Phase 2 uses SQLite via `better-sqlite3`. No cloud database. No Supabase. The database file lives at `data/skillmall.db` (gitignored) and is created automatically on first run.
 
+Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. These tables are local-only and do not introduce a hosted gateway, gateway sidecar, or cloud database.
+
 ## Setup
 
 ```bash
@@ -108,6 +110,161 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   filename TEXT PRIMARY KEY,
   applied_at TEXT NOT NULL DEFAULT (datetime('now'))
 )
+```
+
+---
+
+### llm_provider_configs
+
+Stores non-secret provider configuration for the Phase 1 router. Secret values are not stored here. `env_key` rows store only the environment variable name in `secret_ref`.
+
+Allowed Phase 1 auth modes are:
+
+- `env_key`
+- `local_cli_session`
+- `none_local`
+
+Allowed Phase 1 gateway backend:
+
+- `direct`
+
+Reserved future auth/gateway modes such as `codex_session`, `oauth_device_flow`, `keychain_ref`, `gateway_virtual_key`, GoModel, and Bifrost are not implemented in Phase 1.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_provider_configs (
+  id TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local')),
+  secret_ref_type TEXT CHECK (secret_ref_type IS NULL OR secret_ref_type IN ('env', 'none')),
+  secret_ref TEXT,
+  base_url TEXT,
+  gateway_backend TEXT CHECK (gateway_backend IS NULL OR gateway_backend IN ('direct')),
+  enabled INTEGER NOT NULL DEFAULT 1,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+The migration also enforces auth/secret pairing: `env_key` requires an env secret reference, while `local_cli_session` and `none_local` cannot store secret references.
+
+---
+
+### llm_models
+
+Caches model metadata by provider. Phase 1 stores manual/fallback metadata only; broad auto-refresh is future work.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_models (
+  id TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  display_name TEXT,
+  capabilities_json TEXT NOT NULL DEFAULT '{}',
+  context_window INTEGER,
+  max_output_tokens INTEGER,
+  source TEXT NOT NULL DEFAULT 'manual',
+  last_checked_at TEXT,
+  raw_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(provider_id, model_id)
+);
+```
+
+---
+
+### llm_pricing_snapshots
+
+Stores local pricing snapshots for cost estimation. Phase 1 does not implement provider-wide automatic price refresh.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  pricing_json TEXT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  source TEXT NOT NULL,
+  source_url TEXT,
+  snapshot_at TEXT NOT NULL DEFAULT (datetime('now')),
+  hash TEXT
+);
+```
+
+---
+
+### llm_routing_policies
+
+Stores routing-policy metadata only. Runtime routing-policy evaluation is not implemented in Phase 1.
+
+Allowed Phase 1 mode:
+
+- `manual`
+
+Future/not implemented modes include `fallback_chain`, `cheapest_compatible`, and `quality_first`.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_routing_policies (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('manual')),
+  rules_json TEXT NOT NULL DEFAULT '{}',
+  budget_json TEXT NOT NULL DEFAULT '{}',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+---
+
+### llm_requests
+
+Records local LLM request lifecycle rows. Prompt and response bodies are not stored by default.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_requests (
+  id TEXT PRIMARY KEY,
+  operation TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  model_id TEXT,
+  route_backend TEXT NOT NULL DEFAULT 'direct' CHECK (route_backend IN ('direct')),
+  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local')),
+  routing_policy_id TEXT,
+  status TEXT NOT NULL CHECK (status IN ('started', 'succeeded', 'failed')),
+  started_at TEXT NOT NULL,
+  completed_at TEXT,
+  latency_ms INTEGER,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  cached_input_tokens INTEGER,
+  reasoning_tokens INTEGER,
+  estimated_cost_usd REAL,
+  actual_cost_usd REAL,
+  cost_source TEXT,
+  error_code TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+```
+
+---
+
+### llm_request_events
+
+Records local request lifecycle events such as provider errors. Event metadata is JSON and should not include prompt or response bodies.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_request_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id TEXT NOT NULL REFERENCES llm_requests(id),
+  event_type TEXT NOT NULL,
+  provider_id TEXT,
+  model_id TEXT,
+  message TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 ```
 
 ---

@@ -53,7 +53,7 @@ npx skill-mall configure [--provider <p>] [--key <api-key>] [--model <model>]
 
 Without flags, runs an interactive wizard to select your provider. With flags, configures immediately without prompts.
 
-Writes configuration to `~/.skill-mall/config.json` (global) and `SKILL_MALL_PROVIDER`, `SKILL_MALL_API_KEY`, `SKILL_MALL_MODEL` to `.env.local` in the current project directory.
+Writes non-secret configuration to `~/.skill-mall/config.json`. API providers store an env-var reference such as `OPENAI_API_KEY`; raw API keys are not written.
 
 **Examples:**
 
@@ -65,13 +65,13 @@ npx skill-mall configure
 npx skill-mall configure --provider claude-code --model claude-sonnet-4-6
 
 # OpenAI
-npx skill-mall configure --provider openai --key sk-... --model gpt-4o
+npx skill-mall configure --provider openai --key-env OPENAI_API_KEY --model gpt-4o
 
 # Gemini
-npx skill-mall configure --provider gemini --key AIza... --model gemini-2.0-flash-exp
+npx skill-mall configure --provider gemini --key-env GEMINI_API_KEY --model gemini-2.0-flash-exp
 
 # Groq (fast and inexpensive)
-npx skill-mall configure --provider groq --key gsk_... --model llama-3.3-70b-versatile
+npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.3-70b-versatile
 
 # Ollama (local, no API key)
 ollama pull llama3.1
@@ -83,7 +83,7 @@ npx skill-mall configure --provider ollama --model llama3.1
 ```
 ✓ Provider configured: openai / gpt-4o
   Config written to ~/.skill-mall/config.json
-  .env.local updated
+  API env ref set
 ```
 
 **Exit codes:** 0 on success, 1 on invalid provider or missing required flags.
@@ -930,6 +930,6 @@ npx skill-mall eval-triggers business/blue-ocean-strategy
 ```bash
 # Set embedding provider in .env.local:
 # SKILL_MALL_EMBEDDING_PROVIDER=openai
-# OPENAI_API_KEY=sk-...
+# OPENAI_API_KEY=your-openai-api-key
 npx skill-mall attach-knowledge ai/skill-creator ./docs/
 ```

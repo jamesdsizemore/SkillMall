@@ -102,7 +102,7 @@ Every provider implements `LLMClient`. The `provider` field is used in places th
 
 `resolveProviderConfig()` in `lib/providers/index.ts` resolves configuration in this order:
 
-1. Environment variables (`SKILL_MALL_PROVIDER`, `SKILL_MALL_API_KEY`, `SKILL_MALL_MODEL`)
+1. Environment variables (`SKILL_MALL_PROVIDER`, `SKILL_MALL_MODEL`, plus provider-specific API keys such as `OPENAI_API_KEY`)
 2. `~/.skill-mall/config.json` (written by `npx skill-mall configure`)
 
 If neither source has a provider, it throws `ConfigError: "No LLM provider configured. Run: npx skill-mall configure"`.

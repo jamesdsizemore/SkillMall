@@ -1,6 +1,6 @@
 # Provider Catalog
 
-SkillMall supports 5 LLM providers. All providers implement the same `LLMClient` interface (`lib/providers/types.ts`).
+SkillMall supports 6 LLM providers. All providers implement the same `LLMClient` interface (`lib/providers/types.ts`) and are called through the Phase 1 router wrapper.
 
 ## Interface
 
@@ -16,8 +16,20 @@ interface CompletionOptions {
   responseFormat?: 'text' | 'json_object'
   systemPrompt?: string
   timeoutMs?: number
+  operation?: string
+  metadata?: Record<string, unknown>
 }
 ```
+
+## Phase 1 Auth Contract
+
+Phase 1 stores secret references, not raw secrets. API access is separate from subscription or local tool-session auth:
+
+- `env_key`: API access through an environment variable reference such as `OPENAI_API_KEY`. SkillMall stores the variable name only.
+- `local_cli_session`: local provider tooling owns credentials, such as Claude Code CLI auth. SkillMall does not copy Claude Code credential files.
+- `none_local`: local runtimes that require no credential, such as Ollama.
+
+The only executable Phase 1 gateway backend is `direct`. Gateway sidecar validation, GoModel, Bifrost, external OpenAI-compatible gateway execution, `gateway_virtual_key`, `codex_session`, `oauth_device_flow`, `keychain_ref`, and `file_ref` are future/not implemented behavior.
 
 ## Providers
 
@@ -28,7 +40,16 @@ interface CompletionOptions {
 - **JSON mode:** supported via `response_format: { type: 'json_object' }`
 - **Default model:** `gpt-4o`
 - **Available models:** `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`
-- **Auth:** `SKILL_MALL_API_KEY` or `~/.skill-mall/config.json`
+- **Auth:** `env_key` API access using `OPENAI_API_KEY`
+
+### anthropic
+
+- **Implementation:** `lib/providers/anthropic.ts`
+- **SDK:** direct HTTP call to `https://api.anthropic.com/v1/messages`
+- **JSON mode:** prompt-enforced
+- **Default model:** `claude-sonnet-4-20250514`
+- **Available models:** `claude-sonnet-4-20250514`, `claude-opus-4-1-20250805`
+- **Auth:** `env_key` API access using `ANTHROPIC_API_KEY`
 
 ### claude-code
 
@@ -38,7 +59,7 @@ interface CompletionOptions {
 - **JSON mode:** not natively supported — system prompt instructs JSON-only output
 - **Default model:** `claude-sonnet-4-6`
 - **Available models:** `claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5-20251001`
-- **Auth:** existing Claude Code CLI authentication (no API key)
+- **Auth:** `local_cli_session`; existing Claude Code CLI authentication owns credentials
 - **Implementation detail:** `claude --print --model <model> <prompt>` — system prompt is prepended to user prompt since no separate flag exists
 
 ### gemini
@@ -48,7 +69,7 @@ interface CompletionOptions {
 - **JSON mode:** supported via `responseMimeType: 'application/json'`
 - **Default model:** `gemini-2.0-flash-exp`
 - **Available models:** `gemini-2.0-flash-exp`, `gemini-1.5-pro`
-- **Auth:** `SKILL_MALL_API_KEY` or `~/.skill-mall/config.json`
+- **Auth:** `env_key` API access using `GEMINI_API_KEY`
 
 ### groq
 
@@ -57,7 +78,7 @@ interface CompletionOptions {
 - **JSON mode:** supported
 - **Default model:** `llama-3.3-70b-versatile`
 - **Available models:** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`
-- **Auth:** `SKILL_MALL_API_KEY` or `~/.skill-mall/config.json`
+- **Auth:** `env_key` API access using `GROQ_API_KEY`
 
 ### ollama
 
@@ -66,7 +87,7 @@ interface CompletionOptions {
 - **JSON mode:** supported (model-dependent)
 - **Default model:** `llama3.1`
 - **Available models:** any model pulled via `ollama pull`
-- **Auth:** none required
+- **Auth:** `none_local`; none required
 
 ## Config Resolution
 
@@ -82,7 +103,15 @@ Config file format:
 ```json
 {
   "provider": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "providers": {
+    "claude-code": {
+      "model": "claude-sonnet-4-6",
+      "authMode": "local_cli_session",
+      "secretRef": { "type": "none" },
+      "gatewayBackend": "direct"
+    }
+  }
 }
 ```
 
@@ -90,12 +119,25 @@ With per-provider sections:
 ```json
 {
   "provider": "openai",
+  "model": "gpt-4o",
   "providers": {
-    "openai": { "apiKey": "sk-...", "model": "gpt-4o" },
-    "claude-code": { "model": "claude-sonnet-4-6" }
+    "openai": {
+      "model": "gpt-4o",
+      "authMode": "env_key",
+      "secretRef": { "type": "env", "name": "OPENAI_API_KEY" },
+      "gatewayBackend": "direct"
+    },
+    "claude-code": {
+      "model": "claude-sonnet-4-6",
+      "authMode": "local_cli_session",
+      "secretRef": { "type": "none" },
+      "gatewayBackend": "direct"
+    }
   }
 }
 ```
+
+Legacy `apiKey` fields in config JSON are ignored by the router config resolver. Configure API access with an environment variable reference instead.
 
 ## Adding a New Provider
 
@@ -118,7 +160,8 @@ Then:
 1. Add the provider ID to the `ProviderID` union in `lib/providers/types.ts`
 2. Add a default model to `DEFAULT_MODELS` in `lib/providers/defaults.ts`
 3. Add a case to `createLLMClient` in `lib/providers/index.ts`
-4. Add setup instructions to `PROVIDER_CATALOG` in `app/api/providers/route.ts`
+4. Add setup instructions to `FALLBACK_PROVIDER_CATALOG` in `lib/providers/catalog.ts`
+5. Choose one Phase 1 auth mode: `env_key`, `local_cli_session`, or `none_local`
 
 The rest of the system (research engine, prompt engine, pipeline) works unchanged — all LLM calls go through the `LLMClient` interface.
 

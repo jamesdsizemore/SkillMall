@@ -50,13 +50,14 @@ The research pipeline and skill builder both depend on a configured LLM provider
 **Fix:**
 1. Switch to a provider that supports embeddings for any retrieval-dependent features. OpenAI is the recommended option:
    ```
-   npx skill-mall configure --provider openai --key sk-...
+   export OPENAI_API_KEY="your-openai-api-key"
+   npx skill-mall configure --provider openai --key-env OPENAI_API_KEY
    ```
 2. If you want to keep Claude Code as your main provider for skill creation, set a separate `SKILL_MALL_EMBEDDINGS_PROVIDER` environment variable in `.env.local`:
    ```
    SKILL_MALL_PROVIDER=claude-code
    SKILL_MALL_EMBEDDINGS_PROVIDER=openai
-   SKILL_MALL_API_KEY=sk-...
+   OPENAI_API_KEY=your-openai-api-key
    ```
 3. Restart the development server after editing `.env.local`.
 
@@ -73,7 +74,7 @@ The research pipeline and skill builder both depend on a configured LLM provider
    ```
    cat ~/.skill-mall/config.json
    ```
-   The `apiKey` value should be a bare string with no spaces.
+   The `secretRef.name` value should name the environment variable that contains your API key.
 2. Test the key directly against the provider's API to isolate the issue from SkillMall:
    - OpenAI: `curl https://api.openai.com/v1/models -H "Authorization: Bearer YOUR_KEY"`
    - Gemini: `curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY"`
@@ -81,7 +82,8 @@ The research pipeline and skill builder both depend on a configured LLM provider
    If these return `401`, the key itself is invalid — generate a new one from the provider's dashboard.
 3. Reconfigure with the new key:
    ```
-   npx skill-mall configure --provider openai --key sk-NEW_KEY_HERE
+   export OPENAI_API_KEY="your-new-openai-api-key"
+   npx skill-mall configure --provider openai --key-env OPENAI_API_KEY
    ```
 4. For Groq, make sure the selected model is available in your Groq account tier. The default `llama-3.3-70b-versatile` requires an active Groq account.
 

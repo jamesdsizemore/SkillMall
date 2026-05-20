@@ -189,14 +189,14 @@ The default `claude-code` provider requires the `claude` binary on `PATH`, which
 
 ```bash
 SKILL_MALL_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 ```
 
 Or for Groq (fast, free tier available):
 
 ```bash
 SKILL_MALL_PROVIDER=groq
-SKILL_MALL_API_KEY=gsk_...
+GROQ_API_KEY=your-groq-api-key
 ```
 
 Or for Ollama running as a sidecar container:
@@ -206,7 +206,7 @@ SKILL_MALL_PROVIDER=ollama
 SKILL_MALL_MODEL=llama3.2
 ```
 
-The `resolveProviderConfig()` function in `lib/providers/index.ts` reads `SKILL_MALL_PROVIDER`, `SKILL_MALL_API_KEY`, and `SKILL_MALL_MODEL` from environment variables. Set these in your `docker-compose.yml` or container runtime and all LLM calls will route to the configured provider without any code changes.
+The `resolveProviderConfig()` function in `lib/providers/index.ts` reads `SKILL_MALL_PROVIDER`, `SKILL_MALL_MODEL`, and provider-specific API environment variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `GROQ_API_KEY`. Set these in your `docker-compose.yml` or container runtime and all LLM calls will route to the configured provider without any code changes.
 
 The SQLite database at `data/skillmall.db` needs a persistent volume mount if you want sessions and analytics to survive container restarts: `-v ./data:/app/data`.
 

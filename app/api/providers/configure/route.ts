@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { writeProviderConfig } from "@/lib/providers/config-store";
+import {
+  assertPhase1AuthMode,
+  assertPhase1GatewayBackend,
+  sanitizeSecretRef,
+  validateSecretRefForAuthMode,
+} from "@/lib/llm/router/secret-refs";
 
 const ConfigureBodySchema = z.object({
-  provider: z.string().min(1),
-  apiKey: z.string().optional(),
+  provider: z.enum(["openai", "anthropic", "claude-code", "gemini", "groq", "ollama"]),
   model: z.string().optional(),
-});
+  authMode: z.enum(["env_key", "local_cli_session", "none_local"]).optional(),
+  secretRef: z
+    .discriminatedUnion("type", [
+      z.object({ type: z.literal("env"), name: z.string().min(1) }),
+      z.object({ type: z.literal("none") }),
+    ])
+    .optional(),
+  gatewayBackend: z.literal("direct").optional(),
+}).strict();
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -18,49 +34,38 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // In production, env vars must be set in the hosting environment
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      {
-        error: "use_env_vars",
-        message:
-          "In production, set SKILL_MALL_PROVIDER, SKILL_MALL_API_KEY, and SKILL_MALL_MODEL as environment variables in your hosting dashboard.",
-      },
-      { status: 400 }
-    );
-  }
-
-  // In development, write to .env.local
   try {
-    const fs = await import("fs/promises");
-    const envPath = ".env.local";
-    let existing = "";
-    try {
-      existing = await fs.readFile(envPath, "utf-8");
-    } catch {
-      // File doesn't exist yet
-    }
+    const authMode = parsed.data.authMode
+      ? assertPhase1AuthMode(parsed.data.authMode)
+      : undefined;
+    const gatewayBackend = assertPhase1GatewayBackend(parsed.data.gatewayBackend);
+    const secretRef = parsed.data.secretRef ? sanitizeSecretRef(parsed.data.secretRef) : undefined;
+    if (authMode) validateSecretRefForAuthMode(authMode, secretRef);
 
-    const lines = existing.split("\n").filter((l) => {
-      return (
-        !l.startsWith("SKILL_MALL_PROVIDER=") &&
-        !l.startsWith("SKILL_MALL_API_KEY=") &&
-        !l.startsWith("SKILL_MALL_MODEL=")
-      );
+    const saved = await writeProviderConfig({
+      provider: parsed.data.provider,
+      model: parsed.data.model,
+      authMode,
+      secretRef,
+      gatewayBackend,
     });
-
-    lines.push(`SKILL_MALL_PROVIDER=${parsed.data.provider}`);
-    if (parsed.data.apiKey) lines.push(`SKILL_MALL_API_KEY=${parsed.data.apiKey}`);
-    if (parsed.data.model) lines.push(`SKILL_MALL_MODEL=${parsed.data.model}`);
-
-    await fs.writeFile(envPath, lines.join("\n") + "\n", "utf-8");
 
     return NextResponse.json({
       success: true,
-      provider: parsed.data.provider,
-      model: parsed.data.model,
+      provider: saved.provider,
+      model: saved.model,
+      authMode: saved.authMode,
+      gatewayBackend: saved.gatewayBackend,
+      secretRef: saved.secretRef ?? null,
+      configPath: saved.path,
     });
-  } catch {
-    return NextResponse.json({ error: "write_failed" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "invalid_provider_config",
+        message: error instanceof Error ? error.message : "Invalid provider configuration",
+      },
+      { status: 400 }
+    );
   }
 }

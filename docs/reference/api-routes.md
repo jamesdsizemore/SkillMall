@@ -15,7 +15,7 @@ All API routes use `Content-Type: application/json`. No authentication is requir
 
 ## GET /api/providers
 
-Returns the current provider configuration and the full provider catalog.
+Returns sanitized provider/router status and the full provider catalog. This route returns secret reference display data only; it does not return raw API keys, subscription tokens, browser/session tokens, or local CLI credential files.
 
 **Response:**
 
@@ -24,8 +24,12 @@ Returns the current provider configuration and the full provider catalog.
   configured: boolean          // true if a provider is configured
   activeProvider: string | null
   activeModel: string | null
+  authMode: 'env_key' | 'local_cli_session' | 'none_local' | null
+  gatewayBackend: 'direct'
+  secretRef: { type: 'env', name: string } | { type: 'none' } | null
+  warnings: string[]
   providers: Array<{
-    id: string                 // 'openai' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
+    id: string                 // 'openai' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
     name: string
     requiresApiKey: boolean
     defaultModel: string
@@ -40,15 +44,17 @@ Returns the current provider configuration and the full provider catalog.
 
 ## POST /api/providers/configure
 
-Write provider configuration to `.env.local` (development only).
+Writes non-secret provider configuration to `~/.skill-mall/config.json`. It does not write `.env.local`, does not mutate `process.env`, and does not accept raw API key request bodies.
 
 **Request body:**
 
 ```typescript
 {
   provider: string             // provider ID
-  apiKey?: string              // omit for claude-code and ollama
   model?: string               // defaults to provider's default model
+  authMode?: 'env_key' | 'local_cli_session' | 'none_local'
+  secretRef?: { type: 'env', name: string } | { type: 'none' }
+  gatewayBackend?: 'direct'
 }
 ```
 
@@ -59,10 +65,15 @@ Write provider configuration to `.env.local` (development only).
   success: true
   provider: string
   model: string | undefined
+  authMode: 'env_key' | 'local_cli_session' | 'none_local'
+  gatewayBackend: 'direct'
+  secretRef: { type: 'env', name: string } | { type: 'none' } | null
 }
 ```
 
-**Note:** in production (`NODE_ENV=production`), returns 400 with `{ error: 'use_env_vars' }` — set environment variables in your hosting dashboard instead.
+API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. Subscription/tool-session auth, such as Claude Code CLI, uses `local_cli_session` and SkillMall does not copy credential files.
+
+Phase 1 supports only the `direct` gateway backend. Gateway sidecars, GoModel, Bifrost, `gateway_virtual_key`, `codex_session`, `oauth_device_flow`, `keychain_ref`, `fallback_chain`, `cheapest_compatible`, and `quality_first` are future/not implemented behavior.
 
 ---
 

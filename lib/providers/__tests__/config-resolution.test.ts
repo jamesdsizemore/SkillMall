@@ -1,93 +1,184 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { resolveProviderConfig, ConfigError } from '../index'
+import { resolveRouterProviderConfig } from '../../llm/router/config'
+import { writeProviderConfig } from '../config-store'
+import { ConfigError } from '../types'
 import { DEFAULT_MODELS } from '../defaults'
 import fs from 'fs'
+import fsPromises from 'fs/promises'
 
-describe('resolveProviderConfig', () => {
+describe('router provider config resolution', () => {
   const originalEnv = { ...process.env }
 
   beforeEach(() => {
-    // Clear provider env vars before each test
-    delete process.env.SKILL_MALL_PROVIDER
-    delete process.env.SKILL_MALL_API_KEY
-    delete process.env.SKILL_MALL_MODEL
+    process.env = { ...originalEnv }
+    for (const key of [
+      'SKILL_MALL_PROVIDER',
+      'SKILL_MALL_API_KEY',
+      'SKILL_MALL_MODEL',
+      'OPENAI_API_KEY',
+      'ANTHROPIC_API_KEY',
+      'GEMINI_API_KEY',
+      'GROQ_API_KEY',
+    ]) {
+      delete process.env[key]
+    }
   })
 
   afterEach(() => {
-    // Restore original env
-    Object.assign(process.env, originalEnv)
+    process.env = { ...originalEnv }
     vi.restoreAllMocks()
   })
 
-  it('reads provider from env vars', () => {
+  it('reads provider/model precedence from env vars and returns env secret refs only', () => {
     process.env.SKILL_MALL_PROVIDER = 'openai'
-    process.env.SKILL_MALL_API_KEY = 'sk-test'
+    process.env.OPENAI_API_KEY = 'redacted-openai-token'
     process.env.SKILL_MALL_MODEL = 'gpt-4o-mini'
 
-    const config = resolveProviderConfig()
+    const config = resolveRouterProviderConfig()
     expect(config.provider).toBe('openai')
-    expect(config.apiKey).toBe('sk-test')
     expect(config.model).toBe('gpt-4o-mini')
+    expect(config.authMode).toBe('env_key')
+    expect(config.secretRef).toEqual({ type: 'env', name: 'OPENAI_API_KEY' })
+    expect(JSON.stringify(config)).not.toContain('redacted-openai-token')
   })
 
   it('uses default model when SKILL_MALL_MODEL is not set', () => {
     process.env.SKILL_MALL_PROVIDER = 'openai'
-    process.env.SKILL_MALL_API_KEY = 'sk-test'
 
-    const config = resolveProviderConfig()
+    const config = resolveRouterProviderConfig()
     expect(config.model).toBe(DEFAULT_MODELS.openai)
+    expect(config.secretRef).toEqual({ type: 'env', name: 'OPENAI_API_KEY' })
   })
 
-  it('reads from config file when env vars are not set', () => {
+  it('maps claude-code config to local_cli_session without secret refs', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({
         provider: 'claude-code',
-        model: 'claude-sonnet-4-6',
+        providers: {
+          'claude-code': { model: 'claude-sonnet-4-6' },
+        },
       })
     )
 
-    const config = resolveProviderConfig()
+    const config = resolveRouterProviderConfig()
     expect(config.provider).toBe('claude-code')
     expect(config.model).toBe('claude-sonnet-4-6')
-    expect(config.apiKey).toBeUndefined()
+    expect(config.authMode).toBe('local_cli_session')
+    expect(config.secretRef).toEqual({ type: 'none' })
   })
 
-  it('reads nested provider config from config file', () => {
+  it('ignores legacy raw apiKey config and returns a redacted warning shape', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({
         provider: 'openai',
         providers: {
-          openai: { apiKey: 'sk-from-file', model: 'gpt-4o' },
+          openai: { apiKey: 'legacy-openai-token', model: 'gpt-4o' },
         },
       })
     )
 
-    const config = resolveProviderConfig()
+    const config = resolveRouterProviderConfig()
     expect(config.provider).toBe('openai')
-    expect(config.apiKey).toBe('sk-from-file')
     expect(config.model).toBe('gpt-4o')
+    expect(config.authMode).toBe('env_key')
+    expect(config.secretRef).toEqual({ type: 'env', name: 'OPENAI_API_KEY' })
+    expect(config.warnings).toContain(
+      'Legacy raw apiKey was ignored; configure an env secret reference instead.'
+    )
+    expect(JSON.stringify(config)).not.toContain('legacy-openai-token')
+  })
+
+  it('rejects reserved future auth modes in config files', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        provider: 'anthropic',
+        providers: {
+          anthropic: {
+            authMode: 'codex_session',
+            model: 'claude-sonnet-4-20250514',
+          },
+        },
+      })
+    )
+
+    expect(() => resolveRouterProviderConfig()).toThrow('Unsupported Phase 1 auth mode')
+  })
+
+  it('rejects non-direct gateway backends in config files', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        provider: 'openai',
+        providers: {
+          openai: {
+            model: 'gpt-4o',
+            gatewayBackend: 'gomodel',
+          },
+        },
+      })
+    )
+
+    expect(() => resolveRouterProviderConfig()).toThrow('Unsupported Phase 1 gateway backend')
   })
 
   it('throws ConfigError when no provider is configured', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(false)
 
-    expect(() => resolveProviderConfig()).toThrow(ConfigError)
-    expect(() => resolveProviderConfig()).toThrow('No LLM provider configured')
+    expect(() => resolveRouterProviderConfig()).toThrow(ConfigError)
+    expect(() => resolveRouterProviderConfig()).toThrow('No LLM provider configured')
   })
 
-  it('env vars take precedence over config file', () => {
+  it('SKILL_MALL_PROVIDER and SKILL_MALL_MODEL take precedence over config file values', () => {
     process.env.SKILL_MALL_PROVIDER = 'groq'
-    process.env.SKILL_MALL_API_KEY = 'gsk-env'
+    process.env.SKILL_MALL_MODEL = 'llama-3.3-70b-versatile'
+    process.env.GROQ_API_KEY = 'groq-env-token'
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
-      JSON.stringify({ provider: 'openai', apiKey: 'sk-file' })
+      JSON.stringify({ provider: 'openai', apiKey: 'legacy-root-token', model: 'gpt-4o' })
     )
 
-    const config = resolveProviderConfig()
+    const config = resolveRouterProviderConfig()
     expect(config.provider).toBe('groq')
-    expect(config.apiKey).toBe('gsk-env')
+    expect(config.model).toBe('llama-3.3-70b-versatile')
+    expect(config.secretRef).toEqual({ type: 'env', name: 'GROQ_API_KEY' })
+    expect(JSON.stringify(config)).not.toContain('groq-env-token')
+  })
+
+  it('writes env secret references without raw API keys', async () => {
+    vi.spyOn(fsPromises, 'readFile').mockRejectedValue(new Error('missing'))
+    vi.spyOn(fsPromises, 'mkdir').mockResolvedValue(undefined)
+    const writeFile = vi.spyOn(fsPromises, 'writeFile').mockResolvedValue(undefined)
+
+    const result = await writeProviderConfig({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      keyEnv: 'OPENAI_API_KEY',
+    })
+
+    expect(result).toMatchObject({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      authMode: 'env_key',
+      secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
+    })
+    const written = String(writeFile.mock.calls[0]?.[1])
+    expect(written).toContain('"authMode": "env_key"')
+    expect(written).toContain('"name": "OPENAI_API_KEY"')
+    expect(written).not.toContain('apiKey')
+    expect(written).not.toContain('sk-')
+  })
+
+  it('refuses to write raw API keys to config JSON', async () => {
+    await expect(
+      writeProviderConfig({
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        apiKey: 'raw-openai-secret',
+      })
+    ).rejects.toThrow('Raw API keys must not be written')
   })
 })

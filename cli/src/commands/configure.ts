@@ -7,6 +7,7 @@ import { pc } from "../utils.js";
 interface ConfigureArgs {
   provider?: string;
   key?: string;
+  keyEnv?: string;
   model?: string;
 }
 
@@ -15,6 +16,7 @@ function parseArgs(args: string[]): ConfigureArgs {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--provider" && args[i + 1]) result.provider = args[++i];
     else if (args[i] === "--key" && args[i + 1]) result.key = args[++i];
+    else if (args[i] === "--key-env" && args[i + 1]) result.keyEnv = args[++i];
     else if (args[i] === "--model" && args[i + 1]) result.model = args[++i];
   }
   return result;
@@ -28,13 +30,34 @@ const DEFAULT_MODELS: Record<string, string> = {
   ollama: "llama3.1",
 };
 
-const REQUIRES_KEY = new Set(["openai", "gemini", "groq"]);
+const REQUIRES_KEY = new Set(["openai", "anthropic", "gemini", "groq"]);
+const ENV_BY_PROVIDER: Record<string, string | undefined> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+};
+
+function authConfigForProvider(provider: string, keyEnv?: string): Record<string, unknown> {
+  if (provider === "claude-code") return { authMode: "local_cli_session", secretRef: { type: "none" } };
+  if (provider === "ollama") return { authMode: "none_local", secretRef: { type: "none" } };
+  return {
+    authMode: "env_key",
+    secretRef: { type: "env", name: keyEnv || ENV_BY_PROVIDER[provider] || "PROVIDER_API_KEY" },
+  };
+}
 
 export async function configureCommand(args: string[]): Promise<void> {
   const flags = parseArgs(args);
 
   // Non-interactive mode
   if (flags.provider) {
+    if (flags.key) {
+      console.error(pc.red("  Refusing to write raw API keys. Use --key-env ENV_VAR_NAME instead."));
+      process.exitCode = 1;
+      return;
+    }
+
     const configDir = path.join(os.homedir(), ".skill-mall");
     fs.mkdirSync(configDir, { recursive: true });
 
@@ -46,19 +69,33 @@ export async function configureCommand(args: string[]): Promise<void> {
       // No existing config
     }
 
+    const providerConfig: Record<string, unknown> = {
+      ...((existing.providers as Record<string, Record<string, unknown>> | undefined)?.[flags.provider] ?? {}),
+      model: flags.model ?? DEFAULT_MODELS[flags.provider] ?? "default",
+      gatewayBackend: "direct",
+      ...authConfigForProvider(flags.provider, flags.keyEnv),
+    };
+    delete providerConfig["apiKey"];
+
+    const providers = {
+      ...((existing.providers as Record<string, unknown> | undefined) ?? {}),
+      [flags.provider]: providerConfig,
+    };
+
     const config = {
       ...existing,
       provider: flags.provider,
-      ...(flags.key ? { apiKey: flags.key } : {}),
+      providers,
       model: flags.model ?? DEFAULT_MODELS[flags.provider] ?? "default",
     };
+    delete (config as Record<string, unknown>)["apiKey"];
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 
     console.log(
       pc.green("  Configured: ") +
         `${flags.provider} / ${config.model}` +
-        (config.apiKey ? " (API key set)" : "")
+        (providerConfig["secretRef"] && providerConfig["authMode"] === "env_key" ? " (API env ref set)" : "")
     );
     return;
   }
@@ -80,14 +117,15 @@ export async function configureCommand(args: string[]): Promise<void> {
 
   if (p.isCancel(provider)) { p.cancel("Cancelled."); process.exit(0); }
 
-  let apiKey: string | undefined;
+  let keyEnv: string | undefined;
   if (REQUIRES_KEY.has(String(provider))) {
-    const keyInput = await p.password({
-      message: "API key:",
-      validate: (v) => (!v ? "API key is required for this provider" : undefined),
+    const keyInput = await p.text({
+      message: "API key environment variable:",
+      initialValue: ENV_BY_PROVIDER[String(provider)] ?? "",
+      validate: (v) => (!v ? "An environment variable name is required for API access" : undefined),
     });
     if (p.isCancel(keyInput)) { p.cancel("Cancelled."); process.exit(0); }
-    apiKey = String(keyInput);
+    keyEnv = String(keyInput);
   }
 
   const defaultModel = DEFAULT_MODELS[String(provider)] ?? "";
@@ -102,11 +140,20 @@ export async function configureCommand(args: string[]): Promise<void> {
   fs.mkdirSync(configDir, { recursive: true });
   const configPath = path.join(configDir, "config.json");
 
-  const config: Record<string, unknown> = {
-    provider: String(provider),
-    model: String(modelInput) || defaultModel,
+  const providerId = String(provider);
+  const model = String(modelInput) || defaultModel;
+  const providerConfig = {
+    model,
+    gatewayBackend: "direct",
+    ...authConfigForProvider(providerId, keyEnv),
   };
-  if (apiKey) config.apiKey = apiKey;
+  const config: Record<string, unknown> = {
+    providers: {
+      [providerId]: providerConfig,
+    },
+    provider: String(provider),
+    model,
+  };
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 
