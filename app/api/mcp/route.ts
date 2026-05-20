@@ -3,12 +3,15 @@ import fs from "node:fs";
 import {
   getPromptFiles,
   getSkill,
-  getSkillDir,
   getSkillsDir,
   getSkillsByCategory,
   searchSkills,
 } from "@/lib/skills";
-import { detectAgents, deployToAgents } from "@/lib/agents/detector";
+import {
+  deploySkillToAgents,
+  resolveSkillDeploySource,
+  type DeployScope,
+} from "@/lib/deployment";
 
 export const runtime = "nodejs"; // needs filesystem access
 
@@ -133,15 +136,15 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
   if (name === "deploy_skill") {
     const slug = String(params.slug ?? "");
     const agentId = params.agent ? String(params.agent) : undefined;
+    const scope: DeployScope = params.scope === "project" ? "project" : "user";
 
     const parts = slug.split("/");
     if (slug.includes("/") && parts.length !== 2) {
       return { error: "slug must be in category/slug format (e.g. ai/my-skill)", success: false };
     }
-    const [cat, skillName] = slug.includes("/") ? parts : ["", slug];
-    const skillDir = getSkillDir(cat, skillName);
+    const source = resolveSkillDeploySource(process.cwd(), slug);
 
-    if (!fs.existsSync(skillDir)) {
+    if (!source) {
       return { error: `Skill not found: ${slug}`, success: false };
     }
 
@@ -155,16 +158,18 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
       };
     }
 
-    const agents = detectAgents();
-    if (agents.every(a => !a.detected)) {
+    const summary = deploySkillToAgents(source, {
+      agentIds: agentId ? [agentId] : undefined,
+      scope,
+    });
+    if (summary.agents.every(a => !a.detected)) {
       return { error: "No agents detected on this system.", success: false, agents: [] };
     }
 
-    const results = deployToAgents(skillDir, agentId ? [agentId] : undefined);
     return {
-      success: results.some(r => r.success),
-      deployed: results.filter(r => r.success).map(r => r.agent.id),
-      failed: results.filter(r => !r.success).map(r => ({ agent: r.agent.id, error: r.error })),
+      success: summary.deployed.length > 0,
+      deployed: summary.deployed,
+      failed: summary.failed,
     };
   }
 
