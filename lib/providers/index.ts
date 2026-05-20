@@ -1,36 +1,65 @@
-import fs from 'fs'
-import os from 'os'
-import path from 'path'
 import { OpenAIClient } from './openai'
+import { AnthropicClient } from './anthropic'
 import { ClaudeCodeClient } from './claude-code'
 import { GeminiClient } from './gemini'
 import { GroqClient } from './groq'
 import { OllamaClient } from './ollama'
-import { DEFAULT_MODELS } from './defaults'
 import { ConfigError } from './types'
-import type { LLMClient, ProviderConfig, ProviderID } from './types'
+import type { LLMClient, ProviderConfig } from './types'
+import { createRouterLLMClient } from '../llm/router/create-client'
+import { resolveRouterProviderConfig } from '../llm/router/config'
+import { resolveEnvSecret } from '../llm/router/secret-refs'
 
 export { ConfigError } from './types'
 export type { LLMClient, ProviderConfig, ProviderID, CompletionOptions } from './types'
 
-/** Create an LLMClient for the given provider configuration. */
-export function createLLMClient(config: ProviderConfig): LLMClient {
+function resolveApiKeyForRouterConfig(config: ProviderConfig): string | undefined {
+  if (config.apiKey) return config.apiKey
+  if (config.authMode !== 'env_key' || config.secretRef?.type !== 'env') return undefined
+  const value = resolveEnvSecret(config.secretRef.name)
+  if (!value) {
+    throw new ConfigError(`Missing API key environment variable: ${config.secretRef.name}`)
+  }
+  return value
+}
+
+function assertKnownProvider(provider: string): void {
+  if (!['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'].includes(provider)) {
+    throw new Error(`Unknown provider: ${provider}`)
+  }
+}
+
+/** Create a direct LLMClient for the given provider configuration. */
+export function createDirectLLMClient(config: ProviderConfig): LLMClient {
+  const directConfig = {
+    ...config,
+    apiKey: resolveApiKeyForRouterConfig(config),
+  }
+
   switch (config.provider) {
     case 'openai':
-      return new OpenAIClient(config)
+      return new OpenAIClient(directConfig)
+    case 'anthropic':
+      return new AnthropicClient(directConfig)
     case 'claude-code':
-      return new ClaudeCodeClient(config)
+      return new ClaudeCodeClient(directConfig)
     case 'gemini':
-      return new GeminiClient(config)
+      return new GeminiClient(directConfig)
     case 'groq':
-      return new GroqClient(config)
+      return new GroqClient(directConfig)
     case 'ollama':
-      return new OllamaClient(config)
+      return new OllamaClient(directConfig)
     default: {
       const _exhaustive: never = config.provider
       throw new Error(`Unknown provider: ${_exhaustive}`)
     }
   }
+}
+
+/** Create an LLMClient for the given provider configuration. */
+export function createLLMClient(config: ProviderConfig): LLMClient {
+  assertKnownProvider(config.provider)
+  return createRouterLLMClient(config, createDirectLLMClient)
 }
 
 /**
@@ -39,38 +68,18 @@ export function createLLMClient(config: ProviderConfig): LLMClient {
  * Throws ConfigError if no provider is configured.
  */
 export function resolveProviderConfig(): ProviderConfig {
-  const envProvider = process.env.SKILL_MALL_PROVIDER as ProviderID | undefined
-  const envApiKey = process.env.SKILL_MALL_API_KEY
-  const envModel = process.env.SKILL_MALL_MODEL
-
-  if (envProvider) {
-    return {
-      provider: envProvider,
-      apiKey: envApiKey,
-      model: envModel ?? DEFAULT_MODELS[envProvider],
-    }
+  const routerConfig = resolveRouterProviderConfig()
+  return {
+    provider: routerConfig.provider,
+    model: routerConfig.model,
+    baseURL: routerConfig.baseURL,
+    authMode: routerConfig.authMode,
+    secretRef: routerConfig.secretRef,
+    gatewayBackend: routerConfig.gatewayBackend,
+    routingPolicyId: routerConfig.routingPolicyId,
+    apiKey:
+      routerConfig.authMode === 'env_key' && routerConfig.secretRef?.type === 'env'
+        ? resolveEnvSecret(routerConfig.secretRef.name)
+        : undefined,
   }
-
-  const configPath = path.join(os.homedir(), '.skill-mall', 'config.json')
-  if (fs.existsSync(configPath)) {
-    let raw: Record<string, unknown>
-    try {
-      raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-    } catch {
-      throw new ConfigError(
-        `~/.skill-mall/config.json is malformed JSON. Run: npx skill-mall configure`
-      )
-    }
-    const provider = raw.provider as ProviderID
-    const providerSection = (raw.providers as Record<string, Record<string, unknown>> | undefined)?.[provider] ?? {}
-    return {
-      provider,
-      apiKey: (raw.apiKey ?? providerSection.apiKey) as string | undefined,
-      model: (raw.model ?? providerSection.model ?? DEFAULT_MODELS[provider]) as string,
-    }
-  }
-
-  throw new ConfigError(
-    'No LLM provider configured. Run: npx skill-mall configure'
-  )
 }

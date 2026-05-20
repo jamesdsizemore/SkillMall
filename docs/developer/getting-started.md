@@ -87,20 +87,20 @@ Run the interactive configurator:
 npx skill-mall configure
 ```
 
-This writes your configuration to `~/.skill-mall/config.json` (global) and sets environment variables in `.env.local` for the web app. You can also configure a specific provider directly:
+This writes non-secret configuration to `~/.skill-mall/config.json`. API providers store an env-var reference; raw API keys are not written. You can configure a specific provider directly:
 
 ```bash
 # Option 1: Claude Code CLI (no API key needed — uses your existing auth)
 npx skill-mall configure --provider claude-code --model claude-sonnet-4-6
 
 # Option 2: OpenAI
-npx skill-mall configure --provider openai --key sk-... --model gpt-4o
+npx skill-mall configure --provider openai --key-env OPENAI_API_KEY --model gpt-4o
 
 # Option 3: Gemini
-npx skill-mall configure --provider gemini --key AIza... --model gemini-2.0-flash-exp
+npx skill-mall configure --provider gemini --key-env GEMINI_API_KEY --model gemini-2.0-flash-exp
 
 # Option 4: Groq (fast, inexpensive)
-npx skill-mall configure --provider groq --key gsk_... --model llama-3.3-70b-versatile
+npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.3-70b-versatile
 
 # Option 5: Ollama (local, no API key)
 ollama pull llama3.1
@@ -119,7 +119,7 @@ npx skill-mall configure --provider ollama --model llama3.1
 ```bash
 # In .env.local (not configured via CLI):
 SKILL_MALL_EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 
 # Or for local embeddings:
 SKILL_MALL_EMBEDDING_PROVIDER=ollama
@@ -490,7 +490,7 @@ Create `.env.local` in the project root (it's gitignored). Copy from `.env.local
 | Variable | Required | Source | Breaks if missing |
 |---|---|---|---|
 | `SKILL_MALL_PROVIDER` | Yes (for skill creation) | `npx skill-mall configure` | Skill creation pipeline fails: "No LLM provider configured" |
-| `SKILL_MALL_API_KEY` | Depends on provider | Your LLM provider's dashboard | Auth fails for OpenAI, Gemini, Groq |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `GROQ_API_KEY` | Depends on provider | Provider API dashboard | API provider calls fail |
 | `SKILL_MALL_MODEL` | No | Auto-set during configure | Uses provider default model |
 | `SKILL_MALL_EMBEDDING_PROVIDER` | No (for RAG only) | Same as SKILL_MALL_PROVIDER but separate | RAG attach-knowledge fails |
 | `OPENAI_API_KEY` | For OpenAI embeddings | platform.openai.com | OpenAI embedding calls fail |
@@ -509,7 +509,7 @@ Create `.env.local` in the project root (it's gitignored). Copy from `.env.local
 ```bash
 # .env.local — minimum for skill creation without auth
 SKILL_MALL_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
@@ -522,7 +522,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # 4. Copy the Client ID and generate a secret
 
 SKILL_MALL_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 GITHUB_CLIENT_ID=Ov23li...
 GITHUB_CLIENT_SECRET=...
 NEXTAUTH_SECRET=$(openssl rand -hex 32)

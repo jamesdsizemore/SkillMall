@@ -156,7 +156,7 @@ curl http://localhost:3000/api/providers
 
 ### POST /api/providers/configure
 
-Writes LLM provider configuration to `.env.local`. Development only — not available in production.
+Writes non-secret LLM provider configuration to `~/.skill-mall/config.json`.
 
 **Authentication:** None required
 
@@ -164,15 +164,15 @@ Writes LLM provider configuration to `.env.local`. Development only — not avai
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `provider` | string | Yes | Provider ID (`openai`, `claude-code`, `gemini`, `groq`, `ollama`) |
-| `apiKey` | string | Depends | Required for openai, gemini, groq |
+| `provider` | string | Yes | Provider ID (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`) |
+| `authMode` | string | No | `env_key`, `local_cli_session`, or `none_local` |
+| `secretRef` | object | No | `{ "type": "env", "name": "OPENAI_API_KEY" }` or `{ "type": "none" }` |
 | `model` | string | No | Model name (defaults to provider default) |
-| `baseURL` | string | No | Custom base URL (for Ollama or proxies) |
 
 **Response:**
 
 ```json
-{ "success": true, "provider": "openai", "model": "gpt-4o" }
+{ "success": true, "provider": "openai", "model": "gpt-4o", "authMode": "env_key", "gatewayBackend": "direct" }
 ```
 
 **curl example:**
@@ -180,7 +180,7 @@ Writes LLM provider configuration to `.env.local`. Development only — not avai
 ```bash
 curl -X POST http://localhost:3000/api/providers/configure \
   -H "Content-Type: application/json" \
-  -d '{"provider": "openai", "apiKey": "sk-...", "model": "gpt-4o"}'
+  -d '{"provider": "openai", "authMode": "env_key", "secretRef": {"type": "env", "name": "OPENAI_API_KEY"}, "model": "gpt-4o"}'
 ```
 
 ---
@@ -1082,7 +1082,7 @@ All 30 routes documented in this reference:
 | GET | /api/auth/callback/github | None (validates CSRF) | Complete OAuth |
 | POST | /api/auth/logout | sm_session | Destroy session |
 | GET | /api/providers | None | List LLM providers |
-| POST | /api/providers/configure | None (dev only) | Write .env.local config |
+| POST | /api/providers/configure | None | Write non-secret provider config |
 | POST | /api/research | None | Research Engine extraction |
 | POST | /api/preview-skill | None | Build editable `SKILL.md` preview |
 | POST | /api/confirm-research | None | Build skill files in memory |
@@ -1399,7 +1399,7 @@ Several routes have filesystem requirements that make them incompatible with Ver
 | POST /api/regen-prompt | **No** | Writes to `skills/` |
 | POST /api/create-chain | **No** | Writes to `skills/chains/` |
 | POST /api/improvements/[id]/approve | **No** | Writes SKILL.md |
-| POST /api/providers/configure | **No** | Writes .env.local |
+| POST /api/providers/configure | **No** | Writes non-secret provider config |
 | POST /api/retrieve | **No** | Reads SQLite knowledge_chunks |
 
 For Vercel deployments, the catalog browsing experience works fully. Skill creation, chain building, and improvement suggestions require a deployment with a writable filesystem (Railway, Fly.io, VPS). See [deployment.md](./deployment.md) for platform-specific guidance.

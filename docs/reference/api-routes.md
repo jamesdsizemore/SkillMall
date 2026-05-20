@@ -1,6 +1,6 @@
 # API Routes
 
-All API routes use `Content-Type: application/json`. No authentication is required in Phase 1 (local development). All routes return structured error responses.
+All API routes use `Content-Type: application/json`. No authentication is required in the current local-development surface. All routes return structured error responses.
 
 ## Common Error Responses
 
@@ -16,7 +16,7 @@ All API routes use `Content-Type: application/json`. No authentication is requir
 
 ## GET /api/providers
 
-Returns the current provider configuration and the full provider catalog.
+Returns sanitized provider/router status and the full provider catalog. This route returns secret reference display data only; it does not return raw API keys, subscription tokens, browser/session tokens, or local CLI credential files.
 
 **Response:**
 
@@ -25,8 +25,19 @@ Returns the current provider configuration and the full provider catalog.
   configured: boolean          // true if a provider is configured
   activeProvider: string | null
   activeModel: string | null
+  authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key' | null
+  gatewayBackend: 'direct' | 'bifrost_local'
+  accessLabel: 'api_access' | 'local_cli_session' | 'local_no_auth' | 'gateway_virtual_key'
+  secretRef:
+    | { type: 'env', name: string }
+    | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'none' }
+    | null
+  baseURL: string | null
+  routingPolicyId: string | null
+  warnings: string[]
   providers: Array<{
-    id: string                 // 'openai' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
+    id: string                 // 'openai' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
     name: string
     requiresApiKey: boolean
     defaultModel: string
@@ -41,15 +52,22 @@ Returns the current provider configuration and the full provider catalog.
 
 ## POST /api/providers/configure
 
-Write provider configuration to `.env.local` (development only).
+Writes non-secret provider configuration to `~/.skill-mall/config.json`. It does not write `.env.local`, does not mutate `process.env`, and does not accept raw API key request bodies.
 
 **Request body:**
 
 ```typescript
 {
   provider: string             // provider ID
-  apiKey?: string              // omit for claude-code and ollama
   model?: string               // defaults to provider's default model
+  authMode?: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key'
+  secretRef?:
+    | { type: 'env', name: string }
+    | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'none' }
+  gatewayBackend?: 'direct' | 'bifrost_local'
+  baseURL?: string              // bifrost_local must point to localhost, 127.0.0.1, or ::1
+  routingPolicyId?: string
 }
 ```
 
@@ -60,10 +78,21 @@ Write provider configuration to `.env.local` (development only).
   success: true
   provider: string
   model: string | undefined
+  authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key'
+  gatewayBackend: 'direct' | 'bifrost_local'
+  secretRef:
+    | { type: 'env', name: string }
+    | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'none' }
+    | null
+  baseURL: string | null
+  routingPolicyId: string | null
 }
 ```
 
-**Note:** in production (`NODE_ENV=production`), returns 400 with `{ error: 'use_env_vars' }` — set environment variables in your hosting dashboard instead.
+API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. Subscription/tool-session auth, such as Claude Code CLI, uses `local_cli_session` and SkillMall does not copy credential files.
+
+Phase 2 supports `bifrost_local` as the only approved gateway backend. It uses `gateway_virtual_key` plus a `gateway_virtual_key_ref` environment-variable name, never a raw virtual key in the request body or config file. `bifrost_local` base URLs are intentionally restricted to localhost-class addresses. GoModel, LiteLLM proxy mode, hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, `cheapest_compatible`, `quality_first`, and semantic routers remain unimplemented unless a later approved phase changes the contract.
 
 ---
 
