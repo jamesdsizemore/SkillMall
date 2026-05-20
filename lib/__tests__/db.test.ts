@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { runMigrations } from "../db/migrator";
+import { getMigrationFiles, runMigrations } from "../db/migrator";
 
 describe("SQLite schema", () => {
   const tmpDb = path.join(os.tmpdir(), `skillmall-test-${Date.now()}.db`);
@@ -110,13 +110,7 @@ describe("SQLite schema", () => {
       const first = runMigrations(db);
       const second = runMigrations(db);
 
-      expect(first.applied).toEqual([
-        "001_initial.sql",
-        "002_phase3.sql",
-        "003_fork_events.sql",
-        "004_rag_embedding_column.sql",
-        "005_search_clicks.sql",
-      ]);
+      expect(first.applied).toEqual(getMigrationFiles());
       expect(second.applied).toEqual([]);
 
       const tables = db
