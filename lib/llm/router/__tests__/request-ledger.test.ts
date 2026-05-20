@@ -355,4 +355,50 @@ describe('router Phase 2 request ledger helpers', () => {
     expect(json).not.toContain('secret response body')
     expect(json).not.toContain('secret nested body')
   })
+
+  it('drops secret-like metadata keys before ledger persistence', () => {
+    const json = stringifyLedgerMetadata({
+      operationContext: { step: 'provider-test' },
+      apiKey: 'raw-api-key',
+      raw_key: 'raw-key-value',
+      token: 'raw-token',
+      sessionToken: 'session-token-value',
+      credentialPath: '/Users/test/.codex/auth.json',
+      nested: {
+        authorization: 'Bearer raw-token',
+        visible: 'safe metadata',
+      },
+    })
+
+    expect(json).toContain('operationContext')
+    expect(json).toContain('safe metadata')
+    expect(json).not.toContain('raw-api-key')
+    expect(json).not.toContain('raw-key-value')
+    expect(json).not.toContain('raw-token')
+    expect(json).not.toContain('session-token-value')
+    expect(json).not.toContain('/Users/test/.codex/auth.json')
+    expect(json).not.toContain('authorization')
+  })
+
+  it('redacts credential-like metadata values under otherwise safe keys', () => {
+    const json = stringifyLedgerMetadata({
+      operationContext: { step: 'provider-test' },
+      details: {
+        note: 'safe metadata',
+        reference: 'Authorization Bearer raw-token-value',
+        path: '/Users/test/.claude/credentials.json',
+        cookieHeader: 'session_cookie=raw-session-cookie',
+        nested: ['sk-test-secret-value', 'visible value'],
+      },
+    })
+
+    expect(json).toContain('operationContext')
+    expect(json).toContain('safe metadata')
+    expect(json).toContain('visible value')
+    expect(json).toContain('[redacted]')
+    expect(json).not.toContain('raw-token-value')
+    expect(json).not.toContain('/Users/test/.claude/credentials.json')
+    expect(json).not.toContain('raw-session-cookie')
+    expect(json).not.toContain('sk-test-secret-value')
+  })
 })
