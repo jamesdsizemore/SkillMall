@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth/github'
-import { createFeedback, getFeedbackCount, shouldTriggerAnalysis } from '@/lib/self-improvement/feedback'
+import { authenticationRequiredResponse, getSessionFromCookies } from '@/lib/auth/policy'
+import { createFeedback, shouldTriggerAnalysis } from '@/lib/self-improvement/feedback'
 
 export async function POST(req: NextRequest) {
-  // Auth required
-  const cookieStore = await cookies()
-  const token = cookieStore.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = await getSessionFromCookies()
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return authenticationRequiredResponse()
   }
 
   const body = await req.json().catch(() => null)
