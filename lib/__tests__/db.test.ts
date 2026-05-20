@@ -1,8 +1,9 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { runMigrations } from "../db/migrator";
 
 describe("SQLite schema", () => {
   const tmpDb = path.join(os.tmpdir(), `skillmall-test-${Date.now()}.db`);
@@ -99,5 +100,82 @@ describe("SQLite schema", () => {
     // Should not throw when tables already exist (IF NOT EXISTS)
     expect(() => db.exec(migration)).not.toThrow();
     db.close();
+  });
+
+  it("applies all repository migrations through the Local Data Store migrator", () => {
+    const migratorDb = path.join(os.tmpdir(), `skillmall-migrator-${Date.now()}.db`);
+    const db = new Database(migratorDb);
+
+    try {
+      const first = runMigrations(db);
+      const second = runMigrations(db);
+
+      expect(first.applied).toEqual([
+        "001_initial.sql",
+        "002_phase3.sql",
+        "003_fork_events.sql",
+        "004_rag_embedding_column.sql",
+        "005_search_clicks.sql",
+      ]);
+      expect(second.applied).toEqual([]);
+
+      const tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all() as Array<{ name: string }>;
+      const tableNames = tables.map((row) => row.name);
+
+      expect(tableNames).toContain("sessions");
+      expect(tableNames).toContain("reviews");
+      expect(tableNames).toContain("skill_feedback");
+      expect(tableNames).toContain("knowledge_chunks");
+      expect(tableNames).toContain("fork_events");
+      expect(tableNames).toContain("search_clicks");
+
+      const applied = db
+        .prepare("SELECT filename FROM schema_migrations ORDER BY filename")
+        .all() as Array<{ filename: string }>;
+      expect(applied.map((row) => row.filename)).toEqual(first.applied);
+    } finally {
+      db.close();
+      try { fs.unlinkSync(migratorDb) } catch {}
+      try { fs.unlinkSync(migratorDb + "-shm") } catch {}
+      try { fs.unlinkSync(migratorDb + "-wal") } catch {}
+    }
+  });
+});
+
+describe("getDb", () => {
+  const createdFiles: string[] = [];
+
+  afterEach(async () => {
+    const { closeDbForTests } = await import("../db/client");
+    closeDbForTests();
+    delete process.env.SKILL_MALL_DB_PATH;
+    vi.resetModules();
+
+    for (const file of createdFiles.splice(0)) {
+      try { fs.unlinkSync(file) } catch {}
+      try { fs.unlinkSync(file + "-shm") } catch {}
+      try { fs.unlinkSync(file + "-wal") } catch {}
+    }
+  });
+
+  it("opens a fresh Local Data Store with schema migrations applied", async () => {
+    const tmpDb = path.join(os.tmpdir(), `skillmall-getdb-${Date.now()}.db`);
+    createdFiles.push(tmpDb);
+    process.env.SKILL_MALL_DB_PATH = tmpDb;
+    vi.resetModules();
+
+    const { getDb } = await import("../db/client");
+    const db = getDb();
+
+    const row = db
+      .prepare("SELECT COUNT(*) as count FROM schema_migrations")
+      .get() as { count: number };
+    expect(row.count).toBeGreaterThan(0);
+
+    expect(() => {
+      db.prepare("INSERT INTO search_clicks (skill_slug, query) VALUES (?, ?)").run("demo", "query");
+    }).not.toThrow();
   });
 });
