@@ -2,23 +2,47 @@ import { createHash } from 'crypto'
 import type Database from 'better-sqlite3'
 import { getDb } from '../../db/client'
 import { fetchProviderModels } from '../../providers/catalog'
-import type { ProviderConfig } from '../../providers/types'
+import { refreshProviderModelSource } from '../../providers/model-sources'
+import {
+  getProviderRegistryEntry,
+  providerRegistryIdForExecutableProvider,
+} from '../../providers/registry'
+import type { ProviderConfig, ProviderRegistryEntry, ProviderRegistryID } from '../../providers/types'
+import type { SecretRef } from './types'
 import { resolveEnvSecret } from './secret-refs'
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 export interface RefreshedModel {
   providerId: string
+  providerRegistryId: ProviderRegistryID
+  executionKind: string
   modelId: string
-  source: 'live:direct' | 'live:bifrost_local'
+  displayName?: string
+  source:
+    | 'live:direct'
+    | 'live:bifrost_local'
+    | 'live:openai_compatible'
+    | 'live:provider_specific'
+    | 'live:local_runtime'
+    | 'source_backed_static'
+    | 'manual'
+    | 'fallback'
   raw: Record<string, unknown>
 }
 
 export interface ModelRefreshResult {
   providerId: string
+  providerRegistryId: ProviderRegistryID
+  executionKind: string
   source: RefreshedModel['source']
   models: RefreshedModel[]
   checkedAt: string
+  status?: string
+  blocker?: string
+  authoritative?: boolean
+  networkCalled?: boolean
+  persistedCount?: number
 }
 
 type OpenAICompatibleModelList = {
@@ -41,10 +65,20 @@ function sanitizeRawModel(raw: Record<string, unknown>): Record<string, unknown>
   const sanitized: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(raw)) {
     const normalized = key.toLowerCase()
-    if (normalized.includes('key') || normalized.includes('token') || normalized.includes('secret')) {
+    if (
+      normalized.includes('key') ||
+      normalized.includes('token') ||
+      normalized.includes('secret') ||
+      normalized.includes('credential') ||
+      normalized.includes('session') ||
+      normalized.includes('authorization') ||
+      normalized.includes('bearer')
+    ) {
       continue
     }
-    sanitized[key] = value
+    sanitized[key] = value && typeof value === 'object' && !Array.isArray(value)
+      ? sanitizeRawModel(value as Record<string, unknown>)
+      : value
   }
   return sanitized
 }
@@ -55,6 +89,8 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
     INSERT INTO llm_models (
       id,
       provider_id,
+      provider_registry_id,
+      execution_kind,
       model_id,
       display_name,
       source,
@@ -64,6 +100,8 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
     ) VALUES (
       @id,
       @providerId,
+      @providerRegistryId,
+      @executionKind,
       @modelId,
       @displayName,
       @source,
@@ -71,7 +109,9 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
       @rawJson,
       @checkedAt
     )
-    ON CONFLICT(provider_id, model_id) DO UPDATE SET
+    ON CONFLICT(provider_registry_id, model_id) DO UPDATE SET
+      provider_id = excluded.provider_id,
+      execution_kind = excluded.execution_kind,
       display_name = excluded.display_name,
       source = excluded.source,
       last_checked_at = excluded.last_checked_at,
@@ -80,8 +120,10 @@ function upsertModel(db: Database.Database, model: RefreshedModel, checkedAt: st
   `).run({
     id: `${model.providerId}:${model.modelId}:${rawHash(raw)}`,
     providerId: model.providerId,
+    providerRegistryId: model.providerRegistryId,
+    executionKind: model.executionKind,
     modelId: model.modelId,
-    displayName: typeof raw.name === 'string' ? raw.name : model.modelId,
+    displayName: model.displayName ?? (typeof raw.name === 'string' ? raw.name : model.modelId),
     source: model.source,
     checkedAt,
     rawJson: JSON.stringify(raw),
@@ -95,6 +137,36 @@ function resolveGatewayVirtualKey(config: ProviderConfig): string {
   const value = resolveEnvSecret(config.secretRef.name)
   if (!value) throw new Error(`Missing gateway virtual key environment variable: ${config.secretRef.name}`)
   return value
+}
+
+function directExecutionKind(config: ProviderConfig): string {
+  return config.gatewayBackend === 'bifrost_local' ? 'bifrost_local' : 'direct'
+}
+
+function sourceExecutionKind(
+  entry: ProviderRegistryEntry,
+  source: RefreshedModel['source'],
+): string {
+  if (source === 'live:openai_compatible') return 'openai_compatible'
+  if (source === 'live:provider_specific') return 'provider_specific'
+  if (source === 'live:local_runtime') return 'local_runtime'
+  if (source === 'source_backed_static') return 'source_backed_static'
+  if (source === 'manual') return 'manual'
+  if (source === 'fallback') return 'fallback'
+  if (entry.gatewayProfile?.kind === 'openai_compatible') return 'openai_compatible'
+  return 'provider_specific'
+}
+
+function registrySource(entry: ProviderRegistryEntry, source: 'live' | 'source_backed_static' | 'manual' | 'fallback'): RefreshedModel['source'] {
+  if (source === 'source_backed_static') return 'source_backed_static'
+  if (source === 'manual') return 'manual'
+  if (source === 'fallback') return 'fallback'
+  if (entry.discoveryStrategy === 'local_runtime_models') return 'live:local_runtime'
+  if (entry.discoveryStrategy === 'openai_compatible_models') return 'live:openai_compatible'
+  if (entry.gatewayProfile?.kind === 'openai_compatible' && entry.discoveryStrategy !== 'official_provider_models') {
+    return 'live:openai_compatible'
+  }
+  return 'live:provider_specific'
 }
 
 export async function fetchBifrostModels(
@@ -118,6 +190,8 @@ export async function fetchBifrostModels(
     .filter((model): model is Record<string, unknown> & { id: string } => typeof model.id === 'string')
     .map((model) => ({
       providerId: config.provider,
+      providerRegistryId: providerRegistryIdForExecutableProvider(config.provider),
+      executionKind: 'bifrost_local',
       modelId: model.id,
       source: 'live:bifrost_local',
       raw: model,
@@ -130,11 +204,15 @@ export async function refreshProviderModels(
   fetchFn: FetchLike = fetch
 ): Promise<ModelRefreshResult> {
   const checkedAt = nowIso()
+  const providerRegistryId = providerRegistryIdForExecutableProvider(config.provider)
+  const executionKind = directExecutionKind(config)
   const models =
     config.gatewayBackend === 'bifrost_local'
       ? await fetchBifrostModels(config, fetchFn)
       : (await fetchProviderModels(config)).map((modelId) => ({
           providerId: config.provider,
+          providerRegistryId,
+          executionKind,
           modelId,
           source: 'live:direct' as const,
           raw: { id: modelId },
@@ -146,8 +224,79 @@ export async function refreshProviderModels(
 
   return {
     providerId: config.provider,
+    providerRegistryId,
+    executionKind,
     source: config.gatewayBackend === 'bifrost_local' ? 'live:bifrost_local' : 'live:direct',
     models,
     checkedAt,
+    persistedCount: models.length,
+  }
+}
+
+export async function refreshRegistryProviderModels(
+  input: {
+    providerRegistryId: ProviderRegistryID
+    baseURL?: string
+    secretRef?: SecretRef
+    apiKey?: string
+    project?: Record<string, string | undefined>
+    manualModels?: string[]
+    fetchFn?: FetchLike
+    now?: () => Date
+  },
+  db: Database.Database = getDb(),
+): Promise<ModelRefreshResult> {
+  const entry = getProviderRegistryEntry(input.providerRegistryId)
+  if (!entry) throw new Error(`Unknown provider registry id: ${input.providerRegistryId}`)
+
+  const checkedAt = nowIso()
+  const result = await refreshProviderModelSource({
+    providerRegistryId: entry.id,
+    baseURL: input.baseURL,
+    secretRef: input.secretRef,
+    apiKey: input.apiKey,
+    project: input.project,
+    manualModels: input.manualModels,
+    fetchFn: input.fetchFn,
+    now: input.now,
+  })
+
+  const source = result.source === 'none'
+    ? 'fallback'
+    : registrySource(entry, result.source)
+  const executionKind = sourceExecutionKind(entry, source)
+  const providerId = entry.executableProviderId ?? entry.id
+  const models = result.models.map((model) => ({
+    providerId,
+    providerRegistryId: entry.id,
+    executionKind,
+    modelId: model.modelId,
+    displayName: model.displayName,
+    source,
+    raw: {
+      id: model.modelId,
+      displayName: model.displayName,
+      sourceName: model.sourceName,
+      sourceUrl: model.sourceUrl,
+      ...(model.raw ?? {}),
+    },
+  }))
+
+  for (const model of models) {
+    upsertModel(db, model, checkedAt)
+  }
+
+  return {
+    providerId,
+    providerRegistryId: entry.id,
+    executionKind,
+    source,
+    models,
+    checkedAt,
+    status: result.status,
+    blocker: result.blocker,
+    authoritative: result.authoritative,
+    networkCalled: result.networkCalled,
+    persistedCount: models.length,
   }
 }

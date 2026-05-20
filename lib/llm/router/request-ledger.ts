@@ -61,6 +61,11 @@ function calculateLatencyMs(startedAt: string, completedAt: string): number | nu
   return Math.max(0, completed - started)
 }
 
+function tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>
+  return rows.some((row) => row.name === columnName)
+}
+
 export function startLLMRequest(
   input: LLMRequestStartInput,
   db: Database.Database = getDb()
@@ -70,30 +75,61 @@ export function startLLMRequest(
   const authMode = assertRouterAuthMode(input.authMode)
   const routeBackend = assertRouterGatewayBackend(input.routeBackend)
 
-  db.prepare(`
-    INSERT INTO llm_requests (
-      id,
-      operation,
-      provider_id,
-      model_id,
-      route_backend,
-      auth_mode,
-      routing_policy_id,
-      status,
-      started_at,
-      metadata_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'started', ?, ?)
-  `).run(
-    requestId,
-    input.operation,
-    input.providerId,
-    input.modelId ?? null,
-    routeBackend,
-    authMode,
-    input.routingPolicyId ?? null,
-    startedAt,
-    stringifyLedgerMetadata(input.metadata)
-  )
+  if (tableHasColumn(db, 'llm_requests', 'provider_registry_id')) {
+    db.prepare(`
+      INSERT INTO llm_requests (
+        id,
+        operation,
+        provider_id,
+        provider_registry_id,
+        execution_kind,
+        model_id,
+        route_backend,
+        auth_mode,
+        routing_policy_id,
+        status,
+        started_at,
+        metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'started', ?, ?)
+    `).run(
+      requestId,
+      input.operation,
+      input.providerId,
+      input.providerRegistryId ?? input.providerId,
+      input.executionKind ?? (routeBackend === 'bifrost_local' ? 'bifrost_local' : 'direct'),
+      input.modelId ?? null,
+      routeBackend,
+      authMode,
+      input.routingPolicyId ?? null,
+      startedAt,
+      stringifyLedgerMetadata(input.metadata)
+    )
+  } else {
+    db.prepare(`
+      INSERT INTO llm_requests (
+        id,
+        operation,
+        provider_id,
+        model_id,
+        route_backend,
+        auth_mode,
+        routing_policy_id,
+        status,
+        started_at,
+        metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'started', ?, ?)
+    `).run(
+      requestId,
+      input.operation,
+      input.providerId,
+      input.modelId ?? null,
+      routeBackend,
+      authMode,
+      input.routingPolicyId ?? null,
+      startedAt,
+      stringifyLedgerMetadata(input.metadata)
+    )
+  }
 
   return { requestId, startedAt }
 }
@@ -146,6 +182,31 @@ export function recordLLMRequestEvent(
   input: LLMRequestEventInput,
   db: Database.Database = getDb()
 ): void {
+  if (tableHasColumn(db, 'llm_request_events', 'provider_registry_id')) {
+    db.prepare(`
+      INSERT INTO llm_request_events (
+        request_id,
+        event_type,
+        provider_id,
+        provider_registry_id,
+        execution_kind,
+        model_id,
+        message,
+        metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      input.requestId,
+      input.eventType,
+      input.providerId ?? null,
+      input.providerRegistryId ?? input.providerId ?? null,
+      input.executionKind ?? null,
+      input.modelId ?? null,
+      input.message ?? null,
+      stringifyLedgerMetadata(input.metadata)
+    )
+    return
+  }
+
   db.prepare(`
     INSERT INTO llm_request_events (
       request_id,

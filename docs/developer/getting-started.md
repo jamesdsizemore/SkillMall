@@ -112,9 +112,9 @@ ollama pull llama3.1
 npx skill-mall configure --provider ollama --model llama3.1
 ```
 
-Provider Center also lists registry-only rows such as OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. Those broad `ProviderRegistryID` rows are separate from the narrower executable `ProviderID` set (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`).
+Provider Center also lists broad rows such as OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. Those broad `ProviderRegistryID` rows are separate from the narrower executable `ProviderID` set (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`). OpenAI-compatible rows can execute through the shared registry-target path when configured with a safe env secret reference and base URL.
 
-Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. This currently includes Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
+Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. Phase 4 promotes Alibaba/DashScope/Qwen and Z.AI to source-backed/static OpenAI-compatible configuration behavior, Perplexity to a source-backed catalog row with execution gated, and DeepInfra to a provider-specific model-list adapter plus OpenAI-compatible execution profile. Ambiguous managed NVIDIA NIM variants remain out of scope.
 
 **Provider notes:**
 

@@ -1,8 +1,22 @@
+import fs from "fs";
+import path from "path";
 import { pc } from "../utils.js";
 import { resolveRouterProviderConfig } from "../../../lib/llm/router/config";
 import { resolveEnvSecret, sanitizeSecretRef } from "../../../lib/llm/router/secret-refs";
 import { discoverProviderModels, modelDiscoveryPlanForEntry } from "../../../lib/providers/model-discovery";
-import { PROVIDER_REGISTRY, getProviderRegistryEntry } from "../../../lib/providers/registry";
+import {
+  PROVIDER_REGISTRY,
+  getProviderRegistryEntry,
+  providerRegistryIdForExecutableProvider,
+} from "../../../lib/providers/registry";
+import { getDb } from "../../../lib/db/client";
+import { refreshPricingSnapshots } from "../../../lib/llm/router/pricing-refresh";
+import {
+  normalizeLiteLLMPricing,
+  normalizePortkeyPricing,
+  portkeyPricingUrl,
+  type PricingSource,
+} from "../../../lib/providers/pricing-sources";
 import type { SecretRef } from "../../../lib/llm/router/types";
 import type {
   ProviderID,
@@ -16,6 +30,8 @@ interface ProviderFlags {
   key?: string;
   keyEnv?: string;
   baseURL?: string;
+  source?: PricingSource;
+  modelIds?: string[];
   manualModels?: string[];
   json?: boolean;
   help?: boolean;
@@ -32,17 +48,21 @@ interface ActiveStatus {
   secretRef: SecretRef | null;
   secretStatus: ReturnType<typeof secretStatus>;
   baseURL: string | null;
+  executionKind: string | null;
   routingPolicyId: string | null;
   warnings: string[];
 }
 
-const registryIdByExecutableProvider = PROVIDER_REGISTRY.reduce(
-  (acc, entry) => {
-    if (entry.executableProviderId) acc[entry.executableProviderId] = entry.id;
-    return acc;
-  },
-  {} as Partial<Record<ProviderID, ProviderRegistryID>>
-);
+interface CachedModelStatus {
+  source: string;
+  modelCount: number;
+  lastCheckedAt: string | null;
+  stale: boolean;
+}
+
+function localDbPath(): string {
+  return process.env.SKILL_MALL_DB_PATH ?? path.join(process.cwd(), "data", "skillmall.db");
+}
 
 function parseList(value: string): string[] {
   return value
@@ -59,6 +79,12 @@ function parseFlags(args: string[]): ProviderFlags {
     else if (args[i] === "--key" && args[i + 1]) flags.key = args[++i];
     else if (args[i] === "--key-env" && args[i + 1]) flags.keyEnv = args[++i];
     else if (args[i] === "--base-url" && args[i + 1]) flags.baseURL = args[++i];
+    else if (args[i] === "--source" && args[i + 1]) flags.source = args[++i] as PricingSource;
+    else if ((args[i] === "--model-id" || args[i] === "--model") && args[i + 1]) {
+      flags.modelIds = [...(flags.modelIds ?? []), args[++i]];
+    } else if (args[i] === "--model-ids" && args[i + 1]) {
+      flags.modelIds = [...(flags.modelIds ?? []), ...parseList(args[++i])];
+    }
     else if (args[i] === "--manual-model" && args[i + 1]) {
       flags.manualModels = [...(flags.manualModels ?? []), args[++i]];
     } else if (args[i] === "--manual-models" && args[i + 1]) {
@@ -77,6 +103,7 @@ ${pc.bold("Commands:")}
   list                 List Provider Center rows
   status               Show active provider or selected row status
   refresh-models       Refresh or report model discovery status
+  refresh-pricing      Refresh source-backed pricing snapshots
   test                 Run a safe local provider readiness test
 
 ${pc.bold("Options:")}
@@ -84,6 +111,8 @@ ${pc.bold("Options:")}
   --provider-registry-id <id>  Provider Center row id
   --key-env <ENV>              Environment variable reference for refresh auth
   --base-url <url>             Local, gateway, or OpenAI-compatible endpoint
+  --source <name>              Pricing source: portkey_models or litellm_model_prices
+  --model-ids <a,b>            Limit pricing refresh to selected model ids
   --manual-models <a,b>        Manual labels for custom OpenAI-compatible rows
   --json                       Print JSON
 
@@ -100,6 +129,57 @@ function registryEntryFromFlags(flags: ProviderFlags): ProviderRegistryEntry | u
   return PROVIDER_REGISTRY.find(
     (entry) => entry.id === flags.provider || entry.executableProviderId === flags.provider
   );
+}
+
+function isPricingSource(value: string | undefined): value is PricingSource {
+  return value === "portkey_models" || value === "litellm_model_prices";
+}
+
+function isStale(lastCheckedAt: string | null): boolean {
+  if (!lastCheckedAt) return true;
+  const checked = Date.parse(lastCheckedAt);
+  if (!Number.isFinite(checked)) return true;
+  return Date.now() - checked > 24 * 60 * 60 * 1000;
+}
+
+function loadCachedModelStatuses(): Map<ProviderRegistryID, CachedModelStatus> {
+  if (!fs.existsSync(localDbPath())) return new Map();
+  try {
+    const rows = getDb().prepare(`
+      SELECT provider_registry_id, model_id, source, last_checked_at
+      FROM llm_models
+      WHERE provider_registry_id IS NOT NULL
+      ORDER BY provider_registry_id, model_id
+    `).all() as Array<{
+      provider_registry_id: ProviderRegistryID;
+      model_id: string;
+      source: string;
+      last_checked_at: string | null;
+    }>;
+
+    const statuses = new Map<ProviderRegistryID, CachedModelStatus>();
+    for (const row of rows) {
+      const current = statuses.get(row.provider_registry_id) ?? {
+        source: row.source,
+        modelCount: 0,
+        lastCheckedAt: row.last_checked_at,
+        stale: isStale(row.last_checked_at),
+      };
+      current.modelCount += 1;
+      if (
+        row.last_checked_at &&
+        (!current.lastCheckedAt || Date.parse(row.last_checked_at) > Date.parse(current.lastCheckedAt))
+      ) {
+        current.lastCheckedAt = row.last_checked_at;
+        current.source = row.source;
+        current.stale = isStale(row.last_checked_at);
+      }
+      statuses.set(row.provider_registry_id, current);
+    }
+    return statuses;
+  } catch {
+    return new Map();
+  }
 }
 
 function secretStatus(secretRef: SecretRef | undefined | null) {
@@ -135,7 +215,7 @@ function activeStatus(): ActiveStatus {
     return {
       configured: true,
       activeProvider: config.provider,
-      activeProviderRegistryId: registryIdByExecutableProvider[config.provider] ?? null,
+      activeProviderRegistryId: config.providerRegistryId ?? providerRegistryIdForExecutableProvider(config.provider),
       activeModel: config.model,
       authMode: config.authMode,
       gatewayBackend: config.gatewayBackend,
@@ -143,6 +223,7 @@ function activeStatus(): ActiveStatus {
       secretRef: config.secretRef ?? null,
       secretStatus: secretStatus(config.secretRef),
       baseURL: config.baseURL ?? null,
+      executionKind: config.executionKind ?? null,
       routingPolicyId: config.routingPolicyId ?? null,
       warnings: config.warnings,
     };
@@ -158,15 +239,21 @@ function activeStatus(): ActiveStatus {
       secretRef: null,
       secretStatus: null,
       baseURL: null,
+      executionKind: null,
       routingPolicyId: null,
       warnings: [error instanceof Error ? error.message : "No provider configured"],
     };
   }
 }
 
-function rowStatus(entry: ProviderRegistryEntry, active: ActiveStatus) {
+function rowStatus(
+  entry: ProviderRegistryEntry,
+  active: ActiveStatus,
+  cachedModels: Map<ProviderRegistryID, CachedModelStatus> = new Map()
+) {
   const isConfigured = active.activeProviderRegistryId === entry.id;
   const refresh = modelDiscoveryPlanForEntry(entry);
+  const cachedModelStatus = cachedModels.get(entry.id);
   return {
     id: entry.id,
     name: entry.name,
@@ -180,9 +267,17 @@ function rowStatus(entry: ProviderRegistryEntry, active: ActiveStatus) {
     authMode: isConfigured ? active.authMode : null,
     gatewayBackend: isConfigured ? active.gatewayBackend : null,
     activeModel: isConfigured ? active.activeModel : null,
+    executionKind: isConfigured ? active.executionKind : null,
     secretStatus: isConfigured ? active.secretStatus : null,
     baseURL: isConfigured ? active.baseURL : null,
     routingPolicyId: isConfigured ? active.routingPolicyId : null,
+    modelStatus: {
+      source: cachedModelStatus?.source ?? (entry.fallbackModels.length > 0 ? "fallback" : "none"),
+      modelCount: cachedModelStatus?.modelCount ?? entry.fallbackModels.length,
+      lastCheckedAt: cachedModelStatus?.lastCheckedAt ?? null,
+      stale: cachedModelStatus?.stale ?? true,
+      blocker: cachedModelStatus ? null : refresh.message,
+    },
     modelRefresh: refresh,
     setupUrl: entry.setupUrl,
   };
@@ -213,9 +308,16 @@ function rejectRawKey(flags: ProviderFlags): boolean {
   return true;
 }
 
+function filterModelIds<T extends { modelId: string }>(records: T[], modelIds: string[] | undefined): T[] {
+  if (!modelIds?.length) return records;
+  const allowed = new Set(modelIds);
+  return records.filter((record) => allowed.has(record.modelId));
+}
+
 async function listCommand(flags: ProviderFlags): Promise<void> {
   const active = activeStatus();
-  const rows = PROVIDER_REGISTRY.map((entry) => rowStatus(entry, active));
+  const cachedModels = loadCachedModelStatuses();
+  const rows = PROVIDER_REGISTRY.map((entry) => rowStatus(entry, active, cachedModels));
   if (flags.json) {
     console.log(JSON.stringify({ ...active, providers: rows }, null, 2));
     return;
@@ -229,6 +331,7 @@ async function listCommand(flags: ProviderFlags): Promise<void> {
 
 async function statusCommand(flags: ProviderFlags): Promise<void> {
   const active = activeStatus();
+  const cachedModels = loadCachedModelStatuses();
   const entry = selectedEntry(flags, active);
   if (!entry) {
     if (flags.json) console.log(JSON.stringify(active, null, 2));
@@ -239,7 +342,7 @@ async function statusCommand(flags: ProviderFlags): Promise<void> {
     return;
   }
 
-  const status = rowStatus(entry, active);
+  const status = rowStatus(entry, active, cachedModels);
   if (flags.json) {
     console.log(JSON.stringify(status, null, 2));
     return;
@@ -251,9 +354,15 @@ async function statusCommand(flags: ProviderFlags): Promise<void> {
   console.log(`  Access: ${status.accessLabel}`);
   console.log(`  Auth: ${status.authLabel}`);
   console.log(`  Discovery: ${status.discoveryStrategy}`);
+  console.log(`  Model source: ${status.modelStatus.source}`);
+  console.log(`  Model count: ${status.modelStatus.modelCount}`);
+  console.log(`  Last checked: ${status.modelStatus.lastCheckedAt ?? "never"}`);
+  console.log(`  Stale: ${status.modelStatus.stale ? "yes" : "no"}`);
+  console.log(`  Blocker: ${status.modelStatus.blocker ?? "none"}`);
   console.log(`  Configured: ${status.configured ? "yes" : "no"}`);
   if (status.configured) {
     console.log(`  Active model: ${status.activeModel}`);
+    console.log(`  Execution kind: ${status.executionKind}`);
     console.log(`  Auth mode: ${status.authMode}`);
     console.log(`  Gateway backend: ${status.gatewayBackend}`);
     if (status.secretStatus) {
@@ -261,6 +370,87 @@ async function statusCommand(flags: ProviderFlags): Promise<void> {
     }
   }
   console.log(`  Refresh: ${status.modelRefresh.message}`);
+}
+
+async function refreshPricingCommand(flags: ProviderFlags): Promise<void> {
+  const source = flags.source ?? "portkey_models";
+  if (!isPricingSource(source)) {
+    console.error(pc.red("  Unknown pricing source. Use portkey_models or litellm_model_prices."));
+    process.exitCode = 1;
+    return;
+  }
+
+  const active = activeStatus();
+  const entry = selectedEntry(flags, active);
+  const sourceUrl =
+    (source === "portkey_models" && entry ? portkeyPricingUrl(entry.id) : undefined) ??
+    (source === "litellm_model_prices"
+      ? "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+      : undefined);
+
+  if (!sourceUrl) {
+    console.error(pc.red("  No source-backed pricing file is configured for this provider/source pair."));
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    const response = await fetch(sourceUrl);
+    if (!response.ok) {
+      const payload = {
+        refreshed: false,
+        source,
+        sourceUrl,
+        providerRegistryId: entry?.id ?? null,
+        status: response.status,
+        snapshotCount: 0,
+      };
+      if (flags.json) console.log(JSON.stringify(payload, null, 2));
+      else console.log(pc.yellow(`  Pricing source failed with HTTP ${response.status}; no snapshots written.`));
+      return;
+    }
+
+    const payload = await response.json();
+    const normalized =
+      source === "portkey_models"
+        ? normalizePortkeyPricing(entry?.id ?? "unknown", payload, sourceUrl)
+        : normalizeLiteLLMPricing(payload, sourceUrl);
+    const records = filterModelIds(normalized, flags.modelIds);
+    const snapshots = refreshPricingSnapshots(
+      records.map((record) => ({
+        providerId: record.providerRegistryId,
+        providerRegistryId: record.providerRegistryId,
+        executionKind: record.executionKind,
+        modelId: record.modelId,
+        pricing: record.pricing,
+        source: record.source,
+        sourceUrl: record.sourceUrl,
+        sourceLicense: record.sourceLicense,
+        currency: record.currency,
+      }))
+    );
+    const result = {
+      refreshed: true,
+      source,
+      sourceUrl,
+      sourceLicense: records[0]?.sourceLicense ?? null,
+      providerRegistryId: entry?.id ?? null,
+      snapshotCount: snapshots.length,
+    };
+    if (flags.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    console.log(`${pc.bold(entry?.name ?? "All providers")} (${entry?.id ?? "source-wide"})`);
+    console.log(`  Pricing source: ${source}`);
+    console.log(`  Source URL: ${sourceUrl}`);
+    console.log(`  Source license: ${result.sourceLicense ?? "not recorded"}`);
+    console.log(`  Snapshots written: ${snapshots.length}`);
+  } catch (error) {
+    console.error(pc.red(`  Pricing refresh failed: ${error instanceof Error ? error.message : "unknown error"}`));
+    process.exitCode = 1;
+  }
 }
 
 async function refreshModelsCommand(flags: ProviderFlags): Promise<void> {
@@ -410,6 +600,9 @@ export async function providersCommand(args: string[]): Promise<void> {
       break;
     case "refresh-models":
       await refreshModelsCommand(flags);
+      break;
+    case "refresh-pricing":
+      await refreshPricingCommand(flags);
       break;
     case "test":
       await testCommand(flags);

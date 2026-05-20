@@ -24,6 +24,13 @@ function canUseBaseUrl(provider: ProviderRow): boolean {
   );
 }
 
+function endpointLabel(provider: ProviderRow): string {
+  if (provider.gatewayProfile?.kind === "openai_compatible") return "OPENAI-COMPATIBLE BASE URL";
+  if (provider.gatewayProfile?.kind === "bifrost_local") return "LOCAL GATEWAY BASE URL";
+  if (provider.accessModes.includes("local_runtime")) return "LOCAL RUNTIME BASE URL";
+  return "ENDPOINT / BASE URL";
+}
+
 function canUseEnvRef(provider: ProviderRow): boolean {
   return provider.accessModes.includes("api_access") || provider.accessModes.includes("custom_openai_compatible");
 }
@@ -124,8 +131,18 @@ export function ProviderConfigPanel({
           <p className="text-sm text-sm-primary">{provider.accessModes.map(accessModeLabel).join(" / ")}</p>
         </div>
         <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ AUTH CONTRACT ]</p>
+          <p className="truncate text-sm text-sm-primary">{provider.authLabel}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ ACTIVE MODEL ]</p>
           <p className="truncate text-sm text-sm-primary">{provider.configStatus.configured ? draft.model || "model pending" : "not active"}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ EXECUTION PROFILE ]</p>
+          <p className="truncate text-sm text-sm-primary">
+            {provider.executableProviderId ? provider.executableProviderId : provider.gatewayProfile?.kind ?? "metadata/status only"}
+          </p>
         </div>
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ GATEWAY BACKEND ]</p>
@@ -211,7 +228,7 @@ export function ProviderConfigPanel({
         )}
         {canUseBaseUrl(provider) && (
           <Field
-            label="LOCAL ENDPOINT / BASE URL"
+            label={endpointLabel(provider)}
             value={draft.baseURL}
             placeholder={provider.gatewayProfile?.defaultBaseUrl ?? "http://localhost:11434/v1"}
             onChange={(value) => onDraftChange({ ...draft, baseURL: value })}

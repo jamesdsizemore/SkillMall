@@ -71,6 +71,8 @@ export function resolveProviderConfig(): ProviderConfig {
   const routerConfig = resolveRouterProviderConfig()
   return {
     provider: routerConfig.provider,
+    providerRegistryId: routerConfig.providerRegistryId,
+    executionKind: routerConfig.executionKind,
     model: routerConfig.model,
     baseURL: routerConfig.baseURL,
     authMode: routerConfig.authMode,

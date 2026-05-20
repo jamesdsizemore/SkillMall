@@ -81,13 +81,35 @@ describe('provider registry', () => {
     }
   })
 
-  it('keeps planned-source-review rows visible but not live-callable', () => {
+  it('keeps planned-source-review rows blocked and promotes source-backed rows only with evidence', () => {
     const plannedRows = getPlannedSourceReviewProviderRows()
-    expect(plannedRows.map((entry) => entry.id)).toEqual(
+    expect(plannedRows.every((entry) => entry.liveCallable === false)).toBe(true)
+    expect(plannedRows.map((entry) => entry.id)).not.toEqual(
       expect.arrayContaining(['alibaba_dashscope_qwen', 'zai', 'perplexity', 'deepinfra'])
     )
-    expect(plannedRows.every((entry) => entry.liveCallable === false)).toBe(true)
-    expect(getLiveCallableProviderRows().map((entry) => entry.id)).not.toContain('zai')
+    expect(getProviderRegistryEntry('alibaba_dashscope_qwen')).toMatchObject({
+      discoveryStrategy: 'source_backed_static_models',
+      classification: 'gateway_configurable_openai_compatible',
+      liveCallable: true,
+    })
+    expect(getProviderRegistryEntry('zai')).toMatchObject({
+      discoveryStrategy: 'source_backed_static_models',
+      classification: 'gateway_configurable_openai_compatible',
+      liveCallable: true,
+    })
+    expect(getProviderRegistryEntry('perplexity')).toMatchObject({
+      discoveryStrategy: 'source_backed_static_models',
+      classification: 'active_configurable',
+      liveCallable: false,
+    })
+    expect(getProviderRegistryEntry('deepinfra')).toMatchObject({
+      discoveryStrategy: 'official_provider_models',
+      classification: 'gateway_configurable_openai_compatible',
+      liveCallable: true,
+    })
+    expect(getLiveCallableProviderRows().map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(['alibaba_dashscope_qwen', 'zai', 'deepinfra'])
+    )
   })
 
   it('enforces auth mode compatibility from provider access modes', () => {

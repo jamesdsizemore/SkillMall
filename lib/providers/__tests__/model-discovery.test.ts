@@ -45,13 +45,13 @@ describe('model discovery contracts', () => {
     expect(normalizeOpenAICompatibleModels({ data: [{ id: 'x' }, { id: '' }] })).toEqual(['x'])
   })
 
-  it('marks provider-specific, account/project/local/manual/planned strategies without unsupported network calls', async () => {
+  it('marks provider-specific, account/project/local/manual/static strategies without unsupported network calls', async () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
 
     await expect(discoverProviderModels(getProviderRegistryEntry('anthropic')!)).resolves.toMatchObject({
       strategy: 'official_provider_models',
-      status: 'provider_specific_required',
+      status: 'secret_required',
       networkCalled: false,
     })
     await expect(discoverProviderModels(getProviderRegistryEntry('fireworks')!)).resolves.toMatchObject({
@@ -81,11 +81,11 @@ describe('model discovery contracts', () => {
       networkCalled: false,
     })
     await expect(discoverProviderModels(getProviderRegistryEntry('zai')!)).resolves.toMatchObject({
-      strategy: 'planned_provider_source_review',
-      status: 'planned_source_review',
-      source: 'none',
-      authoritative: false,
-      liveCallable: false,
+      strategy: 'source_backed_static_models',
+      status: 'source_backed_static',
+      source: 'source_backed_static',
+      authoritative: true,
+      models: ['glm-5.1', 'glm-4.6'],
       networkCalled: false,
     })
 
@@ -104,9 +104,9 @@ describe('model discovery contracts', () => {
       requiresEndpoint: true,
     })
     expect(modelDiscoveryPlanForEntry(getProviderRegistryEntry('alibaba_dashscope_qwen')!)).toMatchObject({
-      strategy: 'planned_provider_source_review',
-      canRefreshNow: false,
-      liveCallable: false,
+      strategy: 'source_backed_static_models',
+      canRefreshNow: true,
+      liveCallable: true,
     })
   })
 })

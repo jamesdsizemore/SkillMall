@@ -1,4 +1,4 @@
-import type { GatewayBackend, LLMAuthMode, SecretRef } from '../llm/router/types'
+import type { GatewayBackend, LLMAuthMode, RouterExecutionKind, SecretRef } from '../llm/router/types'
 
 export type ProviderID = 'openai' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
 
@@ -45,6 +45,7 @@ export type ProviderDiscoveryStrategy =
   | 'account_scoped_models'
   | 'cloud_project_scoped_models'
   | 'local_runtime_models'
+  | 'source_backed_static_models'
   | 'manual_custom_models'
   | 'static_fallback_only'
   | 'planned_provider_source_review'
@@ -91,6 +92,8 @@ export interface ProviderRegistryEntry {
 
 export interface ProviderConfig {
   provider: ProviderID
+  providerRegistryId?: ProviderRegistryID
+  executionKind?: RouterExecutionKind
   apiKey?: string
   model: string
   baseURL?: string

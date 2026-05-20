@@ -331,7 +331,7 @@ Every environment variable SkillMall reads, what it does, whether it is required
 
 ### Variable notes
 
-**`SKILL_MALL_PROVIDER` executable values:** `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`. This environment variable is intentionally narrower than the broad Provider Center registry. Registry-only rows such as OpenRouter, cloud-project providers, and custom OpenAI-compatible metadata rows are visible in Provider Center but do not become runnable direct providers until an executable adapter is implemented and tested.
+**`SKILL_MALL_PROVIDER` executable values:** `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`. This environment variable is intentionally narrower than the broad Provider Center registry. OpenAI-compatible registry rows such as OpenRouter, DeepSeek, Kimi/Moonshot, Cerebras, and custom endpoints become runnable only through the persisted Provider Center config target (`activeProviderRegistryId` plus `executionKind: "openai_compatible"`), not by setting `SKILL_MALL_PROVIDER` to a broad registry ID. Cloud-project providers still require their project/resource context before execution.
 
 The `claude-code` provider spawns `claude -p` subprocesses using the authenticated Claude Code CLI local tool session. It does not require Anthropic API-key access, but it does require Claude Code to be installed and authenticated on the server. Claude account/Max auth is separate from Anthropic API access; ChatGPT Pro/Codex subscription auth is separate from OpenAI API access.
 

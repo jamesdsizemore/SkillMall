@@ -16,6 +16,7 @@ import {
 } from './secret-refs'
 import { assertLocalBifrostBaseURL } from './gateway-adapter'
 import type { GatewayBackend, LLMAuthMode, RouterProviderConfig, SecretRef } from './types'
+import type { ProviderRegistryID } from '../../providers/types'
 
 export const ROUTER_USER_CONFIG_PATH = path.join(os.homedir(), '.skill-mall', 'config.json')
 
@@ -29,6 +30,9 @@ const API_ENV_BY_PROVIDER: Partial<Record<ProviderID, string>> = {
 }
 
 export interface StoredRouterProviderConfig {
+  provider?: string
+  providerRegistryId?: string
+  executionKind?: string
   model?: string
   authMode?: string
   secretRef?: unknown
@@ -40,12 +44,15 @@ export interface StoredRouterProviderConfig {
 
 export interface RouterConfigFile {
   provider?: string
+  activeProviderRegistryId?: string
   model?: string
   providers?: Record<string, StoredRouterProviderConfig>
+  providerTargets?: Record<string, StoredRouterProviderConfig>
 }
 
 export interface ResolvedRouterProviderConfig extends RouterProviderConfig {
   provider: ProviderID
+  providerRegistryId: ProviderRegistryID
   gatewayBackend: GatewayBackend
   warnings: string[]
 }
@@ -78,6 +85,7 @@ function readConfigFile(): RouterConfigFile | undefined {
 
 function resolveAuthAndSecret(
   provider: ProviderID,
+  providerRegistryId: ProviderRegistryID,
   stored: StoredRouterProviderConfig | undefined,
   warnings: string[]
 ): { authMode: LLMAuthMode; secretRef?: SecretRef } {
@@ -86,7 +94,7 @@ function resolveAuthAndSecret(
   }
 
   const authMode = assertRouterAuthMode(stored?.authMode ?? defaultAuthModeForProvider(provider))
-  const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(provider))
+  const registryEntry = getProviderRegistryEntry(providerRegistryId)
   if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
   const rawSecretRef =
     stored?.secretRef ??
@@ -122,6 +130,8 @@ export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
 
     return {
       provider: envProvider,
+      providerRegistryId: providerRegistryIdForExecutableProvider(envProvider),
+      executionKind: 'direct',
       model: envModel ?? DEFAULT_MODELS[envProvider],
       authMode,
       secretRef,
@@ -141,19 +151,29 @@ export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
     )
   }
 
-  const stored = raw.providers?.[raw.provider] ?? {}
+  const fallbackRegistryId = providerRegistryIdForExecutableProvider(raw.provider)
+  const activeProviderRegistryId = (raw.activeProviderRegistryId ?? fallbackRegistryId) as ProviderRegistryID
+  const target = raw.providerTargets?.[activeProviderRegistryId]
+  const storedProvider = target?.provider && isProviderID(target.provider) ? target.provider : raw.provider
+  const stored = target ?? raw.providers?.[storedProvider] ?? {}
   const warnings: string[] = []
   if ((raw as { apiKey?: unknown }).apiKey) {
     warnings.push('Legacy root apiKey was ignored; configure an env secret reference instead.')
   }
 
-  const { authMode, secretRef } = resolveAuthAndSecret(raw.provider, stored, warnings)
+  const { authMode, secretRef } = resolveAuthAndSecret(storedProvider, activeProviderRegistryId, stored, warnings)
   const gatewayBackend = assertRouterGatewayBackend(stored.gatewayBackend)
   if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(stored.baseURL)
 
   return {
-    provider: raw.provider,
-    model: envModel ?? stored.model ?? raw.model ?? DEFAULT_MODELS[raw.provider],
+    provider: storedProvider,
+    providerRegistryId: activeProviderRegistryId,
+    executionKind: stored.executionKind === 'openai_compatible'
+      ? 'openai_compatible'
+      : gatewayBackend === 'bifrost_local'
+        ? 'bifrost_local'
+        : 'direct',
+    model: envModel ?? stored.model ?? raw.model ?? DEFAULT_MODELS[storedProvider],
     authMode,
     secretRef,
     baseURL: stored.baseURL,

@@ -1,39 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
-import { getProviderRegistryEntry, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
-import { discoverProviderModels } from '@/lib/providers/model-discovery'
+import { refreshRegistryProviderModels } from '@/lib/llm/router/model-refresh'
+import { getProviderRegistryEntry, PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { resolveEnvSecret } from '@/lib/llm/router/secret-refs'
+import type { ProviderRegistryID } from '@/lib/providers/types'
 
-const registryIds = [
-  'openai',
-  'anthropic',
-  'claude_code',
-  'gemini',
-  'groq',
-  'ollama',
-  'openrouter',
-  'alibaba_dashscope_qwen',
-  'huggingface',
-  'zai',
-  'minimax',
-  'kimi_moonshot',
-  'deepseek',
-  'mistral',
-  'cohere',
-  'xai',
-  'aws_bedrock',
-  'azure_openai',
-  'google_vertex_ai',
-  'together_ai',
-  'fireworks',
-  'replicate',
-  'nvidia_nim',
-  'perplexity',
-  'deepinfra',
-  'cerebras',
-  'custom_openai_compatible',
-] as const
+const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegistryID, ...ProviderRegistryID[]]
 
 const RefreshBodySchema = z.object({
   providerRegistryId: z.enum(registryIds).optional(),
@@ -65,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const providerRegistryId =
     parsed.data.providerRegistryId ??
-    (activeConfig ? providerRegistryIdForExecutableProvider(activeConfig.provider) : undefined)
+    (activeConfig ? activeConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(activeConfig.provider) : undefined)
   const entry = providerRegistryId ? getProviderRegistryEntry(providerRegistryId) : undefined
 
   if (!entry) {
@@ -76,7 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   const activeMatches = Boolean(
-    activeConfig && providerRegistryIdForExecutableProvider(activeConfig.provider) === entry.id
+    activeConfig && (activeConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(activeConfig.provider)) === entry.id
   )
   const secretRef = activeMatches && activeConfig ? activeConfig.secretRef : undefined
   const apiKey = secretRef && 'name' in secretRef ? resolveEnvSecret(secretRef.name) : undefined
@@ -86,8 +59,10 @@ export async function POST(req: NextRequest) {
     (activeMatches ? entry.gatewayProfile?.defaultBaseUrl : undefined)
 
   try {
-    const discovery = await discoverProviderModels(entry, {
-      baseUrl,
+    const refreshed = await refreshRegistryProviderModels({
+      providerRegistryId: entry.id,
+      baseURL: baseUrl,
+      secretRef,
       apiKey,
       manualModels: parsed.data.manualModels,
     })
@@ -96,7 +71,24 @@ export async function POST(req: NextRequest) {
       providerRegistryId: entry.id,
       executableProviderId: entry.executableProviderId ?? null,
       configured: Boolean(activeMatches),
-      discovery,
+      persisted: refreshed.persistedCount ? refreshed.persistedCount > 0 : false,
+      modelStatus: {
+        modelCount: refreshed.models.length,
+        lastCheckedAt: refreshed.checkedAt,
+        source: refreshed.source,
+        executionKind: refreshed.executionKind,
+        blocker: refreshed.blocker ?? null,
+      },
+      discovery: {
+        strategy: entry.discoveryStrategy,
+        status: refreshed.status,
+        source: refreshed.source.startsWith('live:') ? 'live' : refreshed.source,
+        authoritative: Boolean(refreshed.authoritative),
+        models: refreshed.models.map((model) => model.modelId),
+        networkCalled: Boolean(refreshed.networkCalled),
+        ...(refreshed.status === 'planned_source_review' ? { liveCallable: false } : {}),
+        ...(refreshed.blocker ? { message: refreshed.blocker } : {}),
+      },
       secretStatus: secretRef
         ? {
             type: secretRef.type,

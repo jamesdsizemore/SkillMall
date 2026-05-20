@@ -1,0 +1,514 @@
+version: 2
+active_task: null
+goal:
+  slug: provider-auth-router-phase4
+  title: Provider/Auth Router Phase 4
+  status: completed
+  created_at: '2026-05-20'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-auth-router-phase4-plan
+  source_plan: docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+  owner_outcome: Source-backed model/pricing refresh and executable OpenAI-compatible
+    registry providers on top of the Phase 3 Provider Center.
+  proof_type: test_review_artifact_source_backed_decision
+  oracle:
+    signal: GoalBuddy receipts plus final verification prove source-backed model refresh,
+      pricing refresh, executable registry-provider configuration, UI/CLI/API parity,
+      docs, review fixes, and auth/secret containment.
+    final_proof: Final receipt reports verification results, complete work, incomplete
+      work, blockers, lint classification, secret scan, diff containment, and next
+      safe action.
+  hard_constraints:
+  - Phase 4 implementation must start from updated main after the completed PR queue
+    cleanup through bb03dc6.
+  - No hosted gateway/router/proxy/observability product may be required.
+  - SkillMall remains the provider/settings/model/pricing/cost source of truth.
+  - No raw API keys, ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex
+    credential files, Claude Code credential files, copied credential-file contents,
+    or credential-file paths may be accepted.
+  - Do not add one ProviderID per broad ProviderRegistryID row.
+  - Do not assume generic /v1/models for provider-specific, account-scoped, cloud-project,
+    local-runtime, or source-backed static providers.
+  - Update docs, blockers, incomplete work, code review findings, review fixes, and
+    verification receipts.
+  - Do not stage, commit, push, or open a Phase 4 PR unless the user explicitly approves
+    commit-prep or publish.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-auth-router-phase4/.goalbuddy-board/index.html
+tasks:
+  - id: T1001
+    type: pm
+    assignee: PM
+    status: completed
+    objective: Branch, mainline, and scope gate.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - git status -sb => clean implementation branch or exact dirty state classified
+    - git branch --show-current => implementation branch is correct
+    - git fetch origin => remote refs refreshed
+    - git merge-base --is-ancestor bb03dc6 origin/main => exit 0; main includes the
+      completed PR queue cleanup
+    - git diff --cached --name-only => empty before implementation
+    stop_if:
+    - Phase 3 files are not present.
+    - Implementation branch is not based on updated origin/main through bb03dc6.
+    - Implementation would start from unknown provider/router state.
+    receipt: |-
+      2026-05-20 PM gate passed.
+      Commands run:
+      - git status -sb => ## codex/provider-auth-router-phase4
+      - git branch --show-current => codex/provider-auth-router-phase4
+      - git fetch origin => exit 0
+      - git merge-base --is-ancestor bb03dc6 origin/main => exit 0
+      - git rev-parse origin/main => bb03dc6f593976f1ee7d30400efec17e8aa406a3
+      - git diff --cached --name-only => empty
+      - Phase 3 provider files present: app/api/providers/route.ts, lib/providers/registry.ts, components/skill-mall/providers/ProviderCenter.tsx.
+      Implementation base recorded as main_after_pr_queue_cleanup.
+  - id: T1002
+    type: scout
+    assignee: Scout
+    status: completed
+    objective: Scout current source, current official provider docs, maintainer repos,
+      pricing-source licenses/schemas, and planned-row promotion evidence.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    - docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+    verify:
+    - rg -n "ProviderRegistryID|ProviderID|discoveryStrategy|llm_models|llm_pricing_snapshots|models/refresh|ProviderCenter"
+      lib app cli docs db => source map evidence recorded
+    stop_if:
+    - Any provider activation, model source, or pricing source would rely on stale or
+      unofficial evidence only.
+    - License/schema status for the selected pricing source is unknown.
+    receipt: |-
+      2026-05-20 Scout complete; no implementation files edited.
+      Local source map:
+      - AGENTS.md read; Next.js docs must be consulted before app route changes.
+      - Phase 1-3 recovery plans and receipts reviewed for auth boundaries, narrow ProviderID, Bifrost-local gateway boundary, broad ProviderRegistryID catalog, model/pricing ledger tables, and no-stage/commit rule.
+      - rg source map command run: rg -n "ProviderRegistryID|ProviderID|discoveryStrategy|llm_models|llm_pricing_snapshots|models/refresh|ProviderCenter" lib app cli docs db.
+      - Current source preserves narrow ProviderID in lib/providers/types.ts and broad ProviderRegistryID in lib/providers/registry.ts.
+      - Current model-discovery.ts only live-calls configured openai_compatible_models; official/account/cloud/local/planned strategies are status-only.
+      - Current lib/llm/router/model-refresh.ts persists llm_models only for narrow ProviderConfig/direct or Bifrost paths, not arbitrary registry rows.
+      - Current lib/llm/router/pricing-refresh.ts only stores supplied snapshots; no source-backed pricing adapter or pricing refresh route exists.
+      - Current configure/test routes reject raw key/token/session/credential fields; this boundary must remain.
+      Current official/maintainer source decisions:
+      - Anthropic: official GET /v1/models exists; activate provider-specific adapter with Anthropic headers/API-key env ref.
+      - Gemini: official Google AI models.list endpoint exists; activate provider-specific adapter and filter supported generation actions.
+      - Hugging Face: Hub API provider filters and router /v1/models are official; activate model discovery carefully, but do not treat every Hub model as executable.
+      - Cohere: official GET https://api.cohere.com/v1/models exists; activate provider-specific adapter.
+      - Fireworks: official list endpoint is account-scoped at /v1/accounts/{account_id}/models; block without account context.
+      - Replicate: official models are stable, but execution is prediction/schema based; keep limited/status-only unless stable official-model filtering is implemented.
+      - Ollama: official GET /api/tags exists; activate local-runtime adapter for configured local endpoint.
+      - Alibaba DashScope/Qwen: official docs prove regional/API-key execution and OpenAI SDK examples, but no durable live model-list endpoint was proven; promote execution only through configured OpenAI-compatible/static/manual source behavior.
+      - Z.AI: official docs prove bearer auth and OpenAI SDK baseURL execution; no model-list endpoint found; promote execution only with configured endpoint plus source-backed static/manual discovery.
+      - Perplexity: official docs expose models/pricing and model use; promote model discovery/source-backed catalog, but execution must be tested against the supported API semantics before claiming generic chat support.
+      - DeepInfra: official GET https://api.deepinfra.com/models/list exists; promote from planned-source-review with DeepInfra-specific schema normalization.
+      - Bifrost: local /v1/models with virtual key is official; keep optional local gateway source, not required control plane.
+      - GoModel: MIT/local gateway reference only for Phase 4; do not make it default.
+      Pricing source decisions:
+      - Primary: Portkey-AI/models maintainer repo/API, MIT license, provider JSON files under pricing/, free/no-auth API, schema uses pricing_config.pay_as_you_go/batch_config and prices in cents per token.
+      - Fallback/reference: BerriAI/litellm model_prices_and_context_window.json; license is mixed/repo-specific with MIT for non-enterprise content, schema differs and uses input_cost_per_token/output_cost_per_token/context fields.
+      Blockers/risk recorded:
+      - Generic registry execution cannot fit current ProviderConfig.provider: ProviderID without a new execution target/backing config contract.
+      - Config persistence is currently keyed by narrow ProviderID; registry-row executable config needs a storage contract change.
+      - Registry ID arrays are duplicated in API routes; centralize before broad changes to reduce drift.
+      - Ledger has provider_id but no explicit provider_registry_id column; Judge must decide schema/metadata strategy before implementation.
+  - id: T1003
+    type: judge
+    assignee: Judge
+    status: completed
+    objective: Judge and lock the Phase 4 model-source, executable registry-provider,
+      pricing-source, and provider-promotion contract before code.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    - docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+    verify:
+    - rg -n "Model Source Adapter Contract|Executable Registry Provider Contract|Pricing
+      Source Contract|Provider Activation Contract" docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+      => contract sections present and reviewed
+    stop_if:
+    - Design creates duplicate dashboard or hosted dependency.
+    - Design adds one ProviderID per broad provider row.
+    - Design accepts raw keys/tokens/credential files.
+    - Design cannot make registry-only OpenAI-compatible rows executable while preserving
+      the registry/executable split.
+    receipt: |-
+      2026-05-20 Judge gate initially rejected Worker release twice, then approved after PM repaired the plan and board.
+      Rejection fixes applied before Worker release:
+      - Added T1003 Locked Implementation Contract to docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md covering model sources, executable registry targets, config-store shape, DB/ledger migration, pricing source, promotions, and blockers.
+      - Added db/migrations/008_provider_auth_router_phase4.sql to relevant Worker allowed files.
+      - Added lib/llm/router/request-ledger.ts and lib/llm/router/usage-summary.ts to executable registry Worker ownership.
+      - Added lib/llm/router/__tests__/model-refresh.test.ts to T1005 and lib/llm/router/__tests__/pricing-refresh.test.ts to T1007.
+      - Moved registry-id duplication stop conditions onto workers that own the modified route/CLI files.
+      - YAML validation passed after repairs.
+      Final Judge decision: approved for sequential Worker release only. Parallel workers are not safe because migration, provider route tests, docs, and state.yaml overlap.
+      Worker-release constraints:
+      - ProviderID remains narrow.
+      - Broad registry rows execute through generic execution targets, not per-row ProviderID expansion.
+      - No hosted gateway/control plane is required.
+      - No raw key/token/session/browser-token/credential-path/credential-file input is accepted.
+      - No generic /v1/models drift for provider-specific/account/cloud/local/static/manual/planned rows.
+      - Portkey Models is primary pricing source; LiteLLM JSON is fallback/reference.
+  - id: T1004
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: Implement the shared model-source adapter layer with source labels, planned-row
+      non-network behavior, provider-specific adapters, and tests.
+    allowed_files:
+    - lib/providers/model-sources.ts
+    - lib/providers/model-sources/__tests__/model-sources.test.ts
+    - lib/providers/model-discovery.ts
+    - lib/providers/registry.ts
+    - lib/providers/types.ts
+    - docs/reference/provider-catalog.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/providers/model-sources lib/providers/__tests__/model-discovery.test.ts
+      lib/providers/__tests__/registry.test.ts => exit 0
+    stop_if:
+    - Adapter makes live calls for planned-source-review rows.
+    - Adapter leaks raw key/token/secret-like metadata.
+    - Adapter treats generic /v1/models as universal.
+    receipt: |-
+      2026-05-20 T1004 complete.
+      Implemented:
+      - Added shared provider model-source adapter layer in lib/providers/model-sources.ts with live, source_backed_static, manual, fallback, blocker, and raw metadata redaction behavior.
+      - Kept the older model-discovery facade aligned with the shared adapter.
+      - Promoted Alibaba/DashScope/Qwen and Z.AI to configured OpenAI-compatible/source-backed-static registry rows without widening ProviderID.
+      - Promoted Perplexity to source-backed static model/pricing catalog behavior with execution still gated.
+      - Promoted DeepInfra to an official provider-specific models-list adapter plus OpenAI-compatible gateway profile.
+      - Updated docs/reference/provider-catalog.md with source-backed/static behavior and promoted row status.
+      - Added tests for OpenAI-compatible adapter selection, source-backed static rows, manual rows, account/cloud blockers, and secret-like metadata redaction.
+      Verification:
+      - npm test -- lib/providers/model-sources lib/providers/__tests__/model-discovery.test.ts lib/providers/__tests__/registry.test.ts => exit 0; 3 files passed, 13 tests passed.
+      Containment:
+      - No raw key/token/session/credential path input was added.
+      - No hosted gateway/control plane dependency was added.
+      - ProviderID remains narrow; broad rows stay ProviderRegistryID rows.
+      - Unrelated dirty/untracked files remain preserved and untouched.
+  - id: T1005
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: Persist source-backed registry model refresh into llm_models and expose
+      model source/count/timestamp/stale/blocker status through provider APIs.
+    allowed_files:
+    - db/migrations/008_provider_auth_router_phase4.sql
+    - lib/llm/router/model-refresh.ts
+    - lib/llm/router/__tests__/model-refresh.test.ts
+    - app/api/providers/models/refresh/route.ts
+    - app/api/providers/route.ts
+    - app/api/providers/__tests__/providers-route.test.ts
+    - docs/reference/api-routes.md
+    - docs/reference/database-schema.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers/__tests__/providers-route.test.ts
+      => exit 0
+    stop_if:
+    - Registry-only rows cannot persist source-backed snapshots and no blocker is documented.
+    - Planned rows write snapshots without source evidence.
+    - Raw model metadata stores secret-like fields.
+    - Model snapshots cannot persist provider_registry_id and execution_kind.
+    - Modified provider route files continue using duplicated registry-id arrays instead
+      of shared registry/type helpers.
+    receipt: |-
+      2026-05-20 T1005 complete.
+      Implemented:
+      - Added db/migrations/008_provider_auth_router_phase4.sql with provider_registry_id and execution_kind metadata for provider configs, model snapshots, pricing snapshots, requests, and request events; rebuilt llm_models with UNIQUE(provider_registry_id, model_id).
+      - Extended lib/llm/router/model-refresh.ts to persist registry model snapshots from source-backed, manual, fallback, live OpenAI-compatible, provider-specific, and local runtime model sources.
+      - Stored provider_registry_id and execution_kind with model snapshots while preserving narrow ProviderID typing.
+      - Updated POST /api/providers/models/refresh to persist sanitized snapshots and report model count, source, timestamp, execution kind, and blockers.
+      - Updated GET /api/providers to expose cached model source/count/timestamp/stale/blocker status.
+      - Removed the literal duplicated registry-id array from the model-refresh route by deriving IDs from PROVIDER_REGISTRY.
+      - Updated API/database docs for Phase 4 model snapshot identity and refresh behavior.
+      Verification:
+      - npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers/__tests__/providers-route.test.ts => exit 0; 2 files passed, 30 tests passed.
+      - npm test -- lib/providers/model-sources lib/providers/__tests__/model-discovery.test.ts lib/providers/__tests__/registry.test.ts lib/llm/router/__tests__/model-refresh.test.ts app/api/providers/__tests__/providers-route.test.ts => exit 0; 5 files passed, 43 tests passed.
+      Containment:
+      - Blocked/account-context rows return blockers without writes.
+      - Raw model metadata strips key/token/secret/credential/session/authorization/bearer-like fields.
+      - No raw API keys, browser/session tokens, credential contents, or credential paths were added to schema, API responses, tests, or docs.
+  - id: T1006
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: Make OpenAI-compatible registry rows executable through a generic SkillMall-owned
+      execution path without adding one ProviderID per row.
+    allowed_files:
+    - db/migrations/008_provider_auth_router_phase4.sql
+    - lib/llm/router/openai-compatible-client.ts
+    - lib/llm/router/__tests__/openai-compatible-client.test.ts
+    - lib/llm/router/types.ts
+    - lib/llm/router/config.ts
+    - lib/llm/router/create-client.ts
+    - lib/llm/router/request-ledger.ts
+    - lib/llm/router/usage-summary.ts
+    - lib/providers/config-store.ts
+    - lib/providers/index.ts
+    - app/api/providers/configure/route.ts
+    - app/api/providers/test/route.ts
+    - app/api/providers/__tests__/providers-route.test.ts
+    - docs/reference/provider-catalog.md
+    - docs/user/configuring-providers.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/llm/router/__tests__/openai-compatible-client.test.ts lib/llm/router
+      app/api/providers/__tests__/providers-route.test.ts => exit 0
+    stop_if:
+    - Broad provider rows are added directly to ProviderID one by one.
+    - Raw secret fields are accepted.
+    - Ledger stores prompt/response bodies.
+    - Registry execution lacks provider_registry_id or execution_kind in config/ledger.
+    - Modified configure/test route files continue using duplicated registry-id arrays
+      instead of shared registry/type helpers.
+    - Existing direct providers regress.
+    receipt: |-
+      2026-05-20 T1006 complete.
+      Implemented:
+      - Added lib/llm/router/openai-compatible-client.ts for generic SkillMall-owned OpenAI-compatible chat execution with env secret refs, configured base URLs, usage/cost metadata, and no prompt/response metadata leakage.
+      - Extended ProviderConfig/router types with providerRegistryId and executionKind without widening ProviderID.
+      - Made router execution select the generic OpenAI-compatible client when executionKind=openai_compatible.
+      - Added target-aware config resolution and persistence using activeProviderRegistryId/providerTargets while preserving legacy providers compatibility.
+      - Updated configure/test/model-refresh/provider status routes to use providerRegistryId from resolved config and derive registry IDs from PROVIDER_REGISTRY instead of duplicated literal arrays.
+      - Updated request ledger helpers to write provider_registry_id and execution_kind when the Phase 4 migration is present while remaining compatible with older test schemas.
+      - Updated provider docs and user configuration docs for registry execution targets.
+      Verification:
+      - npm test -- lib/llm/router/__tests__/openai-compatible-client.test.ts lib/llm/router app/api/providers/__tests__/providers-route.test.ts => exit 0; 11 files passed, 92 tests passed.
+      - npm test -- lib/llm/router/__tests__/openai-compatible-client.test.ts lib/llm/router app/api/providers/__tests__/providers-route.test.ts lib/providers/__tests__/config-resolution.test.ts lib/providers/__tests__/providers.test.ts => exit 0; 13 files passed, 125 tests passed.
+      Containment:
+      - Broad provider rows were not added to ProviderID.
+      - Registry-only executable rows persist provider=openai as implementation identity plus providerRegistryId/executionKind for attribution.
+      - Raw secret fields remain rejected; generic OpenAI-compatible execution requires env secret references and configured base URLs.
+      - Ledger metadata continues scrubbing prompt/response body fields.
+  - id: T1007
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: Implement pricing-source refresh into llm_pricing_snapshots without requiring
+      hosted gateway credentials.
+    allowed_files:
+    - db/migrations/008_provider_auth_router_phase4.sql
+    - lib/providers/pricing-sources.ts
+    - lib/providers/__tests__/pricing-sources.test.ts
+    - lib/llm/router/pricing-refresh.ts
+    - lib/llm/router/__tests__/pricing-refresh.test.ts
+    - app/api/providers/pricing/refresh/route.ts
+    - app/api/providers/usage/route.ts
+    - app/api/providers/__tests__/providers-route.test.ts
+    - docs/reference/api-routes.md
+    - docs/reference/database-schema.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/providers/__tests__/pricing-sources.test.ts lib/llm/router/__tests__/pricing-refresh.test.ts
+      app/api/providers/__tests__/providers-route.test.ts => exit 0
+    stop_if:
+    - Pricing refresh requires Portkey Gateway, LiteLLM proxy, hosted credentials, or
+      another paid app.
+    - Estimated cost is represented as actual cost.
+    - Pricing source license/schema evidence is missing.
+    - Pricing snapshots cannot persist provider_registry_id and execution_kind.
+    receipt: |-
+      2026-05-20 T1007 complete.
+      Current source evidence refreshed:
+      - Portkey-AI/models license endpoint reports MIT license.
+      - Portkey pricing JSON schema exposes pricing_config.pay_as_you_go request_token/response_token/cache token price fields in cents per token.
+      - LiteLLM model_prices_and_context_window.json remains available as fallback/reference with input_cost_per_token/output_cost_per_token fields.
+      Implemented:
+      - Added lib/providers/pricing-sources.ts with Portkey Models normalization and LiteLLM fallback/reference normalization.
+      - Normalized Portkey cents-per-token prices into SkillMall USD-per-million ModelPricing values.
+      - Extended pricing snapshots with providerRegistryId, executionKind, sourceLicense, sourceUrl, currency, timestamp, and hash behavior.
+      - Added POST /api/providers/pricing/refresh for manual source-backed pricing refresh without Portkey Gateway, LiteLLM proxy, hosted credentials, or paid external apps.
+      - Made pricing source failure tolerant; source failures return refreshed=false and do not break Provider Center routes.
+      - Updated API/database docs for pricing refresh and snapshot attribution.
+      Verification:
+      - npm test -- lib/providers/__tests__/pricing-sources.test.ts lib/llm/router/__tests__/pricing-refresh.test.ts app/api/providers/__tests__/providers-route.test.ts => exit 0; 3 files passed, 35 tests passed.
+      Containment:
+      - Estimated prices remain local pricing snapshots, not actual provider spend.
+      - No hosted gateway credential requirement was introduced.
+      - Pricing snapshots persist provider_registry_id and execution_kind when Phase 4 schema is present.
+  - id: T1008
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: Upgrade Provider Center and CLI parity for model-source, pricing-source,
+      executable registry-provider, stale, and blocker status.
+    allowed_files:
+    - components/skill-mall/providers/ProviderCenter.tsx
+    - components/skill-mall/providers/ModelRefreshPanel.tsx
+    - components/skill-mall/providers/ProviderConfigPanel.tsx
+    - components/skill-mall/providers/UsageCostPanel.tsx
+    - components/skill-mall/providers/__tests__/provider-center.test.tsx
+    - cli/src/commands/providers.ts
+    - cli/src/commands/configure.ts
+    - docs/user/using-the-cli.md
+    - docs/developer/cli-reference.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- components/skill-mall/providers/__tests__/provider-center.test.tsx
+      app/api/providers/__tests__/providers-route.test.ts => exit 0
+    - cd cli && npm run type-check => exit 0
+    stop_if:
+    - Provider Center hides planned-row blockers.
+    - CLI duplicates provider/model/pricing contracts instead of using shared modules.
+    - Modified CLI provider/configure files continue using duplicated registry-id arrays
+      instead of shared registry/type helpers.
+    - UI asks for raw secrets instead of references.
+    receipt: |-
+      2026-05-20 T1008 complete.
+      Implemented:
+      - Provider Center now surfaces auth contract, execution profile, model count, last checked timestamp, stale/fallback cache status, and model-source blockers instead of hiding planned/source-review or unconfigured-row blockers.
+      - Provider Center model refresh reloads provider state after a successful refresh so source/count/timestamp/stale status updates in the UI.
+      - Provider Center usage/cost panel now exposes pricing refresh as a source-backed snapshot action while keeping actual cost and estimated cost labels separate.
+      - Provider Center default configuration mode now prefers env secret references for API/OpenAI-compatible rows, with gateway virtual-key references remaining explicit.
+      - CLI providers status now reports model source, model count, last checked, stale status, blocker, and execution kind using shared registry/config/model-source modules.
+      - CLI providers refresh-pricing now uses the shared Portkey/LiteLLM pricing normalizers and writes through the shared pricing snapshot store.
+      - CLI configure now persists registry-only OpenAI-compatible rows through the shared OpenAI-compatible execution path without widening ProviderID.
+      - CLI docs were updated for executable registry targets, pricing refresh, model source/stale/blocker status, and safe secret-reference behavior.
+      - Fixed a Phase 4-owned model-source TypeScript narrowing issue in lib/providers/model-sources.ts that blocked the required CLI type-check.
+      Verification:
+      - npm test -- components/skill-mall/providers/__tests__/provider-center.test.tsx app/api/providers/__tests__/providers-route.test.ts => exit 0; 2 files passed, 35 tests passed.
+      - cd cli && npm run type-check => exit 0.
+      Containment:
+      - No raw secret fields, browser/session tokens, credential contents, or credential paths were added.
+      - CLI continues to use shared registry/model/pricing/config modules rather than duplicated provider arrays.
+      - Broad provider rows remain ProviderRegistryID targets; ProviderID was not widened.
+      - No hosted gateway, router, proxy, or observability product was required.
+  - id: T1009
+    type: worker
+    assignee: Worker
+    status: completed
+    objective: Update docs and migration notes to match executable registry providers,
+      model/pricing refresh, source labels, blockers, and auth boundaries.
+    allowed_files:
+    - docs/reference/provider-catalog.md
+    - docs/reference/api-routes.md
+    - docs/reference/database-schema.md
+    - docs/user/configuring-providers.md
+    - docs/user/using-the-cli.md
+    - docs/developer/cli-reference.md
+    - docs/developer/deployment.md
+    - docs/developer/faq.md
+    - docs/developer/architecture.md
+    - docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - rg -n "raw ChatGPT|paste.*token|apiKey.*sk-|future-only|TODO|TBD|metadata_only.*executable"
+      docs/reference docs/user docs/developer docs/goals/provider-auth-router-phase4
+      docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md =>
+      only intentional safety-language or verification-command matches, with false positives
+      classified
+    stop_if:
+    - Docs omit known blockers or incomplete provider mechanisms.
+    - Docs contradict implementation.
+    - Docs imply hosted gateway or raw-token support.
+    receipt: |-
+      2026-05-20 T1009 complete.
+      Implemented:
+      - Updated docs/reference/api-routes.md so /api/providers/configure documents executable direct providers and registry-only OpenAI-compatible provider targets through providerRegistryId + executionKind, not metadata-only behavior.
+      - Updated docs/user/using-the-cli.md and docs/developer/cli-reference.md for CLI registry-target configuration, model source/stale/blocker status, and providers refresh-pricing.
+      - Updated docs/user/configuring-providers.md, docs/developer/deployment.md, and docs/developer/architecture.md to match the Phase 4 registry/executable split and current promotions/blockers.
+      - Updated docs/developer/getting-started.md and docs/reference/pipeline-architecture.md because the required doc drift scan includes docs/developer and docs/reference broadly and those files contained stale Phase 3 wording.
+      - Added implementation-status language to docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md clarifying that its Current Source Facts section is the Phase 3 baseline and GoalBuddy receipts are the live implementation status.
+      Verification:
+      - rg -n "raw ChatGPT|paste.*token|apiKey.*sk-|future-only|TODO|TBD|metadata_only.*executable" docs/reference docs/user docs/developer docs/goals/provider-auth-router-phase4 docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md => only intentional safety-language and verification-command matches.
+      False-positive classification:
+      - "raw ChatGPT" matches are intentional auth-boundary safety language.
+      - The rg command string appears in the source plan and state.yaml as the required verification command.
+      - No TODO/TBD/future-only or metadata_only executable contradiction remains in the scanned docs.
+      Containment:
+      - Docs continue to reject raw keys, ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex/Claude credential files, copied credential contents, and credential-file paths.
+      - Docs do not require hosted gateway/router/proxy/observability products or external paid apps.
+      - Docs preserve narrow ProviderID and broad ProviderRegistryID separation.
+  - id: T1010
+    type: judge
+    assignee: Judge
+    status: completed
+    objective: Code review, semantic-drift review, source-evidence review, provider/auth
+      safety review, UI/API/CLI parity review, and review-fix gate.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - git diff --name-only => diff containment reviewed
+    - npm test -- lib/providers lib/llm/router app/api/providers components/skill-mall/providers
+      => exit 0 or PR-owned findings listed
+    stop_if:
+    - Implementation changes excluded wizard/preview files.
+    - Implementation leaks secrets or raw tokens.
+    - Implementation drifts from the approved registry/executable contract.
+    - Review findings are not fixed or explicitly blocked.
+    receipt: |-
+      2026-05-20 T1010 complete.
+      Review performed:
+      - Diff containment reviewed with git diff --name-only.
+      - Semantic drift/auth scan reviewed across lib/providers, lib/llm/router, app/api/providers, components/skill-mall/providers, and CLI provider/configure commands.
+      - Excluded-file scan run: (git diff --name-only; git ls-files --others --exclude-standard) | rg -n "(wizard|preview|\.DS_Store)" => exit 1, no matches.
+      Finding fixed:
+      - CLI providers list/status originally opened getDb() just to read cached model status, which could create a SQLite database as a read-only side effect. Fixed by checking the configured DB path before opening the DB; refresh-pricing still writes through the shared pricing snapshot store when explicitly invoked.
+      - Commit-prep review found arbitrary pricing source URL overrides in the API/CLI. Fixed by removing sourceUrl from accepted inputs, constraining pricing refresh to the approved Portkey Models and LiteLLM source mappings, and adding an API regression test that rejects sourceUrl overrides before fetch.
+      Verification:
+      - npm test -- lib/providers lib/llm/router app/api/providers components/skill-mall/providers => exit 0; 19 files passed, 153 tests passed.
+      - cd cli && npm run type-check => exit 0.
+      Review conclusions:
+      - No wizard/preview files are changed.
+      - ProviderID remains narrow; broad provider rows execute only through providerRegistryId/executionKind targets.
+      - Raw secret fields, browser/session tokens, credential contents, and credential-file paths remain rejected or absent from UI/API/CLI inputs.
+      - Provider Center and CLI expose source/stale/blocker/pricing state without duplicating registry/model/pricing contracts.
+      - No hosted gateway/router/proxy/observability dependency was introduced.
+  - id: T1011
+    type: judge
+    assignee: Judge
+    status: completed
+    objective: Final verification, blocker documentation, incomplete-work documentation,
+      and commit-prep readiness audit.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/providers lib/llm/router app/api/providers components/skill-mall/providers
+      => exit 0 or blocker classified
+    - npm test => exit 0 or blocker classified
+    - npx tsc --noEmit --pretty false => exit 0 or blocker classified
+    - cd cli && npm run type-check => exit 0 or blocker classified
+    - npm run lint => exit 0 or failures classified as PR-owned/pre-existing
+    - git diff --name-only => no excluded files changed
+    - git diff --cached --name-only => empty unless user explicitly approved staging
+    - (git diff --name-only; git ls-files --others --exclude-standard) | xargs rg --pcre2
+      -n "sk-(proj|live|ant-api)[A-Za-z0-9_-]+|OPENAI_API_KEY=(?!your-|sk-test)[A-Za-z0-9_-]+|ANTHROPIC_API_KEY=(?!your-)[A-Za-z0-9_-]+|CLAUDE_CODE_OAUTH_TOKEN=[A-Za-z0-9_-]+|CODEX_ACCESS_TOKEN=[A-Za-z0-9_-]+"
+      => no real secrets in changed files; false positives classified
+    - (git diff --name-only; git ls-files --others --exclude-standard) | rg -n "(wizard|preview|\.DS_Store)"
+      => no excluded changed paths
+    stop_if:
+    - Any PR-owned verification failure remains.
+    - Any incomplete work lacks blocker evidence and next safe action.
+    - Any stage/commit/push action is attempted without explicit user approval.
+    receipt: |-
+      2026-05-20 T1011 complete.
+      Final verification:
+      - npm test -- lib/providers lib/llm/router app/api/providers components/skill-mall/providers => exit 0; 19 files passed, 153 tests passed.
+      - npm test => exit 0; 49 files passed, 382 tests passed.
+      - npx tsc --noEmit --pretty false => exit 0.
+      - cd cli && npm run type-check => exit 0.
+      - git diff --cached --name-only => empty; no staged files.
+      - (git diff --name-only; git ls-files --others --exclude-standard) | xargs rg --pcre2 -n "sk-(proj|live|ant-api)[A-Za-z0-9_-]+|OPENAI_API_KEY=(?!your-|sk-test)[A-Za-z0-9_-]+|ANTHROPIC_API_KEY=(?!your-)[A-Za-z0-9_-]+|CLAUDE_CODE_OAUTH_TOKEN=[A-Za-z0-9_-]+|CODEX_ACCESS_TOKEN=[A-Za-z0-9_-]+" => exit 1; no real secrets found.
+      - (git diff --name-only; git ls-files --others --exclude-standard) | rg -n "(wizard|preview|\.DS_Store)" => exit 1; no excluded changed paths.
+      Lint classification:
+      - npm run lint => exit 1 from pre-existing unrelated lint errors in components/skill-mall/skill-detail/SkillTabs.tsx and components/skill-mall/theme-provider.tsx.
+      - Lint also reports pre-existing warnings in app/layout.tsx, app/prompt-library/page.tsx, app/trending/page.tsx, cli/dist/index.js, several CLI commands outside the Phase 4 diff, docs components, wizard Step2Research, and unrelated lib tests/helpers.
+      - No PR-owned Phase 4 changed file is a lint error blocker.
+      Review fix after initial completion:
+      - Removed arbitrary pricing source URL overrides from app/api/providers/pricing/refresh/route.ts and cli/src/commands/providers.ts.
+      - Added provider route coverage proving sourceUrl is rejected with invalid_input and fetch is not called.
+      Incomplete work:
+      - No Phase 4 board task remains incomplete.
+      - No staging, commit, push, or PR was performed because the user has not approved publish for this implementation result.
+      Commit-prep readiness:
+      - Diff contains Phase 4 provider/auth/router implementation, CLI parity, docs, tests, and GoalBuddy receipts.
+      - Untracked Phase 4 files are expected: pricing refresh API route, migration 008, OpenAI-compatible client/test, model-source adapter/tests, and pricing-source adapter/test.
+      - Next safe action is user-approved diff review or commit-prep/publish.

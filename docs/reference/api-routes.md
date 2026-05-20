@@ -20,7 +20,7 @@ Returns Provider Center-ready sanitized provider/router status and the broad pro
 
 The returned catalog includes broad `ProviderRegistryID` rows for OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The configured `activeProvider` remains an executable `ProviderID` from the narrower direct/router set: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, or `ollama`.
 
-Rows with `planned_source_review` status, including Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants, are visible but not live-callable.
+Rows with `planned_source_review` status are visible but not live-callable. Phase 4 promotes Alibaba/DashScope/Qwen and Z.AI as configured OpenAI-compatible/source-backed-static rows, promotes Perplexity as a source-backed model/pricing catalog row with execution still gated, and promotes DeepInfra with a provider-specific model-list adapter plus OpenAI-compatible execution profile. Ambiguous managed NVIDIA NIM variants remain out of scope; the NIM row covers local/container runtime endpoints only.
 
 **Response:**
 
@@ -29,6 +29,7 @@ Rows with `planned_source_review` status, including Alibaba/DashScope/Qwen, Z.AI
   configured: boolean          // true if a provider is configured
   activeProvider: string | null // executable ProviderID when configured
   activeProviderRegistryId: string | null
+  executionKind: 'direct' | 'openai_compatible' | 'bifrost_local' | null
   activeModel: string | null
   authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key' | null
   gatewayBackend: 'direct' | 'bifrost_local'
@@ -71,9 +72,12 @@ Rows with `planned_source_review` status, including Alibaba/DashScope/Qwen, Z.AI
     }
     modelStatus: {
       strategy: string
-      source: 'fallback' | 'none'
-      authoritative: false
-      stale: true
+      source: string
+      authoritative: boolean
+      stale: boolean
+      modelCount: number
+      lastCheckedAt: string | null
+      blocker: string | null
       models: string[]
       refresh: object
     }
@@ -90,7 +94,7 @@ Rows with `planned_source_review` status, including Alibaba/DashScope/Qwen, Z.AI
 
 ## POST /api/providers/configure
 
-Writes non-secret provider configuration to `~/.skill-mall/config.json` for existing executable providers only. Registry-only rows, including custom OpenAI-compatible endpoints, may be accepted as sanitized metadata/status responses, but the route does not widen executable `ProviderID` support.
+Writes non-secret provider configuration to `~/.skill-mall/config.json`. Existing executable providers persist as direct/router targets. Registry-only OpenAI-compatible rows can persist as registry execution targets through the shared OpenAI-compatible adapter by storing `provider: "openai"` as the implementation identity plus the broad `providerRegistryId` and `executionKind: "openai_compatible"`. This does not widen executable `ProviderID` support.
 
 It does not write `.env.local`, does not mutate `process.env`, and rejects raw secret fields before writing config. Rejected fields include `apiKey`, `rawKey`, `token`, `sessionToken`, browser-token fields, and credential-file/path fields. Secret-reference names must be environment-variable-style names such as `OPENAI_API_KEY` or `BIFROST_VIRTUAL_KEY`; path-like names such as `~/.codex/auth.json` or `/Users/me/.claude/...` are rejected.
 
@@ -122,6 +126,7 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
   persisted: boolean           // true only for executable provider writes
   providerRegistryId: string
   provider: string | null
+  executionKind?: 'direct' | 'openai_compatible' | 'bifrost_local'
   model: string | undefined
   authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key'
   gatewayBackend: 'direct' | 'bifrost_local'
@@ -137,7 +142,7 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
 }
 ```
 
-API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. Subscription/tool-session auth, such as Claude Code CLI, uses `local_cli_session` and SkillMall does not copy credential files. The requested `configMode` / `authMode` must match the selected Provider Center row: API providers cannot be configured as local sessions, local runtimes cannot be configured with API-key refs, and provider rows without gateway access cannot be configured with gateway virtual-key auth.
+API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. OpenAI-compatible registry execution requires an env secret reference and a configured base URL when the row does not have a safe default endpoint. Subscription/tool-session auth, such as Claude Code CLI, uses `local_cli_session` and SkillMall does not copy credential files. The requested `configMode` / `authMode` must match the selected Provider Center row: API providers cannot be configured as local sessions, local runtimes cannot be configured with API-key refs, and provider rows without gateway access cannot be configured with gateway virtual-key auth.
 
 Phase 3 surfaces `bifrost_local` as the only approved optional local gateway backend. It uses `gateway_virtual_key` plus a `gateway_virtual_key_ref` environment-variable name, never a raw virtual key in the request body or config file. `bifrost_local` base URLs are intentionally restricted to localhost-class addresses. Bifrost local is not SkillMall's source of truth and is not a required hosted gateway. GoModel, LiteLLM proxy mode, hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, `cheapest_compatible`, `quality_first`, and semantic routers remain unimplemented unless a later approved phase changes the contract.
 
@@ -146,6 +151,8 @@ Phase 3 surfaces `bifrost_local` as the only approved optional local gateway bac
 ## POST /api/providers/models/refresh
 
 Refreshes or reports model discovery status for a provider registry row. The route only performs network discovery for supported/configured strategies. It does not assume every provider or custom endpoint supports `/v1/models`. OpenAI-compatible default endpoints are used only for the active configured row or when the request supplies an explicit `baseURL`; unconfigured registry rows return `endpoint_required` without probing their public default endpoints.
+
+When discovery produces source-backed, manual, fallback, or live records, the route persists sanitized snapshots into `llm_models` with both `provider_registry_id` and `execution_kind`. Rows that are blocked for missing account/project/local/provider context return the blocker and write no snapshots.
 
 **Request body:**
 
@@ -164,6 +171,14 @@ Refreshes or reports model discovery status for a provider registry row. The rou
   providerRegistryId: string
   executableProviderId: string | null
   configured: boolean
+  persisted: boolean
+  modelStatus: {
+    modelCount: number
+    lastCheckedAt: string
+    source: string
+    executionKind: string
+    blocker: string | null
+  }
   discovery: {
     strategy: string
     status:
@@ -173,10 +188,12 @@ Refreshes or reports model discovery status for a provider registry row. The rou
       | 'account_context_required'
       | 'cloud_project_context_required'
       | 'local_runtime_required'
+      | 'secret_required'
+      | 'source_backed_static'
       | 'manual_models'
       | 'static_fallback'
       | 'planned_source_review'
-    source: 'live' | 'manual' | 'fallback' | 'none'
+    source: 'live' | 'source_backed_static' | 'manual' | 'fallback' | 'none'
     authoritative: boolean
     models: string[]
     networkCalled: boolean
@@ -185,7 +202,7 @@ Refreshes or reports model discovery status for a provider registry row. The rou
 }
 ```
 
-Planned-source-review rows return `planned_source_review` without probing. Provider-specific, account-scoped, cloud-project-scoped, local-runtime, static fallback, and manual rows return their status contract unless a current adapter/configuration supports live discovery.
+Planned-source-review rows return `planned_source_review` without probing or writing snapshots. Provider-specific, account-scoped, cloud-project-scoped, local-runtime, static fallback, source-backed static, and manual rows return their status contract unless a current adapter/configuration supports live discovery.
 
 ---
 
@@ -255,6 +272,51 @@ Returns ledger-backed usage and cost summaries when the `llm_requests` table is 
 ```
 
 If the database or table is unavailable, the route returns `available: false` with zeroed summaries instead of failing the Provider Center.
+
+---
+
+## POST /api/providers/pricing/refresh
+
+Refreshes local pricing snapshots from source-backed public data. The primary source is the MIT-licensed Portkey Models repository/static JSON. LiteLLM model pricing JSON is supported as fallback/reference data. This route does not require Portkey Gateway, LiteLLM proxy mode, hosted gateway credentials, or any paid external app.
+
+**Request body:**
+
+```typescript
+{
+  providerRegistryId?: string
+  source?: 'portkey_models' | 'litellm_model_prices'
+  modelIds?: string[]
+}
+```
+
+**Response:**
+
+```typescript
+{
+  refreshed: boolean
+  source?: 'portkey_models' | 'litellm_model_prices'
+  sourceUrl?: string
+  sourceLicense?: string | null
+  providerRegistryId?: string | null
+  snapshotCount: number
+  models: Array<{
+    providerRegistryId: string
+    modelId: string
+    pricing: {
+      inputPerMillion?: number
+      outputPerMillion?: number
+      cachedInputPerMillion?: number
+      reasoningOutputPerMillion?: number
+    }
+    source: string
+    sourceUrl?: string
+    currency: 'USD'
+    snapshotAt: string
+  }>
+}
+```
+
+Portkey prices are normalized from cents per token into USD per million tokens. LiteLLM prices are normalized from USD per token into USD per million tokens. Source failures return `refreshed: false` with an empty model list rather than breaking the Provider Center.
 
 ---
 

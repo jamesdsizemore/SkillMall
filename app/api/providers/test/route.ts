@@ -1,40 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
-import { getProviderRegistryEntry } from '@/lib/providers/registry'
+import { getProviderRegistryEntry, PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
 import type { SecretRef } from '@/lib/llm/router/types'
-import type { ProviderID, ProviderRegistryID } from '@/lib/providers/types'
+import type { ProviderRegistryID } from '@/lib/providers/types'
 
-const registryIds = [
-  'openai',
-  'anthropic',
-  'claude_code',
-  'gemini',
-  'groq',
-  'ollama',
-  'openrouter',
-  'alibaba_dashscope_qwen',
-  'huggingface',
-  'zai',
-  'minimax',
-  'kimi_moonshot',
-  'deepseek',
-  'mistral',
-  'cohere',
-  'xai',
-  'aws_bedrock',
-  'azure_openai',
-  'google_vertex_ai',
-  'together_ai',
-  'fireworks',
-  'replicate',
-  'nvidia_nim',
-  'perplexity',
-  'deepinfra',
-  'cerebras',
-  'custom_openai_compatible',
-] as const
+const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegistryID, ...ProviderRegistryID[]]
 
 const TestBodySchema = z.object({
   providerRegistryId: z.enum(registryIds).optional(),
@@ -42,15 +14,6 @@ const TestBodySchema = z.object({
 }).passthrough()
 
 export const dynamic = 'force-dynamic'
-
-const registryIdByExecutableProvider: Record<ProviderID, ProviderRegistryID> = {
-  openai: 'openai',
-  anthropic: 'anthropic',
-  'claude-code': 'claude_code',
-  gemini: 'gemini',
-  groq: 'groq',
-  ollama: 'ollama',
-}
 
 const forbiddenSecretFieldNames = new Set([
   'apiKey',
@@ -135,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   const providerRegistryId =
     parsed.data.providerRegistryId ??
-    (activeConfig ? registryIdByExecutableProvider[activeConfig.provider] : undefined)
+    (activeConfig ? activeConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(activeConfig.provider) : undefined)
   const entry = providerRegistryId ? getProviderRegistryEntry(providerRegistryId) : undefined
 
   if (!entry) {
@@ -146,7 +109,7 @@ export async function POST(req: NextRequest) {
   }
 
   const activeMatches = Boolean(
-    activeConfig && registryIdByExecutableProvider[activeConfig.provider] === entry.id
+    activeConfig && (activeConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(activeConfig.provider)) === entry.id
   )
   const secretRef = activeMatches && activeConfig ? activeConfig.secretRef : undefined
   const discoveryPlan = modelDiscoveryPlanForEntry(entry)
