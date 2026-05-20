@@ -1,74 +1,8 @@
 import http from 'node:http'
-import fs from 'node:fs'
-import path from 'node:path'
-import matter from 'gray-matter'
 import { requireRepoRoot, pc } from '../utils.js'
+import { getAllSkills, getSkill, getSkillsByCategory, searchSkills } from '@/lib/skills.js'
 
 const DEFAULT_PORT = 3001
-
-interface SkillEntry {
-  slug: string
-  category: string
-  name: string
-  description: string
-  version: string
-  tags: string[]
-  author: string
-  license: string
-  content: string
-  linked_skills: string[]
-}
-
-// Pure Node.js skill reader — does NOT import from lib/skills.ts to avoid
-// any Next.js module dependencies in a standalone server context.
-function readAllSkills(repoRoot: string): SkillEntry[] {
-  const skillsDir = path.join(repoRoot, 'skills')
-  if (!fs.existsSync(skillsDir)) return []
-
-  const skills: SkillEntry[] = []
-
-  for (const cat of fs.readdirSync(skillsDir)) {
-    if (cat.startsWith('_') || cat.startsWith('.')) continue
-    const catDir = path.join(skillsDir, cat)
-    if (!fs.statSync(catDir).isDirectory()) continue
-
-    for (const slug of fs.readdirSync(catDir)) {
-      const skillMd = path.join(catDir, slug, 'SKILL.md')
-      if (!fs.existsSync(skillMd)) continue
-
-      try {
-        const { data, content } = matter(fs.readFileSync(skillMd, 'utf-8'))
-        const meta = data.metadata && typeof data.metadata === 'object' ? data.metadata as Record<string, unknown> : {}
-        const tagsRaw = meta.tags ?? data.tags ?? ''
-        const tags = typeof tagsRaw === 'string'
-          ? tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)
-          : Array.isArray(tagsRaw) ? tagsRaw as string[] : []
-
-        const linkedRaw = meta['linked-skills'] ?? data.linked_skills ?? ''
-        const linked_skills = typeof linkedRaw === 'string'
-          ? linkedRaw.split(',').map((t: string) => t.trim()).filter(Boolean)
-          : Array.isArray(linkedRaw) ? linkedRaw as string[] : []
-
-        skills.push({
-          slug,
-          category: cat,
-          name: String(data.name ?? slug),
-          description: String(data.description ?? ''),
-          version: String(meta.version ?? data.version ?? '1.0.0'),
-          tags,
-          author: String(meta.author ?? data.author ?? ''),
-          license: String(data.license ?? ''),
-          content,
-          linked_skills,
-        })
-      } catch {
-        // Skip malformed skills
-      }
-    }
-  }
-
-  return skills
-}
 
 const TOOLS = [
   {
@@ -105,34 +39,32 @@ const TOOLS = [
 function handleTool(
   name: string,
   params: Record<string, unknown>,
-  skills: SkillEntry[]
+  repoRoot: string
 ): unknown {
   if (name === 'search_skills') {
-    const query = String(params.query ?? '').toLowerCase()
+    const query = String(params.query ?? '')
     const category = params.category ? String(params.category) : undefined
-    return skills
-      .filter(s => {
-        const matchesCat = !category || s.category === category
-        const matchesQuery =
-          s.name.toLowerCase().includes(query) ||
-          s.description.toLowerCase().includes(query) ||
-          s.tags.some(t => t.toLowerCase().includes(query))
-        return matchesCat && matchesQuery
-      })
-      .slice(0, 20)
-      .map(s => ({ slug: s.slug, category: s.category, name: s.name, description: s.description, tags: s.tags }))
+    return searchSkills(query, { repoRoot, category, limit: 20 })
+      .map(s => ({
+        slug: s.slug,
+        category: s.category,
+        name: s.name,
+        description: s.description,
+        tags: s.tags,
+      }))
   }
 
   if (name === 'get_skill') {
-    const skill = skills.find(s => s.category === String(params.category) && s.slug === String(params.slug))
+    const skill = getSkill(String(params.category), String(params.slug), { repoRoot })
     if (!skill) return { error: `Skill not found: ${params.category}/${params.slug}` }
     return skill
   }
 
   if (name === 'list_categories') {
-    const cats: Record<string, number> = {}
-    for (const s of skills) cats[s.category] = (cats[s.category] ?? 0) + 1
-    return Object.entries(cats).map(([slug, skillCount]) => ({ slug, skillCount }))
+    return getSkillsByCategory({ repoRoot }).map((category) => ({
+      slug: category.slug,
+      skillCount: category.skills.length,
+    }))
   }
 
   return { error: `Unknown tool: ${name}` }
@@ -170,7 +102,7 @@ Options:
   }
 
   const repoRoot = requireRepoRoot()
-  let skills = readAllSkills(repoRoot)
+  const skillCount = getAllSkills({ repoRoot }).length
 
   const server = http.createServer((req, res) => {
     // Reload skills on each request so catalog stays fresh without restart
@@ -202,9 +134,8 @@ Options:
           }
 
           if (rpc.method === 'tools/call') {
-            skills = readAllSkills(repoRoot) // refresh on each call
             const { name, arguments: toolArgs } = rpc.params ?? {}
-            const result = handleTool(name ?? '', toolArgs ?? {}, skills)
+            const result = handleTool(name ?? '', toolArgs ?? {}, repoRoot)
             res.writeHead(200, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({
               jsonrpc: '2.0', id: rpc.id,
@@ -238,7 +169,7 @@ Options:
     console.log(`  Add to your MCP config:`)
     console.log(`  ${pc.cyan(`{ "mcpServers": { "skillmall": { "url": "http://localhost:${port}" } } }`)}`)
     console.log()
-    console.log(pc.dim(`  ${skills.length} skills loaded from ${repoRoot}`))
+    console.log(pc.dim(`  ${skillCount} skills loaded from ${repoRoot}`))
     console.log(pc.dim('  Press Ctrl+C to stop.'))
     console.log()
   })

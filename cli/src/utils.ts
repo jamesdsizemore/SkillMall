@@ -2,6 +2,7 @@ import matter from "gray-matter";
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
+import { getAllSkills as getCatalogSkills } from "@/lib/skills.js";
 
 export interface SkillFrontmatter {
   name: string;
@@ -52,36 +53,23 @@ export function parseSkillFrontmatter(filePath: string): ParsedSkill {
 
 /** Walk the skills/ directory and return all parsed skills */
 export function getAllSkills(repoRoot: string): ParsedSkill[] {
-  const skillsDir = path.join(repoRoot, "skills");
-  const results: ParsedSkill[] = [];
-
-  if (!fs.existsSync(skillsDir)) return results;
-
-  const categories = fs
-    .readdirSync(skillsDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name !== "_template")
-    .map((d) => d.name);
-
-  for (const cat of categories) {
-    const catDir = path.join(skillsDir, cat);
-    const skillNames = fs
-      .readdirSync(catDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name);
-
-    for (const skillName of skillNames) {
-      const skillMd = path.join(catDir, skillName, "SKILL.md");
-      if (fs.existsSync(skillMd)) {
-        try {
-          results.push(parseSkillFrontmatter(skillMd));
-        } catch {
-          // Skip malformed skills silently in listing context
-        }
-      }
-    }
-  }
-
-  return results;
+  return getCatalogSkills({ repoRoot }).map((skill) => ({
+    frontmatter: {
+      name: skill.name,
+      description: skill.description,
+      version: skill.version,
+      category: skill.category,
+      tags: skill.tags,
+      author: skill.author,
+      license: skill.license,
+      linked_skills: skill.linked_skills,
+    },
+    filePath: path.join(repoRoot, "skills", skill.path),
+    skillDir: path.join(repoRoot, "skills", skill.category, skill.slug),
+    category: skill.category,
+    skillName: skill.slug,
+    hasReadme: skill.hasReadme,
+  }));
 }
 
 /** Copy a skill directory to a destination base path */

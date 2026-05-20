@@ -16,6 +16,7 @@ const MOCK_SKILL: Skill = {
   linked_skills: [],
   content: "",
   path: "ai/skill-creator/SKILL.md",
+  hasReadme: false,
   hasScripts: false,
   hasTemplates: false,
   hasSamples: false,
