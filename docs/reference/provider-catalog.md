@@ -1,6 +1,6 @@
 # Provider Catalog
 
-SkillMall supports 6 LLM providers. All providers implement the same `LLMClient` interface (`lib/providers/types.ts`) and are called through the Phase 1 router wrapper.
+SkillMall supports 6 direct LLM providers plus the Phase 2 `bifrost_local` gateway backend. All providers implement the same `LLMClient` interface (`lib/providers/types.ts`) and are called through the router wrapper.
 
 ## Interface
 
@@ -21,15 +21,32 @@ interface CompletionOptions {
 }
 ```
 
-## Phase 1 Auth Contract
+## Router Auth Contract
 
-Phase 1 stores secret references, not raw secrets. API access is separate from subscription or local tool-session auth:
+The router stores secret references, not raw secrets. API access is separate from subscription, gateway, local runtime, or local tool-session auth:
 
 - `env_key`: API access through an environment variable reference such as `OPENAI_API_KEY`. SkillMall stores the variable name only.
 - `local_cli_session`: local provider tooling owns credentials, such as Claude Code CLI auth. SkillMall does not copy Claude Code credential files.
 - `none_local`: local runtimes that require no credential, such as Ollama.
+- `gateway_virtual_key`: local gateway access through an environment variable reference such as `BIFROST_VIRTUAL_KEY`. SkillMall stores the variable name only.
 
-The only executable Phase 1 gateway backend is `direct`. Gateway sidecar validation, GoModel, Bifrost, external OpenAI-compatible gateway execution, `gateway_virtual_key`, `codex_session`, `oauth_device_flow`, `keychain_ref`, and `file_ref` are future/not implemented behavior.
+Executable gateway backends:
+
+- `direct`: direct provider client execution.
+- `bifrost_local`: local Bifrost gateway execution through SkillMall's router contract.
+
+GoModel, LiteLLM, Portkey, TensorZero, new-api, aiproxy, GPT-Load, external hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, and `file_ref` are not implemented runtime behavior in Phase 2.
+
+## Phase 2 Model Refresh Contract
+
+Phase 2 promotes model lists from static defaults to refreshable local metadata:
+
+- Static provider defaults remain fallback labels only.
+- Refreshed models are stored in `llm_models` with `provider_id`, `model_id`, `source`, `last_checked_at`, and sanitized raw metadata.
+- Direct provider refresh uses official provider model-list endpoints where SkillMall already has API access.
+- `bifrost_local` refresh uses the local Bifrost OpenAI-compatible `/v1/models` endpoint through a gateway virtual-key reference.
+- Model refresh must not store provider API keys, gateway virtual keys, request headers, prompt bodies, or response bodies.
+- Missing live model refresh does not remove static fallback models; it leaves the fallback catalog available with `modelSource: "fallback"`.
 
 ## Providers
 
@@ -38,8 +55,8 @@ The only executable Phase 1 gateway backend is `direct`. Gateway sidecar validat
 - **Implementation:** `lib/providers/openai.ts`
 - **SDK:** `openai` npm package
 - **JSON mode:** supported via `response_format: { type: 'json_object' }`
-- **Default model:** `gpt-4o`
-- **Available models:** `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`
+- **Default model:** `gpt-5.1`
+- **Available models:** `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1`
 - **Auth:** `env_key` API access using `OPENAI_API_KEY`
 
 ### anthropic
@@ -119,13 +136,15 @@ With per-provider sections:
 ```json
 {
   "provider": "openai",
-  "model": "gpt-4o",
+  "model": "openai/gpt-4o-mini",
   "providers": {
     "openai": {
-      "model": "gpt-4o",
-      "authMode": "env_key",
-      "secretRef": { "type": "env", "name": "OPENAI_API_KEY" },
-      "gatewayBackend": "direct"
+      "model": "openai/gpt-4o-mini",
+      "authMode": "gateway_virtual_key",
+      "secretRef": { "type": "gateway_virtual_key_ref", "name": "BIFROST_VIRTUAL_KEY" },
+      "gatewayBackend": "bifrost_local",
+      "baseURL": "http://localhost:8080/v1",
+      "routingPolicyId": "policy-1"
     },
     "claude-code": {
       "model": "claude-sonnet-4-6",
@@ -161,7 +180,7 @@ Then:
 2. Add a default model to `DEFAULT_MODELS` in `lib/providers/defaults.ts`
 3. Add a case to `createLLMClient` in `lib/providers/index.ts`
 4. Add setup instructions to `FALLBACK_PROVIDER_CATALOG` in `lib/providers/catalog.ts`
-5. Choose one Phase 1 auth mode: `env_key`, `local_cli_session`, or `none_local`
+5. Choose one implemented router auth mode: `env_key`, `local_cli_session`, `none_local`, or `gateway_virtual_key`
 
 The rest of the system (research engine, prompt engine, pipeline) works unchanged — all LLM calls go through the `LLMClient` interface.
 

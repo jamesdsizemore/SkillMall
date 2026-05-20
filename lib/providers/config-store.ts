@@ -2,11 +2,12 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import {
-  assertPhase1AuthMode,
-  assertPhase1GatewayBackend,
+  assertRouterAuthMode,
+  assertRouterGatewayBackend,
   sanitizeSecretRef,
   validateSecretRefForAuthMode,
 } from '../llm/router/secret-refs'
+import { assertLocalBifrostBaseURL } from '../llm/router/gateway-adapter'
 import {
   defaultAuthModeForProvider,
   defaultSecretRefForProvider,
@@ -50,6 +51,8 @@ export async function writeProviderConfig(input: {
   model: string
   gatewayBackend: GatewayBackend
   path: string
+  baseURL?: string
+  routingPolicyId?: string
 }> {
   if (input.apiKey) {
     throw new Error('Raw API keys must not be written to ~/.skill-mall/config.json; use keyEnv instead.')
@@ -59,12 +62,17 @@ export async function writeProviderConfig(input: {
   const providers = existing.providers ?? {}
   const previousProviderConfig = providers[input.provider] ?? {}
   const model = input.model ?? previousProviderConfig.model ?? DEFAULT_MODELS[input.provider]
-  const authMode = assertPhase1AuthMode(input.authMode ?? defaultAuthModeForProvider(input.provider))
-  const gatewayBackend = assertPhase1GatewayBackend(input.gatewayBackend ?? previousProviderConfig.gatewayBackend)
+  const authMode = assertRouterAuthMode(input.authMode ?? defaultAuthModeForProvider(input.provider))
+  const gatewayBackend = assertRouterGatewayBackend(input.gatewayBackend ?? previousProviderConfig.gatewayBackend)
+  if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(input.baseURL)
   const rawSecretRef =
     input.secretRef ??
     (input.keyEnv ? { type: 'env', name: input.keyEnv } : previousProviderConfig.secretRef) ??
-    (authMode === 'env_key' ? defaultSecretRefForProvider(input.provider) : { type: 'none' })
+    (authMode === 'env_key'
+      ? defaultSecretRefForProvider(input.provider)
+      : authMode === 'gateway_virtual_key'
+        ? undefined
+        : { type: 'none' })
   const secretRef = validateSecretRefForAuthMode(authMode, sanitizeSecretRef(rawSecretRef))
 
   const safePreviousProviderConfig = { ...previousProviderConfig }
@@ -94,6 +102,8 @@ export async function writeProviderConfig(input: {
     apiKey: undefined,
     model,
     gatewayBackend,
+    baseURL: input.baseURL,
+    routingPolicyId: input.routingPolicyId,
     path: USER_CONFIG_PATH,
   }
 }

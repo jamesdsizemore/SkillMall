@@ -104,10 +104,10 @@ describe('router provider config resolution', () => {
       })
     )
 
-    expect(() => resolveRouterProviderConfig()).toThrow('Unsupported Phase 1 auth mode')
+    expect(() => resolveRouterProviderConfig()).toThrow('Unsupported router auth mode')
   })
 
-  it('rejects non-direct gateway backends in config files', () => {
+  it('rejects unapproved gateway backends in config files', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({
@@ -115,13 +115,65 @@ describe('router provider config resolution', () => {
         providers: {
           openai: {
             model: 'gpt-4o',
-            gatewayBackend: 'gomodel',
+            gatewayBackend: 'gomodel_local',
           },
         },
       })
     )
 
-    expect(() => resolveRouterProviderConfig()).toThrow('Unsupported Phase 1 gateway backend')
+    expect(() => resolveRouterProviderConfig()).toThrow('Unsupported router gateway backend')
+  })
+
+  it('resolves bifrost local gateway config with gateway virtual key refs', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        provider: 'openai',
+        providers: {
+          openai: {
+            model: 'openai/gpt-4o-mini',
+            authMode: 'gateway_virtual_key',
+            secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+            gatewayBackend: 'bifrost_local',
+            baseURL: 'http://localhost:8080/v1',
+            routingPolicyId: 'policy-1',
+          },
+        },
+      })
+    )
+
+    const config = resolveRouterProviderConfig()
+    expect(config).toMatchObject({
+      provider: 'openai',
+      model: 'openai/gpt-4o-mini',
+      authMode: 'gateway_virtual_key',
+      secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+      gatewayBackend: 'bifrost_local',
+      baseURL: 'http://localhost:8080/v1',
+      routingPolicyId: 'policy-1',
+    })
+  })
+
+  it('rejects remote bifrost local gateway base URLs in config files', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        provider: 'openai',
+        providers: {
+          openai: {
+            model: 'openai/gpt-4o-mini',
+            authMode: 'gateway_virtual_key',
+            secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+            gatewayBackend: 'bifrost_local',
+            baseURL: 'https://gateway.example.com/v1',
+          },
+        },
+      })
+    )
+
+    expect(() => resolveRouterProviderConfig()).toThrow(
+      'bifrost_local baseURL must point to localhost'
+    )
   })
 
   it('throws ConfigError when no provider is configured', () => {
@@ -170,6 +222,52 @@ describe('router provider config resolution', () => {
     expect(written).toContain('"name": "OPENAI_API_KEY"')
     expect(written).not.toContain('apiKey')
     expect(written).not.toContain('sk-')
+  })
+
+  it('writes bifrost local gateway refs without raw virtual keys', async () => {
+    vi.spyOn(fsPromises, 'readFile').mockRejectedValue(new Error('missing'))
+    vi.spyOn(fsPromises, 'mkdir').mockResolvedValue(undefined)
+    const writeFile = vi.spyOn(fsPromises, 'writeFile').mockResolvedValue(undefined)
+
+    const result = await writeProviderConfig({
+      provider: 'openai',
+      model: 'openai/gpt-4o-mini',
+      authMode: 'gateway_virtual_key',
+      secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+      gatewayBackend: 'bifrost_local',
+      baseURL: 'http://localhost:8080/v1',
+      routingPolicyId: 'policy-1',
+    })
+
+    expect(result).toMatchObject({
+      provider: 'openai',
+      model: 'openai/gpt-4o-mini',
+      authMode: 'gateway_virtual_key',
+      secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+      gatewayBackend: 'bifrost_local',
+      baseURL: 'http://localhost:8080/v1',
+      routingPolicyId: 'policy-1',
+    })
+    const written = String(writeFile.mock.calls[0]?.[1])
+    expect(written).toContain('"gatewayBackend": "bifrost_local"')
+    expect(written).toContain('"type": "gateway_virtual_key_ref"')
+    expect(written).toContain('"name": "BIFROST_VIRTUAL_KEY"')
+    expect(written).not.toContain('redacted-virtual-key')
+  })
+
+  it('refuses to write remote bifrost local gateway base URLs', async () => {
+    vi.spyOn(fsPromises, 'readFile').mockRejectedValue(new Error('missing'))
+
+    await expect(
+      writeProviderConfig({
+        provider: 'openai',
+        model: 'openai/gpt-4o-mini',
+        authMode: 'gateway_virtual_key',
+        secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+        gatewayBackend: 'bifrost_local',
+        baseURL: 'https://gateway.example.com/v1',
+      })
+    ).rejects.toThrow('bifrost_local baseURL must point to localhost')
   })
 
   it('refuses to write raw API keys to config JSON', async () => {

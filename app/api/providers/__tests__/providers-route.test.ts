@@ -40,6 +40,7 @@ describe('provider API routes', () => {
       activeModel: 'gpt-4o-mini',
       authMode: 'env_key',
       gatewayBackend: 'direct',
+      accessLabel: 'api_access',
       secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
     })
     expect(JSON.stringify(json)).not.toContain('redacted-route-test-token')
@@ -51,6 +52,8 @@ describe('provider API routes', () => {
       model: 'gpt-4o-mini',
       authMode: 'env_key',
       gatewayBackend: 'direct',
+      baseURL: null,
+      routingPolicyId: null,
       secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
       path: '/Users/test/.skill-mall/config.json',
     })
@@ -84,6 +87,8 @@ describe('provider API routes', () => {
       authMode: 'env_key',
       secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
       gatewayBackend: 'direct',
+      baseURL: undefined,
+      routingPolicyId: undefined,
     })
     expect(process.env.SKILL_MALL_PROVIDER).toBeUndefined()
     expect(process.env.SKILL_MALL_MODEL).toBeUndefined()
@@ -125,6 +130,72 @@ describe('provider API routes', () => {
     )
 
     expect(response.status).toBe(400)
+    expect(mocks.writeProviderConfig).not.toHaveBeenCalled()
+  })
+
+  it('POST stores bifrost local gateway config with virtual-key refs only', async () => {
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'openai',
+      model: 'openai/gpt-4o-mini',
+      authMode: 'gateway_virtual_key',
+      gatewayBackend: 'bifrost_local',
+      secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+      baseURL: 'http://localhost:8080/v1',
+      routingPolicyId: 'policy-1',
+      path: '/Users/test/.skill-mall/config.json',
+    })
+
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      new Request('http://localhost/api/providers/configure', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: 'openai',
+          model: 'openai/gpt-4o-mini',
+          authMode: 'gateway_virtual_key',
+          secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+          gatewayBackend: 'bifrost_local',
+          baseURL: 'http://localhost:8080/v1',
+          routingPolicyId: 'policy-1',
+        }),
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      success: true,
+      provider: 'openai',
+      model: 'openai/gpt-4o-mini',
+      authMode: 'gateway_virtual_key',
+      gatewayBackend: 'bifrost_local',
+      secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+      baseURL: 'http://localhost:8080/v1',
+      routingPolicyId: 'policy-1',
+    })
+    expect(JSON.stringify(json)).not.toContain('redacted')
+  })
+
+  it('POST rejects remote bifrost local gateway base URLs before writing config', async () => {
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      new Request('http://localhost/api/providers/configure', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: 'openai',
+          model: 'openai/gpt-4o-mini',
+          authMode: 'gateway_virtual_key',
+          secretRef: { type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' },
+          gatewayBackend: 'bifrost_local',
+          baseURL: 'https://gateway.example.com/v1',
+        }),
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toBe('invalid_provider_config')
+    expect(json.message).toContain('bifrost_local baseURL must point to localhost')
     expect(mocks.writeProviderConfig).not.toHaveBeenCalled()
   })
 })

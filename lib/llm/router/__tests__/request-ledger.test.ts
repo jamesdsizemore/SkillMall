@@ -11,15 +11,18 @@ import {
   stringifyLedgerMetadata,
 } from '../request-ledger'
 
-const migrationPath = path.join(process.cwd(), 'db/migrations/006_llm_router_core.sql')
-const migrationSql = fs.readFileSync(migrationPath, 'utf-8')
+const phase1MigrationPath = path.join(process.cwd(), 'db/migrations/006_llm_router_core.sql')
+const phase2MigrationPath = path.join(process.cwd(), 'db/migrations/007_llm_router_phase2.sql')
+const phase1MigrationSql = fs.readFileSync(phase1MigrationPath, 'utf-8')
+const phase2MigrationSql = fs.readFileSync(phase2MigrationPath, 'utf-8')
 const tempDbs: Array<{ db: Database.Database; file: string }> = []
 
 function createRouterDb(): Database.Database {
   const file = path.join(os.tmpdir(), `skillmall-router-${Date.now()}-${Math.random()}.db`)
   const db = new Database(file)
   db.pragma('foreign_keys = ON')
-  db.exec(migrationSql)
+  db.exec(phase1MigrationSql)
+  db.exec(phase2MigrationSql)
   tempDbs.push({ db, file })
   return db
 }
@@ -99,7 +102,7 @@ afterEach(() => {
   }
 })
 
-describe('router Phase 1 migration', () => {
+describe('router Phase 2 migration', () => {
   it('applies through getDb and creates all router tables', () => {
     const db = getDb()
 
@@ -148,25 +151,27 @@ describe('router Phase 1 migration', () => {
     }
   })
 
-  it('rejects non-direct gateway backends in provider configs', () => {
+  it('rejects unapproved gateway backends in provider configs', () => {
     const db = createRouterDb()
 
-    for (const gatewayBackend of ['gomodel', 'bifrost', 'external_openai_compatible']) {
+    for (const gatewayBackend of ['gomodel_local', 'litellm_proxy', 'external_openai_compatible']) {
       expect(() =>
         insertValidProviderConfig(db, { id: `provider-${gatewayBackend}`, gatewayBackend })
       ).toThrow()
     }
   })
 
-  it('rejects non-manual routing-policy modes', () => {
+  it('allows approved Phase 2 routing-policy modes only', () => {
     const db = createRouterDb()
 
-    db.prepare(`
-      INSERT INTO llm_routing_policies (id, name, mode)
-      VALUES ('policy-manual', 'Manual policy', 'manual')
-    `).run()
+    for (const mode of ['manual', 'local_first', 'fallback_chain', 'budget_guarded_manual']) {
+      db.prepare(`
+        INSERT INTO llm_routing_policies (id, name, mode)
+        VALUES (?, ?, ?)
+      `).run(`policy-${mode}`, mode, mode)
+    }
 
-    for (const mode of ['local_first', 'fallback_chain', 'cheapest_compatible', 'quality_first']) {
+    for (const mode of ['cheapest_compatible', 'quality_first']) {
       expect(() => {
         db.prepare(`
           INSERT INTO llm_routing_policies (id, name, mode)
@@ -199,18 +204,50 @@ describe('router Phase 1 migration', () => {
     }
   })
 
-  it('rejects non-direct route backend and unsupported request auth modes', () => {
+  it('allows bifrost_local request rows and rejects unsupported request auth modes', () => {
     const db = createRouterDb()
 
-    expect(() => insertValidRequest(db, { id: 'request-gateway', routeBackend: 'gomodel' })).toThrow()
+    insertValidRequest(db, {
+      id: 'request-bifrost',
+      routeBackend: 'bifrost_local',
+      authMode: 'gateway_virtual_key',
+    })
 
-    for (const authMode of ['raw_token', 'api_key', 'codex_session', 'gateway_virtual_key']) {
+    expect(() =>
+      insertValidRequest(db, { id: 'request-gomodel', routeBackend: 'gomodel_local' })
+    ).toThrow()
+
+    for (const authMode of ['raw_token', 'api_key', 'codex_session', 'oauth_device_flow']) {
       expect(() => insertValidRequest(db, { id: `request-${authMode}`, authMode })).toThrow()
     }
   })
 })
 
-describe('router Phase 1 request ledger helpers', () => {
+describe('router Phase 2 request ledger helpers', () => {
+  it('starts bifrost_local requests with gateway virtual-key auth', () => {
+    const db = createRouterDb()
+    const started = startLLMRequest(
+      {
+        operation: 'skill.preview',
+        providerId: 'openai',
+        modelId: 'openai/gpt-4o-mini',
+        authMode: 'gateway_virtual_key',
+        routeBackend: 'bifrost_local',
+        routingPolicyId: 'policy-1',
+      },
+      db
+    )
+
+    const row = db
+      .prepare('SELECT route_backend, auth_mode, routing_policy_id FROM llm_requests WHERE id = ?')
+      .get(started.requestId)
+    expect(row).toEqual({
+      route_backend: 'bifrost_local',
+      auth_mode: 'gateway_virtual_key',
+      routing_policy_id: 'policy-1',
+    })
+  })
+
   it('records a success lifecycle from started to succeeded', () => {
     const db = createRouterDb()
     const started = startLLMRequest(

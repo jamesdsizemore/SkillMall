@@ -2,7 +2,7 @@
 
 SkillMall Phase 2 uses SQLite via `better-sqlite3`. No cloud database. No Supabase. The database file lives at `data/skillmall.db` (gitignored) and is created automatically on first run.
 
-Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. These tables are local-only and do not introduce a hosted gateway, gateway sidecar, or cloud database.
+Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. Phase 2 expands those tables for local Bifrost gateway execution, model refresh, pricing snapshots, and routing-policy evaluation. These tables are local-only and do not introduce a hosted gateway, hosted observability service, or cloud database.
 
 ## Setup
 
@@ -116,29 +116,31 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 ### llm_provider_configs
 
-Stores non-secret provider configuration for the Phase 1 router. Secret values are not stored here. `env_key` rows store only the environment variable name in `secret_ref`.
+Stores non-secret provider configuration for the router. Secret values are not stored here. `env_key` rows store only the environment variable name in `secret_ref`; `gateway_virtual_key` rows store only the gateway virtual-key environment variable name.
 
-Allowed Phase 1 auth modes are:
+Allowed auth modes are:
 
 - `env_key`
 - `local_cli_session`
 - `none_local`
+- `gateway_virtual_key`
 
-Allowed Phase 1 gateway backend:
+Allowed gateway backends:
 
 - `direct`
+- `bifrost_local`
 
-Reserved future auth/gateway modes such as `codex_session`, `oauth_device_flow`, `keychain_ref`, `gateway_virtual_key`, GoModel, and Bifrost are not implemented in Phase 1.
+Reserved future auth/gateway modes such as `codex_session`, `oauth_device_flow`, `keychain_ref`, GoModel, LiteLLM, Portkey, TensorZero, and external hosted gateways are not implemented in Phase 2.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_provider_configs (
   id TEXT PRIMARY KEY,
   provider_id TEXT NOT NULL,
-  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local')),
-  secret_ref_type TEXT CHECK (secret_ref_type IS NULL OR secret_ref_type IN ('env', 'none')),
+  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key')),
+  secret_ref_type TEXT CHECK (secret_ref_type IS NULL OR secret_ref_type IN ('env', 'none', 'gateway_virtual_key_ref')),
   secret_ref TEXT,
   base_url TEXT,
-  gateway_backend TEXT CHECK (gateway_backend IS NULL OR gateway_backend IN ('direct')),
+  gateway_backend TEXT CHECK (gateway_backend IS NULL OR gateway_backend IN ('direct', 'bifrost_local')),
   enabled INTEGER NOT NULL DEFAULT 1,
   metadata_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -152,7 +154,7 @@ The migration also enforces auth/secret pairing: `env_key` requires an env secre
 
 ### llm_models
 
-Caches model metadata by provider. Phase 1 stores manual/fallback metadata only; broad auto-refresh is future work.
+Caches model metadata by provider. Phase 2 refreshes configured direct providers where model-list APIs are available and refreshes `bifrost_local` through the local OpenAI-compatible `/v1/models` endpoint. Static provider defaults remain fallbacks only.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_models (
@@ -178,6 +180,8 @@ CREATE TABLE IF NOT EXISTS llm_models (
 
 Stores local pricing snapshots for cost estimation. Phase 1 does not implement provider-wide automatic price refresh.
 
+Phase 2 uses these rows for local estimated-cost calculation when a provider or selected gateway does not report an exact request cost. Provider/gateway-reported costs are recorded as `actual_cost_usd`; locally calculated costs are recorded as `estimated_cost_usd` and must never be presented as exact spend.
+
 ```sql
 CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,19 +200,22 @@ CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
 
 ### llm_routing_policies
 
-Stores routing-policy metadata only. Runtime routing-policy evaluation is not implemented in Phase 1.
+Stores routing-policy metadata. Phase 2 supports bounded runtime evaluation for approved modes.
 
-Allowed Phase 1 mode:
+Allowed modes:
 
 - `manual`
+- `fallback_chain`
+- `local_first`
+- `budget_guarded_manual`
 
-Future/not implemented modes include `fallback_chain`, `cheapest_compatible`, and `quality_first`.
+Future/not implemented modes include `cheapest_compatible`, `quality_first`, and semantic/eval-based routing.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_routing_policies (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  mode TEXT NOT NULL CHECK (mode IN ('manual')),
+  mode TEXT NOT NULL CHECK (mode IN ('manual', 'fallback_chain', 'local_first', 'budget_guarded_manual')),
   rules_json TEXT NOT NULL DEFAULT '{}',
   budget_json TEXT NOT NULL DEFAULT '{}',
   enabled INTEGER NOT NULL DEFAULT 1,
@@ -229,8 +236,8 @@ CREATE TABLE IF NOT EXISTS llm_requests (
   operation TEXT NOT NULL,
   provider_id TEXT NOT NULL,
   model_id TEXT,
-  route_backend TEXT NOT NULL DEFAULT 'direct' CHECK (route_backend IN ('direct')),
-  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local')),
+  route_backend TEXT NOT NULL DEFAULT 'direct' CHECK (route_backend IN ('direct', 'bifrost_local')),
+  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key')),
   routing_policy_id TEXT,
   status TEXT NOT NULL CHECK (status IN ('started', 'succeeded', 'failed')),
   started_at TEXT NOT NULL,

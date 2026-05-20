@@ -23,6 +23,12 @@ function resolveApiKeyForRouterConfig(config: ProviderConfig): string | undefine
   return value
 }
 
+function assertKnownProvider(provider: string): void {
+  if (!['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'].includes(provider)) {
+    throw new Error(`Unknown provider: ${provider}`)
+  }
+}
+
 /** Create a direct LLMClient for the given provider configuration. */
 export function createDirectLLMClient(config: ProviderConfig): LLMClient {
   const directConfig = {
@@ -52,6 +58,7 @@ export function createDirectLLMClient(config: ProviderConfig): LLMClient {
 
 /** Create an LLMClient for the given provider configuration. */
 export function createLLMClient(config: ProviderConfig): LLMClient {
+  assertKnownProvider(config.provider)
   return createRouterLLMClient(config, createDirectLLMClient)
 }
 

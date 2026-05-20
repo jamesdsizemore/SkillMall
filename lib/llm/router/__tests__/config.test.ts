@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   assertPhase1AuthMode,
   assertPhase1GatewayBackend,
+  assertRouterAuthMode,
+  assertRouterGatewayBackend,
+  assertRouterRoutingPolicyMode,
   resolveEnvSecret,
   sanitizeSecretRef,
   validateSecretRefForAuthMode,
@@ -41,6 +44,17 @@ describe('router Phase 1 config helpers', () => {
     expect(() => sanitizeSecretRef(null)).toThrow('Secret ref must be an object')
   })
 
+  it('sanitizes gateway virtual key refs without returning key values', () => {
+    const ref = sanitizeSecretRef({
+      type: 'gateway_virtual_key_ref',
+      name: 'BIFROST_VIRTUAL_KEY',
+      value: 'redacted-virtual-key',
+    })
+
+    expect(ref).toEqual({ type: 'gateway_virtual_key_ref', name: 'BIFROST_VIRTUAL_KEY' })
+    expect(JSON.stringify(ref)).not.toContain('redacted-virtual-key')
+  })
+
   it('accepts only Phase 1 auth modes', () => {
     expect(assertPhase1AuthMode('env_key')).toBe('env_key')
     expect(assertPhase1AuthMode('local_cli_session')).toBe('local_cli_session')
@@ -58,6 +72,42 @@ describe('router Phase 1 config helpers', () => {
     for (const backend of ['gomodel', 'bifrost', 'external_openai_compatible']) {
       expect(() => assertPhase1GatewayBackend(backend)).toThrow(
         'Unsupported Phase 1 gateway backend'
+      )
+    }
+  })
+
+  it('accepts approved Phase 2 router auth modes and rejects reserved modes', () => {
+    expect(assertRouterAuthMode('env_key')).toBe('env_key')
+    expect(assertRouterAuthMode('local_cli_session')).toBe('local_cli_session')
+    expect(assertRouterAuthMode('none_local')).toBe('none_local')
+    expect(assertRouterAuthMode('gateway_virtual_key')).toBe('gateway_virtual_key')
+
+    for (const mode of ['api_key', 'keychain_ref', 'codex_session', 'oauth_device_flow', 'file_ref']) {
+      expect(() => assertRouterAuthMode(mode)).toThrow('Unsupported router auth mode')
+    }
+  })
+
+  it('accepts approved Phase 2 router gateway backends only', () => {
+    expect(assertRouterGatewayBackend(undefined)).toBe('direct')
+    expect(assertRouterGatewayBackend('direct')).toBe('direct')
+    expect(assertRouterGatewayBackend('bifrost_local')).toBe('bifrost_local')
+
+    for (const backend of ['gomodel_local', 'litellm_proxy', 'external_openai_compatible']) {
+      expect(() => assertRouterGatewayBackend(backend)).toThrow(
+        'Unsupported router gateway backend'
+      )
+    }
+  })
+
+  it('accepts approved Phase 2 routing-policy modes only', () => {
+    expect(assertRouterRoutingPolicyMode('manual')).toBe('manual')
+    expect(assertRouterRoutingPolicyMode('fallback_chain')).toBe('fallback_chain')
+    expect(assertRouterRoutingPolicyMode('local_first')).toBe('local_first')
+    expect(assertRouterRoutingPolicyMode('budget_guarded_manual')).toBe('budget_guarded_manual')
+
+    for (const mode of ['cheapest_compatible', 'quality_first', 'semantic_router']) {
+      expect(() => assertRouterRoutingPolicyMode(mode)).toThrow(
+        'Unsupported router routing-policy mode'
       )
     }
   })
@@ -87,5 +137,20 @@ describe('router Phase 1 config helpers', () => {
     expect(() => validateSecretRefForAuthMode('none_local', ref)).toThrow(
       'none_local auth must not include a secret ref'
     )
+  })
+
+  it('requires gateway_virtual_key to use a gateway virtual key ref', () => {
+    const ref = sanitizeSecretRef({
+      type: 'gateway_virtual_key_ref',
+      name: 'BIFROST_VIRTUAL_KEY',
+    })
+
+    expect(validateSecretRefForAuthMode('gateway_virtual_key', ref)).toEqual(ref)
+    expect(() => validateSecretRefForAuthMode('gateway_virtual_key', undefined)).toThrow(
+      'gateway_virtual_key auth requires a gateway virtual key ref'
+    )
+    expect(() =>
+      validateSecretRefForAuthMode('gateway_virtual_key', { type: 'env', name: 'OPENAI_API_KEY' })
+    ).toThrow('gateway_virtual_key auth requires a gateway virtual key ref')
   })
 })

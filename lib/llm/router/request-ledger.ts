@@ -2,8 +2,8 @@ import type Database from 'better-sqlite3'
 import { randomUUID } from 'crypto'
 import { getDb } from '../../db/client'
 import {
-  assertPhase1AuthMode,
-  assertPhase1GatewayBackend,
+  assertRouterAuthMode,
+  assertRouterGatewayBackend,
 } from './secret-refs'
 import type {
   LLMRequestEventInput,
@@ -67,8 +67,8 @@ export function startLLMRequest(
 ): LLMRequestStartResult {
   const requestId = randomUUID()
   const startedAt = nowIso()
-  const authMode = assertPhase1AuthMode(input.authMode)
-  const routeBackend = assertPhase1GatewayBackend(input.routeBackend)
+  const authMode = assertRouterAuthMode(input.authMode)
+  const routeBackend = assertRouterGatewayBackend(input.routeBackend)
 
   db.prepare(`
     INSERT INTO llm_requests (

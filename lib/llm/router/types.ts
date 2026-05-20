@@ -1,15 +1,29 @@
 export const PHASE1_AUTH_MODES = ['env_key', 'local_cli_session', 'none_local'] as const
 
-export type LLMAuthMode = (typeof PHASE1_AUTH_MODES)[number]
+export const PHASE2_AUTH_MODES = [...PHASE1_AUTH_MODES, 'gateway_virtual_key'] as const
+
+export type LLMAuthMode = (typeof PHASE2_AUTH_MODES)[number]
 
 export const PHASE1_GATEWAY_BACKENDS = ['direct'] as const
 
-export type GatewayBackend = (typeof PHASE1_GATEWAY_BACKENDS)[number]
+export const PHASE2_GATEWAY_BACKENDS = [...PHASE1_GATEWAY_BACKENDS, 'bifrost_local'] as const
 
-export type SecretRefType = 'env' | 'none'
+export type GatewayBackend = (typeof PHASE2_GATEWAY_BACKENDS)[number]
+
+export const PHASE2_ROUTING_POLICY_MODES = [
+  'manual',
+  'fallback_chain',
+  'local_first',
+  'budget_guarded_manual',
+] as const
+
+export type RoutingPolicyMode = (typeof PHASE2_ROUTING_POLICY_MODES)[number]
+
+export type SecretRefType = 'env' | 'none' | 'gateway_virtual_key_ref'
 
 export type SecretRef =
   | { type: 'env'; name: string }
+  | { type: 'gateway_virtual_key_ref'; name: string }
   | { type: 'none' }
 
 export interface RouterProviderConfig {

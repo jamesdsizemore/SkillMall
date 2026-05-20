@@ -4,11 +4,12 @@ import path from 'path'
 import { DEFAULT_MODELS } from '../../providers/defaults'
 import { ConfigError, type ProviderID } from '../../providers/types'
 import {
-  assertPhase1AuthMode,
-  assertPhase1GatewayBackend,
+  assertRouterAuthMode,
+  assertRouterGatewayBackend,
   sanitizeSecretRef,
   validateSecretRefForAuthMode,
 } from './secret-refs'
+import { assertLocalBifrostBaseURL } from './gateway-adapter'
 import type { GatewayBackend, LLMAuthMode, RouterProviderConfig, SecretRef } from './types'
 
 export const ROUTER_USER_CONFIG_PATH = path.join(os.homedir(), '.skill-mall', 'config.json')
@@ -79,8 +80,14 @@ function resolveAuthAndSecret(
     warnings.push('Legacy raw apiKey was ignored; configure an env secret reference instead.')
   }
 
-  const authMode = assertPhase1AuthMode(stored?.authMode ?? defaultAuthModeForProvider(provider))
-  const rawSecretRef = stored?.secretRef ?? (authMode === 'env_key' ? defaultSecretRefForProvider(provider) : { type: 'none' })
+  const authMode = assertRouterAuthMode(stored?.authMode ?? defaultAuthModeForProvider(provider))
+  const rawSecretRef =
+    stored?.secretRef ??
+    (authMode === 'env_key'
+      ? defaultSecretRefForProvider(provider)
+      : authMode === 'gateway_virtual_key'
+        ? undefined
+        : { type: 'none' })
   const secretRef = rawSecretRef ? sanitizeSecretRef(rawSecretRef) : undefined
 
   return {
@@ -132,7 +139,8 @@ export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
   }
 
   const { authMode, secretRef } = resolveAuthAndSecret(raw.provider, stored, warnings)
-  const gatewayBackend = assertPhase1GatewayBackend(stored.gatewayBackend)
+  const gatewayBackend = assertRouterGatewayBackend(stored.gatewayBackend)
+  if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(stored.baseURL)
 
   return {
     provider: raw.provider,

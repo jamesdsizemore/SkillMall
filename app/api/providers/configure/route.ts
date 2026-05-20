@@ -2,23 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { writeProviderConfig } from "@/lib/providers/config-store";
 import {
-  assertPhase1AuthMode,
-  assertPhase1GatewayBackend,
+  assertRouterAuthMode,
+  assertRouterGatewayBackend,
   sanitizeSecretRef,
   validateSecretRefForAuthMode,
 } from "@/lib/llm/router/secret-refs";
+import { assertLocalBifrostBaseURL } from "@/lib/llm/router/gateway-adapter";
 
 const ConfigureBodySchema = z.object({
   provider: z.enum(["openai", "anthropic", "claude-code", "gemini", "groq", "ollama"]),
   model: z.string().optional(),
-  authMode: z.enum(["env_key", "local_cli_session", "none_local"]).optional(),
+  authMode: z.enum(["env_key", "local_cli_session", "none_local", "gateway_virtual_key"]).optional(),
   secretRef: z
     .discriminatedUnion("type", [
       z.object({ type: z.literal("env"), name: z.string().min(1) }),
+      z.object({ type: z.literal("gateway_virtual_key_ref"), name: z.string().min(1) }),
       z.object({ type: z.literal("none") }),
     ])
     .optional(),
-  gatewayBackend: z.literal("direct").optional(),
+  gatewayBackend: z.enum(["direct", "bifrost_local"]).optional(),
+  baseURL: z.string().url().optional(),
+  routingPolicyId: z.string().min(1).optional(),
 }).strict();
 
 export const dynamic = "force-dynamic";
@@ -36,9 +40,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const authMode = parsed.data.authMode
-      ? assertPhase1AuthMode(parsed.data.authMode)
+      ? assertRouterAuthMode(parsed.data.authMode)
       : undefined;
-    const gatewayBackend = assertPhase1GatewayBackend(parsed.data.gatewayBackend);
+    const gatewayBackend = assertRouterGatewayBackend(parsed.data.gatewayBackend);
+    if (gatewayBackend === "bifrost_local") assertLocalBifrostBaseURL(parsed.data.baseURL);
     const secretRef = parsed.data.secretRef ? sanitizeSecretRef(parsed.data.secretRef) : undefined;
     if (authMode) validateSecretRefForAuthMode(authMode, secretRef);
 
@@ -48,6 +53,8 @@ export async function POST(req: NextRequest) {
       authMode,
       secretRef,
       gatewayBackend,
+      baseURL: parsed.data.baseURL,
+      routingPolicyId: parsed.data.routingPolicyId,
     });
 
     return NextResponse.json({
@@ -57,6 +64,8 @@ export async function POST(req: NextRequest) {
       authMode: saved.authMode,
       gatewayBackend: saved.gatewayBackend,
       secretRef: saved.secretRef ?? null,
+      baseURL: saved.baseURL ?? null,
+      routingPolicyId: saved.routingPolicyId ?? null,
       configPath: saved.path,
     });
   } catch (error) {
