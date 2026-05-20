@@ -35,6 +35,35 @@ interface ProviderFlags {
   manualModels?: string[];
   json?: boolean;
   help?: boolean;
+  rejectedUnsafeFlag?: string;
+}
+
+const unsafeFlags = new Set([
+  "--key",
+  "--api-key",
+  "--raw-key",
+  "--token",
+  "--access-token",
+  "--session-token",
+  "--browser-token",
+  "--cookie",
+  "--session-cookie",
+  "--browser-cookie",
+  "--browser-session-cookie",
+  "--auth-cookie",
+  "--credential-path",
+  "--credential-file",
+  "--prompt",
+  "--system-prompt",
+  "--user-prompt",
+  "--messages",
+  "--response",
+  "--output",
+]);
+
+function unsafeFlagName(arg: string): string | undefined {
+  const [name] = arg.split("=", 1);
+  return unsafeFlags.has(name) ? name : undefined;
 }
 
 interface ActiveStatus {
@@ -80,7 +109,11 @@ function parseList(value: string): string[] {
 function parseFlags(args: string[]): ProviderFlags {
   const flags: ProviderFlags = {};
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--provider" && args[i + 1]) flags.provider = args[++i];
+    const unsafeFlag = unsafeFlagName(args[i]);
+    if (unsafeFlag) {
+      flags.rejectedUnsafeFlag = unsafeFlag;
+      if (!args[i].includes("=") && args[i + 1] && !args[i + 1].startsWith("--")) i += 1;
+    } else if (args[i] === "--provider" && args[i + 1]) flags.provider = args[++i];
     else if (args[i] === "--provider-registry-id" && args[i + 1]) flags.providerRegistryId = args[++i];
     else if (args[i] === "--key" && args[i + 1]) flags.key = args[++i];
     else if (args[i] === "--key-env" && args[i + 1]) flags.keyEnv = args[++i];
@@ -122,7 +155,7 @@ ${pc.bold("Options:")}
   --manual-models <a,b>        Manual labels for custom OpenAI-compatible rows
   --json                       Print JSON
 
-Raw --key values are rejected. Use secret references such as --key-env.
+Raw keys, tokens, browser/session cookies, credential paths, prompts, messages, responses, and outputs are rejected. Use secret references such as --key-env.
 `);
 }
 
@@ -361,6 +394,13 @@ function selectedEntry(flags: ProviderFlags, active: ActiveStatus): ProviderRegi
 function rejectRawKey(flags: ProviderFlags): boolean {
   if (!flags.key) return false;
   console.error(pc.red("  Refusing raw provider secrets. Use --key-env ENV_VAR_NAME instead."));
+  process.exitCode = 1;
+  return true;
+}
+
+function rejectUnsafe(flags: ProviderFlags): boolean {
+  if (!flags.rejectedUnsafeFlag) return false;
+  console.error(pc.red(`  Refusing unsafe provider input ${flags.rejectedUnsafeFlag}. Use references and status metadata only.`));
   process.exitCode = 1;
   return true;
 }
@@ -650,6 +690,7 @@ export async function providersCommand(args: string[]): Promise<void> {
     help();
     return;
   }
+  if (rejectUnsafe(flags)) return;
 
   switch (command) {
     case "list":

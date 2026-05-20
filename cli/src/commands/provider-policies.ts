@@ -32,6 +32,11 @@ const unsafeFlags = new Set([
   "--access-token",
   "--session-token",
   "--browser-token",
+  "--cookie",
+  "--session-cookie",
+  "--browser-cookie",
+  "--browser-session-cookie",
+  "--auth-cookie",
   "--credential-path",
   "--credential-file",
   "--prompt",
@@ -41,6 +46,12 @@ const unsafeFlags = new Set([
   "--response",
   "--output",
 ]);
+
+function unsafeFlagName(arg: string): string | undefined {
+  const [name] = arg.split("=", 1);
+  return unsafeFlags.has(name) ? name : undefined;
+}
+
 const routeOperations = new Set([
   "skill.generate",
   "skill.preview",
@@ -59,9 +70,10 @@ function numberFlag(value: string | undefined): number | undefined {
 function parseFlags(args: string[]): PolicyFlags {
   const flags: PolicyFlags = {};
   for (let i = 0; i < args.length; i++) {
-    if (unsafeFlags.has(args[i])) {
-      flags.rejectedUnsafeFlag = args[i];
-      if (args[i + 1] && !args[i + 1].startsWith("--")) i += 1;
+    const unsafeFlag = unsafeFlagName(args[i]);
+    if (unsafeFlag) {
+      flags.rejectedUnsafeFlag = unsafeFlag;
+      if (!args[i].includes("=") && args[i + 1] && !args[i + 1].startsWith("--")) i += 1;
     } else if (args[i] === "--id" && args[i + 1]) flags.id = args[++i];
     else if (args[i] === "--name" && args[i + 1]) flags.name = args[++i];
     else if (args[i] === "--mode" && args[i + 1]) flags.mode = args[++i];
@@ -100,7 +112,7 @@ ${pc.bold("Options:")}
   --require-pricing            Require usable pricing during route eligibility simulation
   --json                       Print JSON
 
-Raw keys, tokens, credential paths, prompts, messages, responses, and outputs are rejected.
+Raw keys, tokens, browser/session cookies, credential paths, prompts, messages, responses, and outputs are rejected.
 `);
 }
 

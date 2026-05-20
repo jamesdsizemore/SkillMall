@@ -28,18 +28,52 @@ const bodyMetadataKeys = new Set([
   'responsebody',
 ])
 
+const secretMetadataPatterns = [
+  /api[_-]?key/i,
+  /authorization/i,
+  /bearer/i,
+  /cookie/i,
+  /browser[_-]?token/i,
+  /credential/i,
+  /raw[_-]?key/i,
+  /secret/i,
+  /session[_-]?cookie/i,
+  /session[_-]?token/i,
+  /token/i,
+]
+
+const secretMetadataValuePatterns = [
+  /\bapi[_-]?key\s*[:=]\s*\S+/i,
+  /\b(?:access[_-]?token|browser[_-]?token|session[_-]?token|token)\s*[:=]\s*\S+/i,
+  /\b(?:authorization|bearer)\s+[-._~+/=a-z0-9]+\b/i,
+  /\b(?:auth[_-]?cookie|browser[_-]?cookie|browser[_-]?session[_-]?cookie|session[_-]?cookie|cookie)\s*[:=]\s*\S+/i,
+  /\bsk-[a-z0-9_-]{8,}\b/i,
+  /(?:^|[~\s])(?:\/?[.\w-]+\/)*\.(?:codex|claude)\/[^\s]+/i,
+  /\/Users\/[^\s]*(?:\.codex|\.claude|auth\.json|credentials?)[^\s]*/i,
+]
+
+function isSensitiveMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase()
+  return bodyMetadataKeys.has(normalized) || secretMetadataPatterns.some((pattern) => pattern.test(normalized))
+}
+
+function isSensitiveMetadataValue(value: string): boolean {
+  return secretMetadataValuePatterns.some((pattern) => pattern.test(value))
+}
+
 export interface LLMRequestStartResult {
   requestId: string
   startedAt: string
 }
 
 function scrubMetadata(value: unknown): unknown {
+  if (typeof value === 'string') return isSensitiveMetadataValue(value) ? '[redacted]' : value
   if (Array.isArray(value)) return value.map(scrubMetadata)
   if (!value || typeof value !== 'object') return value
 
   const scrubbed: Record<string, unknown> = {}
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (bodyMetadataKeys.has(key.toLowerCase())) continue
+    if (isSensitiveMetadataKey(key)) continue
     scrubbed[key] = scrubMetadata(nestedValue)
   }
   return scrubbed

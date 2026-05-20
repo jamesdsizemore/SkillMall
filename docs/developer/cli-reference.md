@@ -158,6 +158,8 @@ Planned-source-review rows are visible but not live-callable until official evid
 
 `providers refresh-pricing` uses the same source-backed pricing normalization as the Provider Center API. The default source is Portkey Models for provider rows with a configured public pricing file. `--source litellm_model_prices` refreshes from LiteLLM's public model pricing file. Source license and source URL are printed with the snapshot count. Arbitrary source URL overrides are not accepted.
 
+Provider commands reject raw keys, tokens, browser/session cookies, credential paths, prompts, messages, responses, and outputs. Use configured provider references, environment-variable references, endpoint metadata, and numeric/model filters only.
+
 `providers test` performs the same safe status/readiness check as Provider Center. It does not echo prompts, responses, raw secrets, browser tokens, session tokens, or credential files.
 
 **Examples:**
@@ -216,7 +218,7 @@ Supported modes are:
 | `--require-pricing` | No | Require usable pricing in simulation eligibility |
 | `--json` | No | Print JSON |
 
-Policy commands reject raw keys, tokens, credential paths, prompts, messages, responses, and outputs. Use configured provider references and numeric estimates.
+Policy commands reject raw keys, tokens, browser/session cookies, credential paths, prompts, messages, responses, and outputs. Use configured provider references and numeric estimates.
 
 `policies simulate` prints route eligibility for each candidate when metadata is available. Eligibility reports capability status, pricing status, and blocker codes. Unknown capability and missing or stale pricing are blockers for automatic cost-aware routing; they are not treated as compatible or free. `cheapest_compatible` remains unsupported unless a later approved phase changes the shared mode list.
 

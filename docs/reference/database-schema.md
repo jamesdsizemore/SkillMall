@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS llm_routing_policies (
 
 ### llm_requests
 
-Records local LLM request lifecycle rows. Prompt and response bodies are not stored by default.
+Records local LLM request lifecycle rows. Prompt bodies, response bodies, and raw credential-like metadata are scrubbed before request metadata is serialized.
 Provider/auth usage visibility reads this ledger through `lib/llm/router/usage-summary.ts`.
 The helper and `/api/providers/usage` summarize request counts, success/failure counts, per-provider
 usage, per-model usage, per-operation usage, auth modes, route backends, routing-policy usage, token
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS llm_requests (
 
 ### llm_request_events
 
-Records local request lifecycle events such as provider errors. Event metadata is JSON and should not include prompt or response bodies.
+Records local request lifecycle events such as provider errors. Event metadata is JSON and is scrubbed through the same prompt/response/credential-like metadata boundary as request metadata.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_request_events (
