@@ -19,7 +19,12 @@ describe('provider model sources', () => {
           {
             id: 'model-a',
             object: 'model',
+            inputTokenLimit: 1048576,
+            outputTokenLimit: 8192,
             apiKey: 'redacted-test-key',
+            refreshToken: 'redacted-refresh-token',
+            id_token: 'redacted-id-token',
+            jwtToken: 'redacted-jwt-token',
             nested: { authorization: 'Bearer redacted-test-token', visible: true },
           },
           { id: 'model-b', token: 'redacted-token' },
@@ -54,6 +59,8 @@ describe('provider model sources', () => {
     expect(result.models[0].raw).toEqual({
       id: 'model-a',
       object: 'model',
+      inputTokenLimit: 1048576,
+      outputTokenLimit: 8192,
       nested: { visible: true },
     })
     expect(fetchFn).toHaveBeenCalledWith(

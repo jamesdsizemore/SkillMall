@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { ProviderActionState, ProviderDraft, ProviderRow, RoutingPolicyRow } from "./ProviderCenter";
+import type { ProviderActionState, ProviderDraft, ProviderRow, RoutingPolicyRow, RoutingSimulationResult } from "./ProviderCenter";
 
 type PolicyDraft = {
   id: string;
@@ -8,6 +8,8 @@ type PolicyDraft = {
   remainingUsd: string;
   limitUsd: string;
   estimatedCostUsd: string;
+  operation: string;
+  requirePricing: boolean;
 };
 
 function initialPolicyDraft(activeRoutingPolicyId: string | null): PolicyDraft {
@@ -18,6 +20,8 @@ function initialPolicyDraft(activeRoutingPolicyId: string | null): PolicyDraft {
     remainingUsd: "",
     limitUsd: "",
     estimatedCostUsd: "",
+    operation: "chat.text",
+    requirePricing: false,
   };
 }
 
@@ -31,6 +35,8 @@ function draftFromPolicy(policy: RoutingPolicyRow): PolicyDraft {
     estimatedCostUsd: policy.rules.candidates?.[0]?.estimatedCostUsd === undefined
       ? ""
       : String(policy.rules.candidates[0].estimatedCostUsd),
+    operation: "chat.text",
+    requirePricing: false,
   };
 }
 
@@ -150,6 +156,7 @@ export function PolicyControlPanel({
   onActivatePolicy,
   onTogglePolicy,
   onSimulatePolicy,
+  simulationResult,
 }: {
   provider: ProviderRow | null;
   providerDraft: ProviderDraft;
@@ -161,6 +168,7 @@ export function PolicyControlPanel({
   onActivatePolicy: (id: string) => void;
   onTogglePolicy: (id: string, enabled: boolean) => void;
   onSimulatePolicy: (payload: unknown) => void;
+  simulationResult: RoutingSimulationResult | null;
 }) {
   const [draft, setDraft] = useState<PolicyDraft>(() => initialPolicyDraft(activeRoutingPolicyId));
   const selectedPolicy = useMemo(() => policies.find((policy) => policy.id === draft.id) ?? null, [draft.id, policies]);
@@ -234,6 +242,30 @@ export function PolicyControlPanel({
           placeholder="0.02"
           onChange={(value) => setDraft({ ...draft, estimatedCostUsd: value })}
         />
+        <label className="block">
+          <span className="mb-1 block text-[9px] tracking-widest text-sm-secondary font-label">[ OPERATION ]</span>
+          <span className="block border-b border-sm-border focus-within:border-sm-display">
+            <select
+              value={draft.operation}
+              onChange={(event) => setDraft({ ...draft, operation: event.target.value })}
+              className="w-full bg-transparent py-2 text-sm text-sm-primary outline-none"
+            >
+              {["chat.text", "skill.generate", "skill.preview", "skill.optimize_prompt", "provider.test", "embedding"].map((operation) => (
+                <option key={operation} value={operation}>
+                  {operation}
+                </option>
+              ))}
+            </select>
+          </span>
+        </label>
+        <label className="flex items-end gap-2 pb-2 text-sm text-sm-primary">
+          <input
+            type="checkbox"
+            checked={draft.requirePricing}
+            onChange={(event) => setDraft({ ...draft, requirePricing: event.target.checked })}
+          />
+          <span className="text-[9px] tracking-widest text-sm-secondary font-label">[ REQUIRE PRICING ]</span>
+        </label>
         <Field
           label="REMAINING BUDGET USD"
           value={draft.remainingUsd}
@@ -275,7 +307,14 @@ export function PolicyControlPanel({
         </button>
         <button
           type="button"
-          onClick={() => onSimulatePolicy({ ...payload, estimatedCostUsd: numericValue(draft.estimatedCostUsd) })}
+          onClick={() =>
+            onSimulatePolicy({
+              ...payload,
+              estimatedCostUsd: numericValue(draft.estimatedCostUsd),
+              operation: draft.operation,
+              requirePricing: draft.requirePricing,
+            })
+          }
           disabled={disabled}
           className="border border-sm-border px-4 py-2 text-[10px] tracking-widest text-sm-secondary transition-colors hover:border-sm-display hover:text-sm-display disabled:opacity-30 font-label"
         >
@@ -283,6 +322,19 @@ export function PolicyControlPanel({
         </button>
         <ActionStatus state={actionState} />
       </div>
+      {simulationResult?.eligibility?.length ? (
+        <div className="mt-4 border border-sm-border-subtle px-3 py-2">
+          <p className="mb-2 text-[9px] tracking-widest text-sm-disabled font-label">[ ROUTE ELIGIBILITY ]</p>
+          <div className="grid gap-2">
+            {simulationResult.eligibility.map((item) => (
+              <p key={item.candidateId} className="text-xs leading-relaxed text-sm-secondary">
+                {item.candidateId}: capability {item.capabilityStatus}, pricing {item.pricingStatus}
+                {item.blockerCodes.length > 0 ? ` / ${item.blockerCodes.join(", ")}` : ""}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

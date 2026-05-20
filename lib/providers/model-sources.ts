@@ -61,7 +61,29 @@ type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 type ModelObject = Record<string, unknown>
 
-const secretLikeKeyPattern = /(api[_-]?key|authorization|bearer|credential|secret|session|token)/i
+function isSecretLikeMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase()
+  const compact = normalized.replace(/[_-]/g, '')
+  if (/api[_-]?key/.test(normalized)) return true
+  if (/(authorization|bearer|credential|secret|session)/.test(normalized)) return true
+  if (compact.includes('token')) {
+    return !new Set([
+      'inputtokenlimit',
+      'outputtokenlimit',
+      'maxtokens',
+      'maxinputtokens',
+      'maxoutputtokens',
+      'inputtokens',
+      'outputtokens',
+      'prompttokens',
+      'completiontokens',
+      'cachedinputtokens',
+      'reasoningtokens',
+      'tokenizerurl',
+    ]).has(compact)
+  }
+  return false
+}
 
 const staticModelRecords: Partial<Record<ProviderRegistryID, Array<{ modelId: string; displayName?: string }>>> = {
   alibaba_dashscope_qwen: [
@@ -100,7 +122,7 @@ function sanitizeRawMetadata(value: unknown): unknown {
 
   const sanitized: Record<string, unknown> = {}
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (secretLikeKeyPattern.test(key)) continue
+    if (isSecretLikeMetadataKey(key)) continue
     sanitized[key] = sanitizeRawMetadata(nestedValue)
   }
   return sanitized

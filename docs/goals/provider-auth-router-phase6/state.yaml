@@ -1,0 +1,640 @@
+version: 2
+active_task: null
+goal:
+  slug: provider-auth-router-phase6
+  title: Provider/Auth Router Phase 6
+  status: done
+  created_at: '2026-05-20'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-auth-router-phase6-plan
+  implementation_branch: codex/provider-auth-router-phase6
+  source_plan: docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md
+  owner_outcome: SkillMall can determine route candidate compatibility from local capability/pricing metadata before routing.
+  proof_type: test_review_artifact_source_grounded_capability_route_eligibility
+  intake:
+    completion_proof: Focused tests, full tests or documented blocker, TypeScript, lint classification, secret scan, code review/fixes, docs parity, diff containment, and GoalBuddy receipts prove capability normalization and route eligibility work across router, API, CLI, Provider Center, and docs without auth or simulation drift.
+  oracle:
+    signal: GoalBuddy receipts plus final verification prove model capability metadata, route eligibility blockers, simulation behavior, API/CLI/UI parity, docs, review fixes, and auth/secret containment.
+    final_proof: Final receipt reports verification results, complete work, incomplete work, blockers, lint classification, secret scan, diff containment, and next safe action.
+  hard_constraints:
+    - Phase 6 implementation must start from updated main containing Phase 5 merge commit ff04dcd.
+    - No hosted gateway/router/proxy/observability product may be required.
+    - SkillMall remains the provider/settings/model/pricing/policy/budget/cost source of truth.
+    - No raw API keys, ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, copied credential contents, browser session cookies, or credential-file paths may be accepted.
+    - Do not store prompt or response bodies in capability checks, simulations, ledger metadata, or review artifacts.
+    - Do not add one ProviderID per broad ProviderRegistryID row.
+    - Do not implement quality_first, semantic routing, learned routing, or complexity routing.
+    - Do not implement cheapest_compatible unless Scout and Judge receipts prove the conditional scope gate.
+    - Unknown capability is not eligible for automatic cost-aware routing.
+    - Missing price is not free and is not cheapest.
+    - Update docs, blockers, incomplete work, code review findings, review fixes, and verification receipts.
+    - Do not stage, commit, push, or open a Phase 6 PR unless the user explicitly approves commit-prep or publish.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-auth-router-phase6/.goalbuddy-board/index.html
+tasks:
+  - id: T101
+    type: pm
+    assignee: PM
+    status: done
+    objective: Branch, mainline, dirty-state, and scope gate before implementation.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - git status -sb => implementation branch state recorded
+      - git branch --show-current => codex implementation branch recorded
+      - git fetch origin => exit 0
+      - git merge-base --is-ancestor ff04dcd origin/main => exit 0; main includes Phase 5 merge
+      - git diff --cached --name-only => empty before implementation
+      - git diff --name-only => dirty files classified before implementation
+    stop_if:
+      - Phase 5 merge commit ff04dcd is not present in updated origin/main.
+      - Implementation branch is not based on updated main.
+      - Dirty files are unrelated and unclassified.
+      - The agent starts implementation before the /goal command.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Implementation approved by `/goal`; created dedicated branch `codex/provider-auth-router-phase6` from Phase 5 merge tip `ff04dcd`.
+      commands:
+        - git status -sb
+        - git branch --show-current
+        - git log --oneline -5
+        - git fetch origin
+        - git merge-base --is-ancestor ff04dcd origin/main
+        - git diff --cached --name-only
+        - git diff --name-only
+        - git checkout -b codex/provider-auth-router-phase6
+      results:
+        - Current implementation branch is `codex/provider-auth-router-phase6`.
+        - `git merge-base --is-ancestor ff04dcd origin/main` exited 0.
+        - Staged file gate was empty before implementation.
+        - Dirty file gate contained only untracked Phase 6 planning/GoalBuddy artifacts.
+      blockers: []
+      incomplete: []
+  - id: T102
+    type: scout
+    assignee: Scout
+    status: done
+    objective: Revalidate current source and current official/maintainer capability metadata sources before code.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase6/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md
+    verify:
+      - rg -n "capabilities_json|context_window|max_output_tokens|cheapest_compatible|quality_first|semantic_router|model refresh|pricing" lib app cli docs db => evidence recorded
+      - Current official docs/repo sources for OpenAI, Anthropic, Gemini, OpenRouter, Cohere, Portkey Models, and LiteLLM metadata reviewed => evidence recorded
+    stop_if:
+      - Scout relies on stale prior docs instead of current source and current primary sources.
+      - Scout recommends unsupported auth/token/session handling.
+      - Scout treats unknown capability or missing price as eligible.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Scout revalidated current source and current official/maintainer capability metadata sources. Current code has model/pricing storage, local-only simulation, policy store safety checks, Provider Center and CLI policy surfaces, and unsupported mode rejection, but lacks a normalized capability contract, route eligibility engine, capability-aware simulation blockers, and proof required to promote `cheapest_compatible`.
+      evidence:
+        - "db/migrations/008_provider_auth_router_phase4.sql confirms `llm_models` has `capabilities_json`, `context_window`, `max_output_tokens`, `provider_registry_id`, and `execution_kind`; `llm_pricing_snapshots` has `provider_registry_id` and `execution_kind`."
+        - "lib/llm/router/types.ts keeps supported routing modes to `manual`, `fallback_chain`, `local_first`, and `budget_guarded_manual`; `cheapest_compatible`, `quality_first`, and `semantic_router` are unsupported."
+        - "lib/llm/router/model-refresh.ts persists sanitized raw metadata but does not write normalized `capabilities_json`, `context_window`, or `max_output_tokens`."
+        - "lib/llm/router/routing-policy-simulation.ts is local-only with `providerRequestSent=false`, `promptStored=false`, and `responseStored=false`, but lacks capability/pricing eligibility blockers."
+        - "lib/llm/router/routing-policy-store.ts rejects raw keys, tokens, sessions, credential paths, prompts, messages, responses, completions, and outputs."
+        - "components/skill-mall/providers/ProviderCenter.tsx exposes model source/stale/blocker data but not normalized capability or eligibility status."
+        - "cli/src/commands/provider-policies.ts exposes safe policy commands but no capability/eligibility inspection."
+      source_links:
+        - "OpenAI Models API: https://developers.openai.com/api/reference/resources/models/methods/list"
+        - "Gemini Models API: https://ai.google.dev/api/models"
+        - "Anthropic Claude models overview: https://platform.claude.com/docs/en/about-claude/models/overview"
+        - "Cohere Get a Model: https://docs.cohere.com/reference/get-model"
+        - "OpenRouter Models endpoint: https://openrouter.ai/docs/api/api-reference/models/get-models"
+        - "Portkey Models: https://github.com/Portkey-AI/models"
+        - "LiteLLM model metadata: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+      source_findings:
+        - "OpenAI Models API is authoritative for model list/basic fields only, not rich per-model capabilities."
+        - "Gemini Models API exposes input/output token limits, supported generation methods, and thinking support."
+        - "Anthropic model docs expose model IDs, context/output limits, pricing, modalities, thinking notes, and platform availability."
+        - "Cohere model detail exposes endpoints, deprecation, context length, default endpoints, and features."
+        - "OpenRouter models endpoint exposes modalities, context length, pricing, supported parameters, and top-provider max completion tokens, but is OpenRouter-routed metadata."
+        - "Portkey Models is MIT pricing/config metadata, not live account availability."
+        - "LiteLLM metadata is broad reference data with price/limit/capability flags where present, not authoritative live availability."
+      recommendation: Do not promote `cheapest_compatible` until Judge verifies normalized capability contract, source confidence, operation requirements, route eligibility blockers, usable pricing checks, missing-data blocking, deterministic tie-breaks, and API/UI/CLI simulation without provider calls or prompt/response storage.
+      blockers:
+        - No shared model capability contract exists yet.
+        - No route eligibility engine exists yet.
+        - No normalized capability fields are persisted during current model refresh.
+        - No current code joins candidate capability requirements to pricing snapshots before simulation.
+      incomplete: []
+  - id: T103
+    type: judge
+    assignee: Judge
+    status: done
+    objective: Lock capability, operation, eligibility, cheapest-gate, UI/API/CLI, docs, and Worker ownership contracts before Worker release.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase6/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md
+    verify:
+      - rg -n "Model Capability Contract" docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md => capability contract present
+      - rg -n "Operation Requirement Contract" docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md => operation contract present
+      - rg -n "Route Eligibility Contract" docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md => eligibility contract present
+      - rg -n "cheapest_compatible.*Contract|Conditional cheapest_compatible" docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md docs/goals/provider-auth-router-phase6/state.yaml => cheapest gate present
+    stop_if:
+      - The plan allows unknown capability to pass eligibility.
+      - The plan allows missing price to rank as cheapest.
+      - The plan promotes cheapest_compatible without proof.
+      - The plan allows prompt/response storage for capability or simulation.
+      - The plan lacks allowed-file ownership for Worker tasks.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      decision: approved
+      summary: Judge approved Worker release for the capability/eligibility substrate only. `cheapest_compatible` is not approved at Phase 6 start because normalized capabilities, eligibility, pricing joins, and parity proof do not exist yet.
+      locked_contracts:
+        - "Capability source confidence: official provider APIs/docs are authoritative only for fields they explicitly expose; OpenRouter is authoritative only for OpenRouter-routed metadata; source-backed static is source_backed; Portkey and LiteLLM are reference; manual is manual; fallback is fallback; absent/unmapped data is unknown."
+        - "Operation requirements: use only `skill.generate`, `skill.preview`, `skill.optimize_prompt`, `provider.test`, `chat.text`, and optional `embedding` only if already used by source code."
+        - "Route eligibility must return candidate id, provider registry id, executable provider id, model id, enabled state, capability status, pricing status, blocker codes, explanation, and source evidence."
+        - "Unknown capability, missing metadata, unsupported operation, account-scoped source, fallback-only data, disabled candidates, stale/untrusted data, and missing price must produce deterministic blockers where required."
+        - "Missing price is not free and cannot rank as cheapest. Stale price is not usable for `cheapest_compatible`."
+        - "API/UI/CLI/docs must use shared contracts, expose the same blockers, preserve source-confidence labels, distinguish reference metadata from live account availability, and reject raw secrets/prompts/responses/credential paths/tokens/session material."
+      cheapest_compatible: Not approved for Phase 6 start; T107 is rejection-only unless a later Judge gate is inserted after T104-T106 receipts and explicitly approves mode promotion.
+      required_sequence:
+        - Run T104, T105, T106, T107, T108, and T109 sequentially unless PM/Judge proves disjoint allowed files.
+        - Do not edit database migrations unless Scout/Judge prove existing columns cannot represent the contract.
+        - Stop if any Worker needs files outside its allowed files.
+      blockers:
+        - No implemented normalized capability contract exists yet.
+        - No route eligibility engine exists yet.
+        - No persisted normalized capability refresh proof exists yet.
+        - No pricing join or usable price coverage proof exists yet.
+        - No API/UI/CLI/docs parity proof exists yet.
+      incomplete: []
+  - id: T104
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Implement shared model capability normalization and tests.
+    allowed_files:
+      - lib/llm/router/model-capabilities.ts
+      - lib/llm/router/__tests__/model-capabilities.test.ts
+      - lib/providers/model-sources.ts
+      - lib/providers/pricing-sources.ts
+      - lib/providers/__tests__/**/*.test.ts
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- lib/llm/router/__tests__/model-capabilities.test.ts lib/providers => exit 0
+    stop_if:
+      - The Worker stores secrets, prompts, responses, auth headers, or credential paths.
+      - The Worker treats reference/fallback metadata as live account availability.
+      - The Worker changes provider auth modes unrelated to capability metadata.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Added shared model capability normalization contract and focused tests. Contract preserves source/confidence labels, capability flags, token limits, blockers for manual/fallback/unknown metadata, and reference-only LiteLLM handling.
+      changed_files:
+        - lib/llm/router/model-capabilities.ts
+        - lib/llm/router/__tests__/model-capabilities.test.ts
+      commands:
+        - cmd: npm test -- lib/llm/router/__tests__/model-capabilities.test.ts lib/providers
+          status: pass
+          output: "8 test files passed; 56 tests passed."
+      results:
+        - "8 test files passed; 56 tests passed."
+      blockers: []
+      incomplete: []
+  - id: T105
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Persist and expose capability metadata through model refresh surfaces.
+    allowed_files:
+      - lib/llm/router/model-refresh.ts
+      - lib/llm/router/__tests__/model-refresh.test.ts
+      - lib/providers/model-sources.ts
+      - lib/providers/model-sources/__tests__/model-sources.test.ts
+      - app/api/providers/models/refresh/route.ts
+      - app/api/providers/__tests__/**/*.test.ts
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers => exit 0
+    stop_if:
+      - The Worker adds a database migration before proving existing fields cannot represent the contract.
+      - The Worker stores raw provider responses that include secret-like fields.
+      - The API claims fallback/manual data is authoritative.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Persisted normalized capability metadata through model refresh using existing `llm_models` columns and exposed capability summaries from the model-refresh API. Narrowed raw metadata redaction so token limit fields survive while real secret/session/token keys remain stripped.
+      changed_files:
+        - lib/llm/router/model-refresh.ts
+        - lib/llm/router/__tests__/model-refresh.test.ts
+        - lib/providers/model-sources.ts
+        - lib/providers/model-sources/__tests__/model-sources.test.ts
+        - app/api/providers/models/refresh/route.ts
+      commands:
+        - cmd: npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers lib/providers/model-sources
+          status: pass
+          output: "3 test files passed; 43 tests passed."
+      results:
+        - "3 test files passed; 43 tests passed."
+      blockers: []
+      incomplete: []
+  - id: T106
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Implement route eligibility and simulation blockers.
+    allowed_files:
+      - lib/llm/router/route-eligibility.ts
+      - lib/llm/router/routing-policy.ts
+      - lib/llm/router/routing-policy-simulation.ts
+      - lib/llm/router/routing-policy-store.ts
+      - lib/llm/router/__tests__/route-eligibility.test.ts
+      - lib/llm/router/__tests__/routing-policy-simulation.test.ts
+      - lib/llm/router/__tests__/routing-policy-store.test.ts
+      - app/api/providers/policies/simulate/route.ts
+      - app/api/providers/__tests__/**/*.test.ts
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- lib/llm/router/__tests__/route-eligibility.test.ts lib/llm/router/__tests__/routing-policy-simulation.test.ts app/api/providers => exit 0
+    stop_if:
+      - Simulation calls a provider.
+      - Simulation accepts or stores prompt/response bodies.
+      - Unknown capability or missing price is treated as eligible.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Added route eligibility engine and simulation eligibility blockers. Simulation remains local-only and reports capability/pricing blockers without provider calls or prompt/response storage.
+      changed_files:
+        - lib/llm/router/route-eligibility.ts
+        - lib/llm/router/__tests__/route-eligibility.test.ts
+        - lib/llm/router/routing-policy-simulation.ts
+        - lib/llm/router/__tests__/routing-policy-simulation.test.ts
+        - app/api/providers/policies/simulate/route.ts
+      commands:
+        - cmd: npm test -- lib/llm/router/__tests__/route-eligibility.test.ts lib/llm/router/__tests__/routing-policy-simulation.test.ts app/api/providers
+          status: pass
+          output: "3 test files passed; 39 tests passed."
+      results:
+        - "3 test files passed; 39 tests passed."
+      blockers: []
+      incomplete: []
+  - id: T107
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Record explicit `cheapest_compatible` rejection receipt unless a later Judge gate approves mode promotion after T104-T106 proof.
+    allowed_files:
+      - lib/llm/router/types.ts
+      - lib/llm/router/secret-refs.ts
+      - lib/llm/router/routing-policy.ts
+      - lib/llm/router/routing-policy-store.ts
+      - lib/llm/router/routing-policy-simulation.ts
+      - lib/llm/router/route-eligibility.ts
+      - lib/llm/router/__tests__/routing-policy.test.ts
+      - lib/llm/router/__tests__/config.test.ts
+      - lib/llm/router/__tests__/gateway-adapter.test.ts
+      - lib/llm/router/__tests__/request-ledger.test.ts
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - Validation tests continue to reject cheapest_compatible and receipt records exact blocker.
+      - If a later Judge gate explicitly approves promotion, npm test -- lib/llm/router => exit 0 and docs/API/UI/CLI tasks must include the mode.
+    stop_if:
+      - Worker attempts to implement cheapest_compatible without a later explicit Judge approval after T104-T106 receipts.
+      - The Worker sorts incomplete or untrusted prices.
+      - Missing data does not produce deterministic blockers.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      decision: rejected_for_phase6_start
+      summary: `cheapest_compatible` remains unsupported. T103 did not approve mode promotion, and current Phase 6 proof has not yet established API/UI/CLI/docs parity for cost-aware automatic routing.
+      blocker: Judge approval is required after T104-T106 proof and before mode promotion; no later Judge gate has approved promotion.
+      changed_files:
+        - docs/goals/provider-auth-router-phase6/state.yaml
+      commands:
+        - cmd: npm test -- lib/llm/router/__tests__/routing-policy-store.test.ts lib/llm/router/__tests__/routing-policy.test.ts
+          status: pass
+          output: "2 test files passed; 9 tests passed."
+      results:
+        - "2 test files passed; 9 tests passed."
+        - "Existing store tests continue to reject `cheapest_compatible` as an unsupported future mode."
+      incomplete:
+        - "`cheapest_compatible` implementation remains future work pending explicit Judge approval and parity proof."
+  - id: T108
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Add Provider Center, API, and CLI visibility for capabilities and route eligibility.
+    allowed_files:
+      - components/skill-mall/providers/**/*.tsx
+      - components/skill-mall/providers/**/*.ts
+      - components/skill-mall/providers/*.tsx
+      - components/skill-mall/providers/*.ts
+      - components/skill-mall/providers/__tests__/**/*.test.tsx
+      - app/api/providers/**/*.ts
+      - app/api/providers/*.ts
+      - cli/src/index.ts
+      - cli/src/commands/provider-policies.ts
+      - cli/src/commands/providers.ts
+      - cli/src/commands/provider-models.ts
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- components/skill-mall/providers app/api/providers cli lib/llm/router => exit 0
+    stop_if:
+      - UI or CLI invents a capability/mode not supported by shared contracts.
+      - UI implies reference/fallback metadata is live account availability.
+      - API/CLI accepts raw secrets, prompts, responses, or credential paths.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Added capability and eligibility visibility across Provider Center, provider status API, model-refresh API, policy simulation API, and CLI output without adding unsupported routing modes.
+      changed_files:
+        - app/api/providers/route.ts
+        - app/api/providers/models/refresh/route.ts
+        - app/api/providers/policies/simulate/route.ts
+        - components/skill-mall/providers/ProviderCenter.tsx
+        - components/skill-mall/providers/ModelRefreshPanel.tsx
+        - components/skill-mall/providers/__tests__/provider-center.test.tsx
+        - cli/src/commands/providers.ts
+        - cli/src/commands/provider-policies.ts
+      commands:
+        - cmd: npm test -- components/skill-mall/providers app/api/providers cli lib/llm/router
+          status: pass
+          output: "16 test files passed; 121 tests passed."
+      results:
+        - "16 test files passed; 121 tests passed."
+      blockers: []
+      incomplete: []
+  - id: T109
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Update API, database, CLI, user, and phase docs for capability and eligibility behavior.
+    allowed_files:
+      - docs/reference/api-routes.md
+      - docs/reference/database-schema.md
+      - docs/developer/cli-reference.md
+      - docs/user/configuring-providers.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - rg -n "capability|eligibility|cheapest_compatible|quality_first|semantic|prompt body|credential-file|source confidence" docs/reference docs/developer docs/user docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md => docs reviewed for approved language
+    stop_if:
+      - Docs imply unsupported auth/token/session mechanisms.
+      - Docs claim quality_first or semantic routing exists.
+      - Docs claim cheapest_compatible exists without the Judge-approved gate.
+      - Docs omit blocker or incomplete-work status.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Updated API, database, CLI, user, and Phase 6 language for capability metadata, route eligibility, source confidence, blockers, and `cheapest_compatible` rejection.
+      changed_files:
+        - docs/reference/api-routes.md
+        - docs/reference/database-schema.md
+        - docs/developer/cli-reference.md
+        - docs/user/configuring-providers.md
+      commands:
+        - cmd: rg -n "capability|eligibility|cheapest_compatible|quality_first|semantic|prompt body|credential-file|source confidence" docs/reference docs/developer docs/user docs/recovery/2026-05-20-provider-auth-router-phase-6-implementation-plan.md
+          status: pass
+          output: "Docs preserve approved capability, eligibility, source-confidence, missing-data blocker, and unsupported future-mode language."
+        - cmd: npm test -- components/skill-mall/providers app/api/providers cli lib/llm/router
+          status: pass
+          output: "16 test files passed; 121 tests passed."
+      results:
+        - "Docs preserve auth boundaries, source-confidence labels, missing-data blockers, and unsupported future mode language."
+        - "16 test files passed; 121 tests passed."
+      blockers: []
+      incomplete: []
+  - id: T110
+    type: judge
+    assignee: Judge
+    status: done
+    objective: Perform code review, semantic-drift review, auth/secret review, source-confidence review, and mode-promotion review before commit-prep.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - git diff --name-only => reviewed file list recorded
+      - rg -n "quality_first|cheapest_compatible|semantic_router|apiKey|api_key|session|credential|token|prompt|response" changed files => findings recorded and classified
+      - npm test -- lib/llm/router app/api/providers components/skill-mall/providers => exit 0 or blocker recorded
+    stop_if:
+      - Any Phase 6-owned review finding remains unfixed and is not documented as blocked.
+      - Any raw secret/token/session/credential-file path acceptance is present.
+      - Any prompt/response storage is present in capability or simulation paths.
+      - Any unsupported mode is promoted without the Judge-approved contract.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      decision: rejected
+      summary: Judge review blocked final verification until Phase 6-owned findings are fixed.
+      findings:
+        - "HIGH: sanitizer regression allowed common token variants such as refreshToken, refresh_token, idToken, id_token, jwtToken, and jwt_token."
+        - "HIGH: API/UI/CLI eligibility parity incomplete; UI/CLI did not expose operation/requirePricing and UI discarded eligibility blocker details."
+        - "MEDIUM: simulation could return `blocked: true` while still returning a selected ineligible candidate."
+      commands:
+        - git diff --check
+        - npm test -- lib/llm/router app/api/providers components/skill-mall/providers
+        - rg changed files for unsupported mode and secret/prompt/response patterns
+      results:
+        - "Focused tests passed and diff check passed, but review findings require fixes before T111."
+      blockers:
+        - T111 blocked until review fixes are implemented and re-reviewed.
+      incomplete:
+        - Review-fix Worker task T112 inserted.
+  - id: T112
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Fix T110 blockers for token-key redaction, simulation selected/blocked consistency, and API/UI/CLI eligibility parity without mode promotion.
+    allowed_files:
+      - lib/llm/router/model-refresh.ts
+      - lib/providers/model-sources.ts
+      - lib/providers/model-sources/__tests__/model-sources.test.ts
+      - lib/llm/router/__tests__/model-refresh.test.ts
+      - lib/llm/router/routing-policy-simulation.ts
+      - lib/llm/router/__tests__/routing-policy-simulation.test.ts
+      - app/api/providers/policies/simulate/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - cli/src/commands/provider-policies.ts
+      - components/skill-mall/providers/PolicyControlPanel.tsx
+      - components/skill-mall/providers/ProviderCenter.tsx
+      - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      - docs/developer/cli-reference.md
+      - docs/reference/api-routes.md
+      - docs/user/configuring-providers.md
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- lib/providers/model-sources/__tests__/model-sources.test.ts lib/llm/router/__tests__/model-refresh.test.ts lib/llm/router/__tests__/routing-policy-simulation.test.ts app/api/providers components/skill-mall/providers cli lib/llm/router => exit 0
+      - rg changed files for raw secret/prompt/response patterns => findings classified
+      - git diff --check => exit 0
+    stop_if:
+      - Fix requires cheapest_compatible, quality_first, semantic/learned/complexity routing, new auth/session/token handling, raw prompt/response acceptance, or files outside allowed_files.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Fixed T110 review blockers without promoting unsupported routing modes.
+      fixes:
+        - "Token-key redaction now preserves explicit token-limit metadata keys while stripping refresh/id/jwt token variants and other secret/session/credential keys."
+        - "Route simulation now nulls `selected` and marks the selected attempt blocked when eligibility blocks the selected candidate."
+        - "UI and CLI now expose operation plus require-pricing controls for simulation, and Provider Center displays eligibility blocker codes."
+      changed_files:
+        - lib/llm/router/model-refresh.ts
+        - lib/providers/model-sources.ts
+        - lib/providers/model-sources/__tests__/model-sources.test.ts
+        - lib/llm/router/__tests__/model-refresh.test.ts
+        - lib/llm/router/routing-policy-simulation.ts
+        - lib/llm/router/__tests__/routing-policy-simulation.test.ts
+        - app/api/providers/policies/simulate/route.ts
+        - cli/src/commands/provider-policies.ts
+        - components/skill-mall/providers/PolicyControlPanel.tsx
+        - components/skill-mall/providers/ProviderCenter.tsx
+        - components/skill-mall/providers/__tests__/provider-center.test.tsx
+        - docs/developer/cli-reference.md
+        - docs/reference/api-routes.md
+        - docs/user/configuring-providers.md
+      commands:
+        - cmd: npm test -- lib/providers/model-sources/__tests__/model-sources.test.ts lib/llm/router/__tests__/model-refresh.test.ts lib/llm/router/__tests__/routing-policy-simulation.test.ts app/api/providers components/skill-mall/providers cli lib/llm/router
+          status: pass
+          output: "17 test files passed; 126 tests passed."
+        - cmd: npx tsc --noEmit --pretty false
+          status: pass
+          output: "TypeScript exited 0."
+        - cmd: git diff --check
+          status: pass
+          output: "Diff check exited 0."
+        - cmd: git diff --name-only | xargs rg -n "quality_first|cheapest_compatible|semantic_router|apiKey|api_key|refreshToken|refresh_token|idToken|id_token|jwtToken|jwt_token|session|credential|secret|authorization|bearer|cookie|prompt|response"
+          status: pass
+          output: "Scan hits were classified as safe references, docs, tests with redacted fixtures, or guard strings; no raw secret material found."
+      results:
+        - "17 test files passed; 126 tests passed."
+        - "TypeScript exited 0."
+        - "Diff check exited 0."
+        - "Secret/prompt/response scan hits were classified as safe references, docs, tests with redacted fixtures, or guard strings; no raw secret material found."
+      blockers: []
+      incomplete: []
+  - id: T113
+    type: judge
+    assignee: Judge
+    status: done
+    objective: Re-review T110 fixes before final verification.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - git diff --name-only => reviewed file list recorded
+      - rg changed files for unsupported mode and secret/prompt/response patterns => findings classified
+      - npm test -- lib/llm/router app/api/providers components/skill-mall/providers => exit 0
+      - npx tsc --noEmit --pretty false => exit 0
+    stop_if:
+      - Any T110 finding remains unfixed.
+      - Any unsupported routing mode is promoted.
+      - Any raw secret/token/session/credential path or prompt/response body is accepted or persisted.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      decision: rejected
+      summary: Re-review approved redaction, selected-ineligible simulation behavior, CLI/API fields, and unsupported-mode containment, but found UI simulation still nested `operation` and `requirePricing` under policy instead of sending them as top-level API fields.
+      blocker:
+        - Provider Center simulation request builder drops top-level operation/requirePricing, so UI/API parity is not real.
+      incomplete:
+        - Inserted T114 bounded UI/API parity fix before T111.
+  - id: T114
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Preserve operation and requirePricing as top-level fields in Provider Center simulation requests and add a request-body regression test.
+    allowed_files:
+      - components/skill-mall/providers/ProviderCenter.tsx
+      - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- components/skill-mall/providers app/api/providers lib/llm/router => exit 0
+      - npx tsc --noEmit --pretty false => exit 0
+      - git diff --check => exit 0
+    stop_if:
+      - Fix requires routing mode promotion, auth/session/token handling changes, raw prompt/response acceptance, or files outside allowed_files.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      summary: Fixed UI/API simulation parity by preserving operation and requirePricing as top-level Provider Center simulation request fields and adding a regression test.
+      changed_files:
+        - components/skill-mall/providers/ProviderCenter.tsx
+        - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      commands:
+        - cmd: npm test -- components/skill-mall/providers app/api/providers lib/llm/router
+          status: pass
+          output: "16 test files passed; 122 tests passed."
+        - cmd: npx tsc --noEmit --pretty false
+          status: pass
+          output: "TypeScript exited 0."
+        - cmd: git diff --check
+          status: pass
+          output: "Diff check exited 0."
+      results:
+        - "16 test files passed; 122 tests passed."
+        - "TypeScript exited 0."
+        - "Diff check exited 0."
+      blockers: []
+      incomplete: []
+  - id: T111
+    type: pm
+    assignee: PM
+    status: done
+    objective: Final verification, blocker report, incomplete-work report, diff containment, and commit-prep readiness.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase6/state.yaml
+    verify:
+      - npm test -- lib/llm/router app/api/providers components/skill-mall/providers => exit 0
+      - npm test => exit 0 or blocker recorded
+      - npx tsc --noEmit --pretty false => exit 0
+      - npm run lint => exit 0 or pre-existing unrelated failures classified
+      - git diff --check => exit 0
+      - git diff --name-only => changed files match Phase 6 scope
+      - git diff --cached --name-only => empty unless user approved staging
+      - GoalBuddy checker => exit 0
+    stop_if:
+      - Focused tests fail from Phase 6-owned code.
+      - TypeScript fails from Phase 6-owned code.
+      - Lint fails from Phase 6-owned code.
+      - Secret scan finds raw credential material.
+      - Incomplete work is hidden or minimized.
+      - The agent stages, commits, pushes, or opens a PR without explicit approval.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T00:00:00-07:00'
+      decision: complete
+      full_outcome_complete: true
+      summary: Phase 6 implementation is complete for the approved capability/eligibility substrate. Normalized capabilities are persisted and surfaced, route eligibility blocks unsupported or untrusted candidates, reference-only metadata remains blocked from live route eligibility, Provider Center/API/CLI/docs expose matching operation and require-pricing behavior, review findings were fixed, and no staging/commit/push occurred before explicit commit-prep approval.
+      verification:
+        - "Focused Phase 6 tests passed: `npm test -- lib/llm/router app/api/providers components/skill-mall/providers` reported 16 test files and 122 tests passing."
+        - "Code-review fix tests passed: `npm test -- lib/llm/router/__tests__/model-capabilities.test.ts lib/llm/router/__tests__/route-eligibility.test.ts app/api/providers components/skill-mall/providers cli` reported 6 test files and 63 tests passing."
+        - "Full test suite passed: `npm test` reported 53 test files and 403 tests passing."
+        - "`npx tsc --noEmit --pretty false` exited 0."
+        - "`git diff --check` exited 0."
+        - "`git diff --cached --name-only` was empty."
+        - "Secret scan found only redacted/must-not-store fixtures and safe guard/doc references; no raw secret material found."
+      blockers:
+        - "`npm run lint` still fails on pre-existing unrelated lint errors in components/skill-mall/skill-detail/SkillTabs.tsx:328 and components/skill-mall/theme-provider.tsx:42."
+      incomplete:
+        - "`cheapest_compatible` remains unsupported by Judge decision; future implementation requires explicit Judge approval after parity proof."
+        - "No commit, push, or PR was performed during `/goal`; commit-prep/publish begins only after explicit user approval."
+      commands:
+        - cmd: npm test -- lib/llm/router app/api/providers components/skill-mall/providers
+          status: pass
+          output: "16 test files passed; 122 tests passed."
+        - cmd: npm test
+          status: pass
+          output: "53 test files passed; 403 tests passed."
+        - cmd: npx tsc --noEmit --pretty false
+          status: pass
+          output: "TypeScript exited 0."
+        - cmd: npm run lint
+          status: fail
+          output: "Pre-existing unrelated lint errors remain in SkillTabs.tsx:328 and theme-provider.tsx:42; no Phase 6-owned lint failure was identified."
+        - cmd: git diff --check
+          status: pass
+          output: "No whitespace errors."
+        - cmd: git diff --cached --name-only
+          status: pass
+          output: "Empty; nothing staged."
+        - cmd: git diff --name-only | xargs rg -n "sk-[A-Za-z0-9_-]+|AKIA[0-9A-Z]{16}|refreshToken|refresh_token|idToken|id_token|jwtToken|jwt_token|credentialPath|credential_file_path|browser_session_token|session_token|prompt body|response body|do not store this|must-not-store|redacted"
+          status: pass
+          output: "Only redacted/must-not-store test fixtures and safe guard/doc references; no raw secret material."

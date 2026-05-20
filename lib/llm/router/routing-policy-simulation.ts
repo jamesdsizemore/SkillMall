@@ -1,11 +1,17 @@
 import type { ProviderConfig } from '../../providers/types'
 import { evaluateRoutingPolicy, type RoutingCandidate, type RoutingDecision, type RoutingPolicy } from './routing-policy'
 import type { RoutingPolicyRecord } from './routing-policy-store'
+import { evaluateRouteEligibility, type RouteEligibilityResult, type RouteOperation } from './route-eligibility'
+import type Database from 'better-sqlite3'
 
 export interface RoutingPolicySimulationInput {
   baseConfig: ProviderConfig
   policy: RoutingPolicy | RoutingPolicyRecord
   estimatedCostUsd?: number
+  operation?: RouteOperation
+  requirePricing?: boolean
+  db?: Database.Database
+  now?: () => Date
 }
 
 export interface RoutingPolicySimulationResult {
@@ -23,6 +29,7 @@ export interface RoutingPolicySimulationResult {
   } | null
   blocked: boolean
   attempts: RoutingDecision['attempts']
+  eligibility: RouteEligibilityResult[]
   estimatedCostUsd: number | null
 }
 
@@ -51,7 +58,34 @@ export function simulateRoutingPolicyDecision(input: RoutingPolicySimulationInpu
   }
   const decision = evaluateRoutingPolicy(input.baseConfig, policy)
   const selectedAttempt = decision.attempts.find((attempt) => attempt.status === 'selected') ?? null
-  const blocked = decision.attempts.some((attempt) => attempt.status === 'blocked')
+  const eligibility = (policy.candidates ?? []).map((candidate) =>
+    evaluateRouteEligibility({
+      candidate,
+      operation: input.operation,
+      requirePricing: input.requirePricing,
+      db: input.db,
+      now: input.now,
+    })
+  )
+  const selectedEligibility = eligibility.find((item) => item.candidateId === selectedAttempt?.candidateId)
+  const selectedBlocked = selectedEligibility
+    ? selectedEligibility.capabilityStatus !== 'eligible' ||
+      (input.requirePricing === true && selectedEligibility.pricingStatus !== 'available')
+    : false
+  const blocked = decision.attempts.some((attempt) => attempt.status === 'blocked') || selectedBlocked
+  const attempts = selectedBlocked && selectedAttempt
+    ? decision.attempts.map((attempt) =>
+        attempt.candidateId === selectedAttempt.candidateId
+          ? {
+              ...attempt,
+              status: 'blocked' as const,
+              reason: selectedEligibility?.blockerCodes.length
+                ? `route_eligibility_blocked:${selectedEligibility.blockerCodes.join(',')}`
+                : 'route_eligibility_blocked',
+            }
+          : attempt
+      )
+    : decision.attempts
 
   return {
     simulation: true,
@@ -60,7 +94,7 @@ export function simulateRoutingPolicyDecision(input: RoutingPolicySimulationInpu
     responseStored: false,
     policyId: policy.id,
     mode: decision.mode,
-    selected: selectedAttempt
+    selected: selectedAttempt && !selectedBlocked
       ? {
           candidateId: selectedAttempt.candidateId,
           providerId: selectedAttempt.providerId,
@@ -69,7 +103,8 @@ export function simulateRoutingPolicyDecision(input: RoutingPolicySimulationInpu
         }
       : null,
     blocked,
-    attempts: decision.attempts,
+    attempts,
+    eligibility,
     estimatedCostUsd: input.estimatedCostUsd ?? null,
   }
 }

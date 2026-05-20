@@ -16,6 +16,8 @@ interface PolicyFlags {
   remainingUsd?: number;
   limitUsd?: number;
   estimatedCostUsd?: number;
+  operation?: "skill.generate" | "skill.preview" | "skill.optimize_prompt" | "provider.test" | "chat.text" | "embedding";
+  requirePricing?: boolean;
   candidateCurrent?: boolean;
   json?: boolean;
   help?: boolean;
@@ -39,6 +41,14 @@ const unsafeFlags = new Set([
   "--response",
   "--output",
 ]);
+const routeOperations = new Set([
+  "skill.generate",
+  "skill.preview",
+  "skill.optimize_prompt",
+  "provider.test",
+  "chat.text",
+  "embedding",
+]);
 
 function numberFlag(value: string | undefined): number | undefined {
   if (!value) return undefined;
@@ -58,6 +68,8 @@ function parseFlags(args: string[]): PolicyFlags {
     else if (args[i] === "--remaining-usd" && args[i + 1]) flags.remainingUsd = numberFlag(args[++i]);
     else if (args[i] === "--limit-usd" && args[i + 1]) flags.limitUsd = numberFlag(args[++i]);
     else if (args[i] === "--estimated-cost-usd" && args[i + 1]) flags.estimatedCostUsd = numberFlag(args[++i]);
+    else if (args[i] === "--operation" && args[i + 1]) flags.operation = args[++i] as PolicyFlags["operation"];
+    else if (args[i] === "--require-pricing") flags.requirePricing = true;
     else if (args[i] === "--candidate-current") flags.candidateCurrent = true;
     else if (args[i] === "--json") flags.json = true;
     else if (args[i] === "--help" || args[i] === "-h") flags.help = true;
@@ -84,6 +96,8 @@ ${pc.bold("Options:")}
   --remaining-usd <n>          Remaining budget for budget_guarded_manual
   --limit-usd <n>              Budget limit metadata
   --estimated-cost-usd <n>     Numeric estimate for simulation or candidate metadata
+  --operation <name>           chat.text, skill.generate, skill.preview, skill.optimize_prompt, provider.test, embedding
+  --require-pricing            Require usable pricing during route eligibility simulation
   --json                       Print JSON
 
 Raw keys, tokens, credential paths, prompts, messages, responses, and outputs are rejected.
@@ -100,6 +114,13 @@ function requireId(flags: PolicyFlags): string | undefined {
 function rejectUnsafe(flags: PolicyFlags): boolean {
   if (!flags.rejectedUnsafeFlag) return false;
   console.error(pc.red(`  Refusing unsafe policy input ${flags.rejectedUnsafeFlag}. Use references and numeric estimates only.`));
+  process.exitCode = 1;
+  return true;
+}
+
+function rejectInvalidOperation(flags: PolicyFlags): boolean {
+  if (!flags.operation || routeOperations.has(flags.operation)) return false;
+  console.error(pc.red(`  Unsupported simulation operation ${flags.operation}.`));
   process.exitCode = 1;
   return true;
 }
@@ -179,6 +200,8 @@ function simulatePolicy(id: string, flags: PolicyFlags): void {
     baseConfig: resolveRouterProviderConfig(),
     policy,
     estimatedCostUsd: flags.estimatedCostUsd,
+    operation: flags.operation,
+    requirePricing: flags.requirePricing,
   });
   if (flags.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -195,6 +218,15 @@ function simulatePolicy(id: string, flags: PolicyFlags): void {
   for (const attempt of result.attempts) {
     console.log(`  - ${attempt.candidateId}: ${attempt.status}${attempt.reason ? ` (${attempt.reason})` : ""}`);
   }
+  if (result.eligibility.length > 0) {
+    console.log("  Eligibility:");
+    for (const item of result.eligibility) {
+      console.log(
+        `  - ${item.candidateId}: capability=${item.capabilityStatus}, pricing=${item.pricingStatus}` +
+          `${item.blockerCodes.length > 0 ? ` (${item.blockerCodes.join(", ")})` : ""}`
+      );
+    }
+  }
 }
 
 export async function providerPoliciesCommand(args: string[]): Promise<void> {
@@ -205,6 +237,7 @@ export async function providerPoliciesCommand(args: string[]): Promise<void> {
     return;
   }
   if (rejectUnsafe(flags)) return;
+  if (rejectInvalidOperation(flags)) return;
 
   try {
     switch (command) {
