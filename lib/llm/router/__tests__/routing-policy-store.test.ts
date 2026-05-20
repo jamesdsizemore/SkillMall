@@ -116,7 +116,7 @@ describe('routing policy store', () => {
               model: 'gpt-4o-mini',
               authMode: 'env_key',
               secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
-              apiKey: 'sk-raw',
+              api_key: 'sk-raw',
             },
           },
         ],

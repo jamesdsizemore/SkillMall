@@ -4,39 +4,12 @@ import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { simulateRoutingPolicyDecision } from '@/lib/llm/router/routing-policy-simulation'
 import {
   getRoutingPolicyRecord,
+  findForbiddenRoutingPolicyFields,
   normalizeRoutingPolicyDraft,
   RoutingPolicyStoreError,
 } from '@/lib/llm/router/routing-policy-store'
 
 export const dynamic = 'force-dynamic'
-
-const forbiddenPolicyFieldNames = new Set([
-  'apiKey',
-  'rawKey',
-  'key',
-  'token',
-  'accessToken',
-  'sessionToken',
-  'browserToken',
-  'browser_token',
-  'credentialPath',
-  'credential_path',
-  'credentialsPath',
-  'credentials_path',
-  'credentialFile',
-  'credential_file',
-  'credentialFilePath',
-  'credential_file_path',
-  'prompt',
-  'prompts',
-  'systemPrompt',
-  'userPrompt',
-  'messages',
-  'response',
-  'responses',
-  'completion',
-  'output',
-])
 
 const SimulationBodySchema = z.object({
   id: z.string().min(1).optional(),
@@ -53,22 +26,9 @@ const SimulationBodySchema = z.object({
   estimatedCostUsd: z.number().finite().optional(),
 }).strict()
 
-function rejectedForbiddenFields(value: unknown, prefix = ''): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) => rejectedForbiddenFields(item, `${prefix}[${index}]`))
-  }
-  if (!value || typeof value !== 'object') return []
-
-  return Object.entries(value).flatMap(([key, nestedValue]) => {
-    const path = prefix ? `${prefix}.${key}` : key
-    const nested = rejectedForbiddenFields(nestedValue, path)
-    return forbiddenPolicyFieldNames.has(key) ? [path, ...nested] : nested
-  })
-}
-
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
-  const rejectedFields = rejectedForbiddenFields(body)
+  const rejectedFields = findForbiddenRoutingPolicyFields(body, '')
   if (rejectedFields.length > 0) {
     return NextResponse.json(
       {

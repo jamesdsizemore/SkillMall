@@ -4,6 +4,7 @@ import { writeProviderConfig } from '@/lib/providers/config-store'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import {
   getRoutingPolicyRecord,
+  findForbiddenRoutingPolicyFields,
   listRoutingPolicies,
   RoutingPolicyStoreError,
   setRoutingPolicyEnabled,
@@ -12,34 +13,6 @@ import {
 import { PHASE2_ROUTING_POLICY_MODES } from '@/lib/llm/router/types'
 
 export const dynamic = 'force-dynamic'
-
-const forbiddenPolicyFieldNames = new Set([
-  'apiKey',
-  'rawKey',
-  'key',
-  'token',
-  'accessToken',
-  'sessionToken',
-  'browserToken',
-  'browser_token',
-  'credentialPath',
-  'credential_path',
-  'credentialsPath',
-  'credentials_path',
-  'credentialFile',
-  'credential_file',
-  'credentialFilePath',
-  'credential_file_path',
-  'prompt',
-  'prompts',
-  'systemPrompt',
-  'userPrompt',
-  'messages',
-  'response',
-  'responses',
-  'completion',
-  'output',
-])
 
 const PolicyBodySchema = z.object({
   action: z.enum(['upsert', 'enable', 'disable', 'activate']).optional(),
@@ -50,19 +23,6 @@ const PolicyBodySchema = z.object({
   budget: z.unknown().optional(),
   enabled: z.boolean().optional(),
 }).strict()
-
-function rejectedForbiddenFields(value: unknown, prefix = ''): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) => rejectedForbiddenFields(item, `${prefix}[${index}]`))
-  }
-  if (!value || typeof value !== 'object') return []
-
-  return Object.entries(value).flatMap(([key, nestedValue]) => {
-    const path = prefix ? `${prefix}.${key}` : key
-    const nested = rejectedForbiddenFields(nestedValue, path)
-    return forbiddenPolicyFieldNames.has(key) ? [path, ...nested] : nested
-  })
-}
 
 function policyResponse(policy: ReturnType<typeof getRoutingPolicyRecord>) {
   return policy ?? null
@@ -88,7 +48,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
-  const rejectedFields = rejectedForbiddenFields(body)
+  const rejectedFields = findForbiddenRoutingPolicyFields(body, '')
   if (rejectedFields.length > 0) {
     return NextResponse.json(
       {

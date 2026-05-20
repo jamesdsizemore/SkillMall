@@ -789,7 +789,7 @@ describe('provider API routes', () => {
               config: {
                 provider: 'openai',
                 model: 'gpt-4o-mini',
-                apiKey: 'raw-secret',
+                api_key: 'raw-secret',
               },
             },
           ],
@@ -907,7 +907,7 @@ describe('provider API routes', () => {
     const rejected = await POST(
       postRequest('http://localhost/api/providers/policies/simulate', {
         id: 'budget-openai',
-        prompt: 'do not store this',
+        session_token: 'do not store this',
       }) as never
     )
     const rejectedJson = await rejected.json()

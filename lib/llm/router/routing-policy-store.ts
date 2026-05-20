@@ -13,15 +13,27 @@ import type { LLMAuthMode, RoutingPolicyMode } from './types'
 
 const providerIds = new Set<ProviderID>(['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'])
 const policyIdPattern = /^[a-z0-9][a-z0-9._-]{1,80}$/
-const forbiddenPolicyFieldNames = new Set([
+export const FORBIDDEN_ROUTING_POLICY_FIELD_NAMES = new Set([
   'apiKey',
+  'api_key',
   'rawKey',
+  'raw_key',
   'key',
   'token',
   'accessToken',
+  'access_token',
+  'authToken',
+  'auth_token',
+  'oauthToken',
+  'oauth_token',
   'sessionToken',
+  'session_token',
+  'browserSessionToken',
+  'browser_session_token',
   'browserToken',
   'browser_token',
+  'credential',
+  'credentials',
   'credentialPath',
   'credential_path',
   'credentialsPath',
@@ -108,19 +120,23 @@ function parseJsonObject(value: string): Record<string, unknown> {
   }
 }
 
-function rejectForbiddenFields(value: unknown, prefix = 'policy'): void {
+export function findForbiddenRoutingPolicyFields(value: unknown, prefix = 'policy'): string[] {
   if (Array.isArray(value)) {
-    value.forEach((item, index) => rejectForbiddenFields(item, `${prefix}[${index}]`))
-    return
+    return value.flatMap((item, index) => findForbiddenRoutingPolicyFields(item, `${prefix}[${index}]`))
   }
-  if (!isObject(value)) return
+  if (!isObject(value)) return []
 
-  for (const [key, nested] of Object.entries(value)) {
-    const path = `${prefix}.${key}`
-    if (forbiddenPolicyFieldNames.has(key)) {
-      throw new RoutingPolicyStoreError(`Routing policy field is not allowed: ${path}`)
-    }
-    rejectForbiddenFields(nested, path)
+  return Object.entries(value).flatMap(([key, nested]) => {
+    const path = prefix ? `${prefix}.${key}` : key
+    const nestedMatches = findForbiddenRoutingPolicyFields(nested, path)
+    return FORBIDDEN_ROUTING_POLICY_FIELD_NAMES.has(key) ? [path, ...nestedMatches] : nestedMatches
+  })
+}
+
+function rejectForbiddenFields(value: unknown, prefix = 'policy'): void {
+  const rejectedFields = findForbiddenRoutingPolicyFields(value, prefix)
+  if (rejectedFields.length > 0) {
+    throw new RoutingPolicyStoreError(`Routing policy field is not allowed: ${rejectedFields[0]}`)
   }
 }
 
