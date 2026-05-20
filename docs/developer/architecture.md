@@ -66,20 +66,62 @@ The central insight is that the web wizard and the CLI are two UIs for the same 
 
 ## The Provider Abstraction
 
-SkillMall supports five LLM providers through a single interface. Every feature that calls an LLM goes through this abstraction — there is no provider-specific code outside `lib/providers/`.
+SkillMall separates the broad Provider Center catalog from executable LLM clients. The Provider Center uses `ProviderRegistryID` rows for API providers, local tools, local runtimes, cloud-project providers, gateway-compatible providers, and custom OpenAI-compatible endpoints. The executable router still uses a narrower `ProviderID` set for clients that are implemented and tested today.
+
+Current executable direct/router providers are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows such as OpenRouter, Hugging Face, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, Cerebras, and custom OpenAI-compatible endpoints can appear in Provider Center without becoming executable direct clients.
+
+Planned-source-review rows are visible but not live-callable until primary-source evidence and adapter support are added: Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
 
 ### The LLMClient Interface
 
 ```typescript
 // lib/providers/types.ts
 
-export type ProviderID = 'openai' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
+export type ProviderID =
+  | 'openai'
+  | 'anthropic'
+  | 'claude-code'
+  | 'gemini'
+  | 'groq'
+  | 'ollama'
+
+export type ProviderRegistryID =
+  | 'openai'
+  | 'anthropic'
+  | 'claude_code'
+  | 'gemini'
+  | 'groq'
+  | 'ollama'
+  | 'openrouter'
+  | 'alibaba_dashscope_qwen'
+  | 'huggingface'
+  | 'zai'
+  | 'minimax'
+  | 'kimi_moonshot'
+  | 'deepseek'
+  | 'mistral'
+  | 'cohere'
+  | 'xai'
+  | 'aws_bedrock'
+  | 'azure_openai'
+  | 'google_vertex_ai'
+  | 'together_ai'
+  | 'fireworks'
+  | 'replicate'
+  | 'nvidia_nim'
+  | 'perplexity'
+  | 'deepinfra'
+  | 'cerebras'
+  | 'custom_openai_compatible'
 
 export interface ProviderConfig {
   provider: ProviderID
-  apiKey?: string
   model: string
   baseURL?: string
+  authMode?: LLMAuthMode
+  secretRef?: SecretRef
+  gatewayBackend?: GatewayBackend
+  routingPolicyId?: string
 }
 
 export interface CompletionOptions {
@@ -100,12 +142,14 @@ Every provider implements `LLMClient`. The `provider` field is used in places th
 
 ### Resolution Order
 
-`resolveProviderConfig()` in `lib/providers/index.ts` resolves configuration in this order:
+`resolveProviderConfig()` and `resolveRouterProviderConfig()` resolve configuration in this order:
 
-1. Environment variables (`SKILL_MALL_PROVIDER`, `SKILL_MALL_API_KEY`, `SKILL_MALL_MODEL`)
+1. Environment variables (`SKILL_MALL_PROVIDER`, `SKILL_MALL_MODEL`, plus provider-specific API variables such as `OPENAI_API_KEY`)
 2. `~/.skill-mall/config.json` (written by `npx skill-mall configure`)
 
 If neither source has a provider, it throws `ConfigError: "No LLM provider configured. Run: npx skill-mall configure"`.
+
+The config file stores secret references, not secret values. API access uses `env_key`; Claude Code uses `local_cli_session`; Ollama uses `none_local`; optional local Bifrost gateway routing uses `gateway_virtual_key` with a gateway virtual-key reference.
 
 ### Factory Function
 
@@ -113,6 +157,7 @@ If neither source has a provider, it throws `ConfigError: "No LLM provider confi
 export function createLLMClient(config: ProviderConfig): LLMClient {
   switch (config.provider) {
     case 'openai':    return new OpenAIClient(config)
+    case 'anthropic': return new AnthropicClient(config)
     case 'claude-code': return new ClaudeCodeClient(config)
     case 'gemini':    return new GeminiClient(config)
     case 'groq':      return new GroqClient(config)
@@ -125,33 +170,39 @@ export function createLLMClient(config: ProviderConfig): LLMClient {
 }
 ```
 
-The `_exhaustive: never` pattern ensures TypeScript will produce a compile error if a new `ProviderID` is added without a corresponding `case` in the factory.
+The `_exhaustive: never` pattern ensures TypeScript will produce a compile error if a new executable `ProviderID` is added without a corresponding `case` in the factory. Do not add broad registry-only rows to `ProviderID` unless an executable adapter is implemented and tested.
+
+### Provider Center Registry
+
+`lib/providers/registry.ts` owns the broad Provider Center rows. Each row declares access labels, auth labels, setup/source URLs, `discoveryStrategy`, status/classification, `liveCallable`, optional executable mapping, optional gateway profile, fallback model labels, and evidence notes.
+
+Model refresh uses the row's declared `discoveryStrategy`: OpenAI-compatible rows can probe configured endpoints, provider-specific rows require adapters, cloud rows require project/resource/region/deployment context, local rows require local runtime/tool status, manual rows use manual labels, static rows display fallback labels only, and planned-source-review rows do not make live calls. This prevents generic `/v1/models` drift.
 
 ### Claude Code: Subprocess, Not SDK
 
 `ClaudeCodeClient` does not use the Anthropic SDK (`@anthropic-ai/sdk`). It spawns `claude -p "<prompt>"` as a child process and reads stdout. This is because:
 
 - Claude Code CLI users are already authenticated — no API key to manage
-- The Anthropic SDK requires an API key that Claude Code users may not have
+- Anthropic API access uses a separate API key and billing path from Claude account or Max subscription auth
 - The CLI uses the same model versioning as the user's installed Claude Code
 
 This means `claude` must be in `$PATH` for the claude-code provider to work.
 
 ### Adding a New Provider
 
-1. Create `lib/providers/<name>.ts` implementing `LLMClient`
-2. Add the provider ID to `ProviderID` in `types.ts`
-3. Add a `case` in `createLLMClient()` in `index.ts`
-4. Add default model to `DEFAULT_MODELS` in `defaults.ts`
-5. Add setup instructions to `PROVIDER_CATALOG` in `defaults.ts`
+1. Add or update the `ProviderRegistryID` row in `lib/providers/registry.ts`.
+2. Choose the correct `discoveryStrategy` in `lib/providers/model-discovery.ts`; do not assume `/v1/models`.
+3. If the provider is executable, add the narrow `ProviderID`, client implementation, factory case, tests, and config-store support.
+4. If the provider is registry-only, keep it metadata/status-only until an adapter exists.
+5. Update Provider Center docs, API docs, and CLI examples with the secret-reference boundary.
 
-The entire addition is ~50 lines and one new file.
+Broad catalog support is not the same as executable direct-client support.
 
 ---
 
 ## The 5-Stage Pipeline
 
-The skill creation pipeline runs when a user calls `POST /api/create-skill` (web wizard) or `npx skill-mall confirm-research` (CLI). It produces a complete skill directory from a topic and optional source URLs.
+The skill creation pipeline runs when a user calls `POST /api/create-skill` (web wizard) or `npx skill-mall confirm-research` (CLI). It produces a complete skill directory from a topic and optional source URLs. The web wizard also calls `POST /api/preview-skill` after metadata selection so users can review and edit the generated `SKILL.md` before prompt files or final disk writes are produced.
 
 ### Stage 1 — Input Validation
 
@@ -212,6 +263,8 @@ export interface InMemorySkillDirectory {
 
 The distinction matters for testing: template-generated files can be tested without an LLM mock; LLM-powered files require `MockLLMClient`.
 
+In the browser wizard, the Stage 3 output is returned to Step 4 as an editable `SKILL.md` preview. Later `/api/confirm-research` and `/api/create-skill` calls accept the reviewed `skillMdContent`, rebuild the directory, replace `SKILL.md` with the reviewed content, and validate before returning a preview or writing to disk.
+
 ### Stage 4 — Prompt Engine (`lib/prompt-engine.ts`)
 
 The Prompt Engine generates framework-specific prompts for each tool. This is the most LLM-intensive stage — a 20-tool domain generates 60+ LLM calls.
@@ -259,7 +312,7 @@ This prevents the catalog from containing half-written skills if a write fails m
 
 The multi-step wizard uses `useReducer` + React Context (`WizardContext`) with `sessionStorage` persistence.
 
-**Why not Zustand?** Zustand is a library dependency for state that could be handled with React primitives. The wizard state is simple: a few fields advancing through 4 steps. `useReducer` is sufficient and requires zero additional packages.
+**Why not Zustand?** Zustand is a library dependency for state that could be handled with React primitives. The wizard state is simple: fields advancing through six ordered steps. `useReducer` is sufficient and requires zero additional packages.
 
 **Why not URL state?** The research result contains thousands of characters of JSON (tools, prompts, samples). Encoding this in a URL would produce a URL too long for browsers and would expose sensitive pipeline output in browser history and server logs.
 
@@ -268,13 +321,19 @@ The multi-step wizard uses `useReducer` + React Context (`WizardContext`) with `
 **State shape:**
 ```typescript
 type WizardState = {
-  step: 'topic' | 'research' | 'review' | 'building' | 'done'
+  step: 1 | 2 | 3 | 4 | 5 | 6
   topic: string
   sourceUrls: string[]
-  category: string
   researchResult: ResearchResult | null
-  selectedTools: string[]
-  buildResult: BuildResult | null
+  selectedToolNames: string[]
+  category: string
+  tags: string[]
+  targetAgents: string[]
+  selectedMetaTypes: string[]
+  skillMdPreview: string | null
+  previewDirectory: InMemorySkillDirectory | null
+  isLoading: boolean
+  error: string | null
 }
 ```
 

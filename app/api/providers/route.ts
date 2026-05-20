@@ -1,72 +1,150 @@
-import { NextResponse } from "next/server";
-import { ConfigError, resolveProviderConfig } from "@/lib/providers";
+import { NextResponse } from 'next/server'
+import { ConfigError } from '@/lib/providers'
+import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
+import { PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
+import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
+import type { SecretRef } from '@/lib/llm/router/types'
+import type { ProviderRegistryEntry } from '@/lib/providers/types'
 
-const PROVIDER_CATALOG = [
-  {
-    id: "openai",
-    name: "OpenAI",
-    requiresApiKey: true,
-    defaultModel: "gpt-4o",
-    availableModels: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-    setupUrl: "https://platform.openai.com/api-keys",
-    setupInstructions: "Get an API key from platform.openai.com and add SKILL_MALL_API_KEY to .env.local",
-  },
-  {
-    id: "claude-code",
-    name: "Claude Code CLI",
-    requiresApiKey: false,
-    defaultModel: "claude-sonnet-4-6",
-    availableModels: ["claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5-20251001"],
-    setupUrl: "https://claude.ai/code",
-    setupInstructions: "Install Claude Code CLI and authenticate. No API key required.",
-  },
-  {
-    id: "gemini",
-    name: "Google Gemini",
-    requiresApiKey: true,
-    defaultModel: "gemini-2.0-flash-exp",
-    availableModels: ["gemini-2.0-flash-exp", "gemini-1.5-pro"],
-    setupUrl: "https://aistudio.google.com/app/apikey",
-    setupInstructions: "Get an API key from Google AI Studio and add SKILL_MALL_API_KEY to .env.local",
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    requiresApiKey: true,
-    defaultModel: "llama-3.3-70b-versatile",
-    availableModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
-    setupUrl: "https://console.groq.com/keys",
-    setupInstructions: "Get an API key from Groq console and add SKILL_MALL_API_KEY to .env.local",
-  },
-  {
-    id: "ollama",
-    name: "Ollama (Local)",
-    requiresApiKey: false,
-    defaultModel: "llama3.1",
-    availableModels: ["llama3.1", "mistral", "codellama"],
-    setupUrl: "https://ollama.ai",
-    setupInstructions: "Install Ollama, run 'ollama pull llama3.1', then 'ollama serve'. No API key needed.",
-  },
-];
+export const dynamic = 'force-dynamic'
+
+function accessLabel(authMode: string | null, gatewayBackend: string | null): string | null {
+  if (gatewayBackend && gatewayBackend !== 'direct') return 'gateway_access'
+  if (authMode === 'env_key') return 'api_access'
+  if (authMode === 'local_cli_session') return 'local_tool_session'
+  if (authMode === 'none_local') return 'local_runtime'
+  if (authMode === 'gateway_virtual_key') return 'gateway_access'
+  return null
+}
+
+function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
+  if (!secretRef) return null
+  if (secretRef.type === 'none') {
+    return {
+      type: 'none',
+      valuePresent: true,
+      source: 'no_secret_required',
+    }
+  }
+
+  return {
+    type: secretRef.type,
+    name: secretRef.name,
+    valuePresent: Boolean(process.env[secretRef.name]),
+    source: 'reference_only',
+  }
+}
+
+function sanitizedGatewayProfile(entry: ProviderRegistryEntry) {
+  if (!entry.gatewayProfile) return null
+  return {
+    kind: entry.gatewayProfile.kind,
+    defaultBaseUrl: entry.gatewayProfile.defaultBaseUrl ?? null,
+    requiresUserEndpoint: Boolean(entry.gatewayProfile.requiresUserEndpoint),
+    note: entry.gatewayProfile.note,
+  }
+}
+
+function providerRow(entry: ProviderRegistryEntry, active: ReturnType<typeof activeStatus> | null) {
+  const discoveryPlan = modelDiscoveryPlanForEntry(entry)
+  const isConfigured = active?.activeProviderRegistryId === entry.id
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    accessModes: entry.accessModes,
+    accessLabel: entry.accessLabel,
+    authLabel: entry.authLabel,
+    setupUrl: entry.setupUrl,
+    officialSourceUrl: entry.officialSourceUrl,
+    discoveryStrategy: entry.discoveryStrategy,
+    status: entry.status,
+    classification: entry.classification,
+    liveCallable: entry.liveCallable,
+    executableProviderId: entry.executableProviderId ?? null,
+    gatewayProfile: sanitizedGatewayProfile(entry),
+    registryInclusionNote: entry.registryInclusionNote,
+    evidenceNote: entry.evidenceNote,
+    configStatus: {
+      configured: isConfigured,
+      authMode: isConfigured ? active?.authMode : null,
+      gatewayBackend: isConfigured ? active?.gatewayBackend : null,
+      accessLabel: isConfigured ? active?.accessLabel : null,
+      secretRef: isConfigured ? active?.secretRef : null,
+      secretStatus: isConfigured ? active?.secretStatus : null,
+      baseURL: isConfigured ? active?.baseURL : null,
+      routingPolicyId: isConfigured ? active?.routingPolicyId : null,
+      activeModel: isConfigured ? active?.activeModel : null,
+    },
+    modelStatus: {
+      strategy: entry.discoveryStrategy,
+      source: entry.fallbackModels.length > 0 ? 'fallback' : 'none',
+      authoritative: false,
+      stale: true,
+      models: entry.fallbackModels,
+      refresh: discoveryPlan,
+    },
+    costStatus: {
+      actual_cost_usd: null,
+      estimated_cost_usd: null,
+      note: 'Use /api/providers/usage for ledger-backed usage and cost summaries.',
+    },
+  }
+}
+
+function activeStatus() {
+  const config = resolveRouterProviderConfig()
+  const activeProviderRegistryId = providerRegistryIdForExecutableProvider(config.provider)
+  const activeAccessLabel = accessLabel(config.authMode, config.gatewayBackend)
+
+  return {
+    configured: true,
+    activeProvider: config.provider,
+    activeProviderRegistryId,
+    activeModel: config.model,
+    authMode: config.authMode,
+    gatewayBackend: config.gatewayBackend,
+    accessLabel: activeAccessLabel,
+    secretRef: config.secretRef ?? null,
+    secretStatus: sanitizeSecretStatus(config.secretRef),
+    baseURL: config.baseURL ?? null,
+    routingPolicyId: config.routingPolicyId ?? null,
+    warnings: config.warnings,
+  }
+}
+
+function emptyStatus() {
+  return {
+    configured: false,
+    activeProvider: null,
+    activeProviderRegistryId: null,
+    activeModel: null,
+    authMode: null,
+    gatewayBackend: 'direct',
+    accessLabel: null,
+    secretRef: null,
+    secretStatus: null,
+    baseURL: null,
+    routingPolicyId: null,
+    warnings: [],
+  }
+}
 
 export async function GET() {
   try {
-    const config = resolveProviderConfig();
+    const active = activeStatus()
     return NextResponse.json({
-      configured: true,
-      activeProvider: config.provider,
-      activeModel: config.model,
-      providers: PROVIDER_CATALOG,
-    });
+      ...active,
+      providers: PROVIDER_REGISTRY.map((entry) => providerRow(entry, active)),
+    })
   } catch (err) {
     if (err instanceof ConfigError) {
+      const active = emptyStatus()
       return NextResponse.json({
-        configured: false,
-        activeProvider: null,
-        activeModel: null,
-        providers: PROVIDER_CATALOG,
-      });
+        ...active,
+        providers: PROVIDER_REGISTRY.map((entry) => providerRow(entry, null)),
+      })
     }
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 })
   }
 }

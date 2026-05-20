@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth/github'
+import {
+  authenticationRequiredResponse,
+  getSessionFromCookies,
+  requireSkillAuthor,
+} from '@/lib/auth/policy'
 import { getSuggestions, analyzeFeedback } from '@/lib/self-improvement/analyzer'
 import { getSkill } from '@/lib/skills'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers'
@@ -24,11 +27,9 @@ export async function POST(
 ) {
   const { id: skillSlug } = await params
 
-  const cookieStore = await cookies()
-  const token = cookieStore.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = await getSessionFromCookies()
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return authenticationRequiredResponse()
   }
 
   const body = await req.json().catch(() => ({})) as { category?: string }
@@ -42,9 +43,8 @@ export async function POST(
     return NextResponse.json({ error: `Skill not found: ${category}/${skillSlug}` }, { status: 404 })
   }
 
-  if (skill.author !== session.github_login) {
-    return NextResponse.json({ error: 'Only the skill author can trigger analysis' }, { status: 403 })
-  }
+  const authorError = requireSkillAuthor(session, skill, 'Only the skill author can trigger analysis')
+  if (authorError) return authorError
 
   let config
   try {

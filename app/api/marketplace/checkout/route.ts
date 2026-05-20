@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth/github'
+import { authenticationRequiredResponse, getSessionFromCookies } from '@/lib/auth/policy'
 import { createCheckoutSession } from '@/lib/marketplace/payments'
 import { getSkill } from '@/lib/skills'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = await getSessionFromCookies()
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return authenticationRequiredResponse()
   }
 
   const body = await req.json().catch(() => null)

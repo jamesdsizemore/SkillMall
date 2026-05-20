@@ -63,7 +63,8 @@ Expected output:
 For OpenAI:
 
 ```bash
-npx skill-mall configure --provider openai --key sk-your-key-here --model gpt-4o
+export OPENAI_API_KEY="your-openai-api-key"
+npx skill-mall configure --provider openai --key-env OPENAI_API_KEY --model gpt-4o
 ```
 
 For Groq (fast inference, low cost, good for iteration):

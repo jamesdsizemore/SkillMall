@@ -1,0 +1,706 @@
+version: 2
+active_task: null
+
+goal:
+  title: "Provider/Auth Router Phase 1"
+  slug: provider-auth-router-phase1
+  status: done
+  created_at: "2026-05-19"
+  goal_file: docs/goals/provider-auth-router-phase1/goal.md
+  plan_file: docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md
+  intake:
+    input_shape: existing_plan
+    authority: needs_approval
+    proof_type: test_review_artifact
+    existing_plan_facts:
+      - "Phase 1 builds SkillMall-native provider/auth/router core."
+      - "Phase 1 preserves existing provider call surface."
+      - "Phase 1 stores secret references, not raw secrets."
+      - "Phase 1 adds local request/cost ledger tables."
+      - "Phase 1 excludes gateway sidecars, broad Provider Center redesign, and full model refresh implementation."
+      - "Phase 1 executable auth modes are only env_key, local_cli_session, and none_local."
+      - "Phase 1 executable gateway backend is only direct."
+      - "Phase 1 routing-policy storage is metadata only; no runtime policy evaluation."
+      - "env_key requires an env secret ref; local_cli_session and none_local must not store secret refs."
+      - "Next.js route-handler docs must be read before app route edits."
+      - "No code implementation starts until user approval."
+      - "Workspace is /Users/jamesdsizemore/Developer/skill-mall."
+      - "Branch is codex/agent-operating-contract-auth-token-skill."
+      - "If native Codex /goal runtime is unavailable, the Codex thread acts as PM and executes the same board one active task at a time."
+    completion_proof: "All approved tasks have receipts; safe local work is complete; Judge review is complete; review fixes are done or explicitly accepted; focused tests, full tests, typecheck, lint, secret scan, reserved-term scan classification, and diff containment are recorded; plan docs/reference docs/board receipts are current; any incomplete work has blocker evidence and next action; no excluded UI/wizard/gateway files were changed by Phase 1 work."
+  oracle:
+    signal: "GoalBuddy receipts plus final verification commands prove router/auth Phase 1 behavior, direct-only execution, completion discipline, blocker documentation, documentation currency, and scope containment."
+    final_proof: "T711 receipt reports final verification results, git diff containment, docs/plan/board currency, completed work, incomplete work if any, blocker evidence if any, and next safe action if blocked; T710 Judge receipt reports ready_for_final_verification or accepted findings."
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+tasks:
+  - id: T701
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Approval gate and plan/source validation before implementation. Confirm approval, source facts, dirty state, staged state, runtime path, direct-only Phase 1 boundaries, and board alignment."
+    inputs:
+      - AGENTS.md
+      - docs/recovery/2026-05-19-provider-recovery-inventory.md
+      - docs/recovery/2026-05-19-skillmall-recovery-auth-token-plan.md
+      - docs/recovery/2026-05-19-provider-auth-router-architecture-plan.md
+      - docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md
+      - docs/goals/provider-auth-router-phase1/goal.md
+      - docs/goals/provider-auth-router-phase1/state.yaml
+    verify:
+      - cmd: "git branch --show-current"
+        expect: "codex/agent-operating-contract-auth-token-skill recorded or mismatch documented"
+      - cmd: "git status --short"
+        expect: "dirty tree recorded without cleanup"
+      - cmd: "git diff --cached --name-only"
+        expect: "empty unless user explicitly staged files"
+      - cmd: "npx goalbuddy@0.3.7 doctor --target codex --goal-ready --json"
+        expect: "native /goal readiness recorded; if not ready, fallback PM execution path is documented"
+    stop_if:
+      - "User has not approved implementation."
+      - "Plan requires excluded UI/wizard/gateway files."
+      - "Staged files exist without explicit user approval."
+      - "Board does not require complete work, blocker documentation, incomplete-work documentation, review fixes, final verification, and docs updates."
+      - "Board allows executable auth modes beyond env_key, local_cli_session, and none_local."
+      - "Board allows executable gateway backend beyond direct."
+      - "Board allows runtime routing-policy evaluation."
+      - "Neither native /goal nor documented Codex-thread PM fallback is available."
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      summary: "Approval/source gate passed. User invoked /goal, branch is codex/agent-operating-contract-auth-token-skill, staged diff is empty, dirty tree is recorded, direct-only Phase 1 boundaries remain encoded, and Codex-thread PM fallback is available because native Codex goals are disabled."
+      evidence:
+        - "git branch --show-current => codex/agent-operating-contract-auth-token-skill"
+        - "git diff --cached --name-only => empty"
+        - "git status --short recorded pre-existing dirty provider/auth and preview files"
+        - "npx goalbuddy@0.3.7 doctor --target codex --goal-ready --json => native goals feature disabled; plugin and agents installed"
+      blocked_tasks: []
+      required_board_updates:
+        - "Activate T702 for read-only current-source and dirty-file map."
+
+  - id: T702
+    type: scout
+    assignee: Scout
+    status: done
+    objective: "Read-only current-source and dirty-file map. Confirm exact call sites, file ownership, dirty overlap, and whether Next.js docs must be read before app-route edits."
+    inputs:
+      - lib/providers/types.ts
+      - lib/providers/index.ts
+      - lib/providers/config-store.ts
+      - cli/src/commands/configure.ts
+      - app/api/providers/route.ts
+      - app/api/providers/configure/route.ts
+      - lib/db/client.ts
+      - db/migrations/
+    expected_output:
+      - "Source map with current call sites."
+      - "Dirty-file overlap inventory."
+      - "Allowed-file confirmation for T703-T709."
+      - "Any Next.js docs that must be read before app-route edits."
+      - "Confirmation that node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md must be read before T708."
+      - "Any current-source mismatch that requires updating the plan before implementation."
+    verify:
+      - cmd: "rg -n \"resolveProviderConfig|createLLMClient|LLMClient|ProviderConfig|writeProviderConfig\" lib app cli"
+        expect: "current call sites identified"
+      - cmd: "git status --short"
+        expect: "dirty files recorded"
+    stop_if:
+      - "Source map contradicts the implementation plan in a way that changes architecture."
+      - "The plan would cause partial implementation or a handoff without complete Phase 1 work."
+    receipt:
+      result: done
+      summary: "Source map completed. Existing provider path is API-key-centered and matches the planned rework target. Dirty overlap is real in provider route/config/type/test files and must be preserved/reworked within task allowed_files only. Next.js route-handler docs exist and must be read before T708."
+      evidence:
+        - "rg resolveProviderConfig/createLLMClient/LLMClient/ProviderConfig/writeProviderConfig across lib app cli"
+        - "lib/providers/types.ts still has ProviderConfig.apiKey and narrow ProviderID union"
+        - "lib/providers/index.ts reads env/config raw apiKey and constructs direct clients"
+        - "lib/providers/config-store.ts writes apiKey to ~/.skill-mall/config.json"
+        - "app/api/providers/configure/route.ts writes .env.local and mutates process.env"
+        - "node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md exists"
+      facts:
+        - "T703-T709 allowed_files cover the planned router core, migration, config, wrapper, route, and docs slices."
+        - "app/settings/providers/page.tsx and wizard files remain excluded from Phase 1."
+        - "No current-source mismatch requires changing the approved plan before implementation."
+      contradictions: []
+      ambiguity_requiring_judge: []
+
+  - id: T703
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Add Phase 1 router auth-mode types and secret-reference helpers with redaction and reserved-mode rejection tests."
+    allowed_files:
+      - lib/llm/router/types.ts
+      - lib/llm/router/secret-refs.ts
+      - lib/llm/router/__tests__/config.test.ts
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/config.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved generated dirs"
+    stop_if:
+      - "Implementation requires raw token fields."
+      - "Implementation accepts reserved future auth modes as executable Phase 1 behavior."
+      - "Implementation accepts non-direct gateway backend as executable Phase 1 behavior."
+      - "Implementation allows env_key without env secret ref or local_cli_session/none_local with secret refs."
+      - "Implementation requires changing provider UI or gateway files."
+      - "Only partial scaffolding can be completed without a blocker receipt."
+    receipt:
+      result: done
+      summary: "Phase 1 router auth-mode types and secret-reference helpers were added. The helpers redact secret references, resolve env values only through explicit runtime lookup, reject reserved future auth modes, reject non-direct gateway backends, and enforce env_key/local_cli_session/none_local secret-ref pairings."
+      changed_files:
+        - lib/llm/router/types.ts
+        - lib/llm/router/secret-refs.ts
+        - lib/llm/router/__tests__/config.test.ts
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/config.test.ts"
+          status: pass
+          summary: "1 file passed, 7 tests passed."
+        - cmd: "git status --short lib/llm/router docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "Only untracked goal state and lib/llm/router files were reported for this slice."
+      evidence:
+        - "npm test -- lib/llm/router/__tests__/config.test.ts => 1 file passed, 7 tests passed"
+        - "git status --short lib/llm/router docs/goals/provider-auth-router-phase1/state.yaml => only untracked goal state and lib/llm/router files in this slice"
+      remaining_blockers: []
+
+  - id: T704
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Add SQLite router/ledger migration only, with Phase 1 auth/gateway/routing constraints."
+    allowed_files:
+      - db/migrations/006_llm_router_core.sql
+      - lib/llm/router/__tests__/request-ledger.test.ts
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/request-ledger.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved generated dirs"
+    stop_if:
+      - "Migration breaks existing DB initialization."
+      - "Migration allows reserved Phase 1 auth modes, non-direct gateway backends, or non-manual routing-policy modes."
+      - "Migration allows invalid auth-mode/secret-ref pairings or non-direct request route_backend values."
+      - "Only partial migration work can be completed without a blocker receipt."
+    receipt:
+      result: done
+      summary: "SQLite router core migration was added with Phase 1 constraints for auth modes, secret-reference pairings, direct-only provider/request backends, manual-only routing-policy metadata, request rows, and request events. Focused tests verify migration application through getDb plus isolated constraint checks."
+      changed_files:
+        - db/migrations/006_llm_router_core.sql
+        - lib/llm/router/__tests__/request-ledger.test.ts
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/request-ledger.test.ts"
+          status: pass
+          summary: "1 file passed, 7 tests passed."
+        - cmd: "git diff --name-only db/migrations/006_llm_router_core.sql lib/llm/router/__tests__/request-ledger.test.ts docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "No tracked diff output because this slice's new files are untracked."
+        - cmd: "git status --short db/migrations/006_llm_router_core.sql lib/llm/router docs/goals/provider-auth-router-phase1/state.yaml data"
+          status: pass
+          summary: "Reported only untracked migration, untracked router files, and untracked goal state for this slice."
+      evidence:
+        - "getDb migration path created llm_provider_configs, llm_models, llm_pricing_snapshots, llm_routing_policies, llm_requests, and llm_request_events."
+        - "Constraint tests reject raw_token/api_key/keychain_ref/codex_session/oauth_device_flow auth modes, non-direct gateway backends, non-manual routing policies, invalid auth/secret pairings, and non-direct request backends."
+      remaining_blockers: []
+
+  - id: T705
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Implement request ledger helpers and tests without storing prompt or response bodies by default."
+    allowed_files:
+      - lib/llm/router/request-ledger.ts
+      - lib/llm/router/__tests__/request-ledger.test.ts
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/request-ledger.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved generated dirs"
+    stop_if:
+      - "Ledger requires storing prompt or response bodies by default."
+      - "Only partial ledger helper work can be completed without a blocker receipt."
+    receipt:
+      result: done
+      summary: "Request ledger helpers now insert started rows, update succeeded/failed completion fields, record request events, and JSON-stringify scrubbed metadata. Tests verify success and failure lifecycles plus metadata storage that keeps operation context while stripping prompt/response-shaped body fields by default."
+      changed_files:
+        - lib/llm/router/request-ledger.ts
+        - lib/llm/router/__tests__/request-ledger.test.ts
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/request-ledger.test.ts"
+          status: pass
+          summary: "1 file passed, 10 tests passed."
+        - cmd: "git status --short lib/llm/router/request-ledger.ts lib/llm/router/__tests__/request-ledger.test.ts docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "Reported only untracked goal state plus this slice's router ledger files."
+        - cmd: "git diff --name-only lib/llm/router/request-ledger.ts lib/llm/router/__tests__/request-ledger.test.ts docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "No tracked diff output because this slice's new files are untracked."
+      evidence:
+        - "startLLMRequest() validates Phase 1 auth/backend values and writes status=started."
+        - "finishLLMRequest() updates status, completed_at, latency, token, cost, and error fields."
+        - "recordLLMRequestEvent() writes request events."
+        - "stringifyLedgerMetadata() removes prompt/response/body/message-like payload keys before storage."
+      remaining_blockers: []
+
+  - id: T706
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Add router config resolution and make CLI/config-store use Phase 1 auth modes and secret refs instead of raw apiKey storage."
+    allowed_files:
+      - lib/llm/router/config.ts
+      - lib/llm/router/secret-refs.ts
+      - lib/llm/router/__tests__/config.test.ts
+      - lib/providers/config-store.ts
+      - lib/providers/__tests__/config-resolution.test.ts
+      - cli/src/commands/configure.ts
+    verify:
+      - cmd: "npm test -- lib/providers/__tests__/config-resolution.test.ts lib/llm/router/__tests__/config.test.ts"
+        expect: "exit 0"
+      - cmd: "rg -n \"apiKey.*sk-|\\.env.local|process\\.env\\[[^\\]]+\\] =|writeFileSync\\([^)]*env\" lib/providers cli/src/commands/configure.ts"
+        expect: "no approved configure path writes raw secrets or .env.local"
+    stop_if:
+      - "Task requires storing raw API keys in config JSON."
+      - "Task requires app configure route changes beyond sanitized config contract."
+      - "Task accepts reserved future auth modes, non-direct gateway backends, or runtime routing-policy evaluation."
+      - "Only partial config behavior can be completed without a blocker receipt."
+    receipt:
+      result: done
+      summary: "Router config resolution now returns Phase 1 auth modes and secret refs instead of raw secrets. Config-store writes env-var references and refuses raw apiKey writes. CLI non-interactive configure accepts --key-env and refuses --key; interactive configure asks for an API-key environment variable. Focused tests and typecheck pass."
+      changed_files:
+        - lib/llm/router/config.ts
+        - lib/providers/config-store.ts
+        - lib/providers/__tests__/config-resolution.test.ts
+        - cli/src/commands/configure.ts
+      commands:
+        - cmd: "npm test -- lib/providers/__tests__/config-resolution.test.ts lib/llm/router/__tests__/config.test.ts"
+          status: pass
+          summary: "2 files passed, 17 tests passed."
+        - cmd: "rg -n \"apiKey.*sk-|\\.env.local|process\\.env\\[[^\\]]+\\] =|writeFileSync\\([^)]*env\" lib/providers cli/src/commands/configure.ts"
+          status: pass
+          summary: "Hits are raw-secret negative/test fixtures in provider tests; no approved configure path writes .env.local, mutates process.env, or writes raw secrets."
+        - cmd: "npx tsc --noEmit --pretty false"
+          status: pass
+          summary: "Typecheck completed with exit 0 after preserving apiKey?: undefined compatibility for the not-yet-cleaned app route."
+        - cmd: "git status --short lib/llm/router/config.ts lib/llm/router/secret-refs.ts lib/llm/router/__tests__/config.test.ts lib/providers/config-store.ts lib/providers/__tests__/config-resolution.test.ts cli/src/commands/configure.ts docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "Reported only this slice's allowed files plus earlier untracked router helper/board files."
+      evidence:
+        - "resolveRouterProviderConfig() maps OpenAI/Anthropic/Gemini/Groq to env_key secret refs, claude-code to local_cli_session, and ollama to none_local."
+        - "Reserved auth modes and non-direct gateway backends throw during config resolution."
+        - "writeProviderConfig() omits legacy apiKey fields and throws if asked to write a raw API key."
+        - "CLI configure now writes providers[provider].authMode/secretRef/gatewayBackend and deletes legacy apiKey before writing."
+      remaining_blockers: []
+
+  - id: T707
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Add router-compatible LLM client wrapper that records request lifecycle and preserves existing direct client behavior."
+    allowed_files:
+      - lib/llm/router/create-client.ts
+      - lib/llm/router/__tests__/create-client.test.ts
+      - lib/providers/index.ts
+      - lib/providers/types.ts
+      - lib/providers/__tests__/providers.test.ts
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/create-client.test.ts lib/providers/__tests__/providers.test.ts"
+        expect: "exit 0"
+      - cmd: "npm test -- lib/llm/router lib/providers"
+        expect: "exit 0 or documented pre-existing blocker"
+    stop_if:
+      - "Existing direct clients stop constructing."
+      - "Existing LLMClient.complete() call surface must change."
+      - "Wrapper implements gateway backend selection or routing-policy evaluation."
+      - "Only partial wrapper behavior can be completed without a blocker receipt."
+    receipt:
+      result: done
+      summary: "Router-compatible client wrapper now surrounds existing direct clients with request lifecycle ledger writes while preserving the LLMClient.complete() surface and readonly provider. Provider construction remains direct-only through createDirectLLMClient, and createLLMClient returns the router wrapper."
+      changed_files:
+        - lib/llm/router/create-client.ts
+        - lib/llm/router/__tests__/create-client.test.ts
+        - lib/providers/index.ts
+        - lib/providers/types.ts
+        - lib/providers/__tests__/providers.test.ts
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/create-client.test.ts lib/providers/__tests__/providers.test.ts"
+          status: pass
+          summary: "2 files passed, 18 tests passed."
+        - cmd: "npm test -- lib/llm/router lib/providers"
+          status: pass
+          summary: "6 files passed, 48 tests passed."
+        - cmd: "npx tsc --noEmit --pretty false"
+          status: pass
+          summary: "Typecheck completed with exit 0."
+        - cmd: "git status --short lib/llm/router/create-client.ts lib/llm/router/__tests__/create-client.test.ts lib/providers/index.ts lib/providers/types.ts lib/providers/__tests__/providers.test.ts docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "Reported only allowed T707 files plus untracked board state."
+      evidence:
+        - "createRouterLLMClient() records started, succeeded, failed, and provider.error events around direct complete() calls."
+        - "operation metadata defaults to unknown when callers do not provide options.operation."
+        - "createDirectLLMClient() preserves concrete direct provider construction."
+        - "Non-direct gateway backend values are rejected before wrapper execution."
+      remaining_blockers: []
+
+  - id: T708
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Sanitize provider API routes so status/config endpoints never return raw secrets and configure route does not mutate .env.local or process.env."
+    inputs:
+      - node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md
+    allowed_files:
+      - app/api/providers/route.ts
+      - app/api/providers/configure/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - lib/providers/__tests__/config-resolution.test.ts
+      - lib/llm/router/__tests__/config.test.ts
+    verify:
+      - cmd: "npm test -- lib/providers/__tests__/config-resolution.test.ts lib/llm/router/__tests__/config.test.ts"
+        expect: "exit 0"
+      - cmd: "npm test -- app/api/providers"
+        expect: "exit 0"
+      - cmd: "test -f node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md"
+        expect: "route-handler docs exist and were read before app route edits"
+      - cmd: "rg -n \"\\.env.local|process\\.env\\[[^\\]]+\\] =|apiKey.*sk-\" app/api/providers lib/providers lib/llm/router"
+        expect: "no approved raw-secret or .env.local configure behavior"
+    stop_if:
+      - "Task requires changing app/settings/providers/page.tsx."
+      - "Task requires adding Provider Center redesign."
+      - "Route tests are skipped because no existing route harness exists."
+      - "Routes accept reserved future auth modes or non-direct gateway backends."
+      - "Route docs were not read before editing app route files."
+      - "Only partial route sanitization can be completed without a blocker receipt."
+    receipt:
+      result: done
+      summary: "Provider API routes now return sanitized auth status and accept only non-secret provider/model/auth-mode/secret-ref configuration. Configure route no longer writes .env.local or mutates process.env. Route tests verify sanitized GET, non-mutating POST, invalid auth/secret rejection, and raw apiKey request rejection."
+      changed_files:
+        - app/api/providers/route.ts
+        - app/api/providers/configure/route.ts
+        - app/api/providers/__tests__/providers-route.test.ts
+      commands:
+        - cmd: "sed -n '1,220p' node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md"
+          status: pass
+          summary: "Read local Next.js 16 route-handler guide before editing app routes."
+        - cmd: "npm test -- lib/providers/__tests__/config-resolution.test.ts lib/llm/router/__tests__/config.test.ts"
+          status: pass
+          summary: "2 files passed, 17 tests passed."
+        - cmd: "npx vitest run --config .vitest.app.tmp.mts app/api/providers"
+          status: pass
+          summary: "Temporary app-test config was created and removed in-command; 1 app route test file passed, 4 tests passed."
+        - cmd: "test -f node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md"
+          status: pass
+          summary: "Route-handler docs file exists."
+        - cmd: "rg -n \"\\.env.local|process\\.env\\[[^\\]]+\\] =|apiKey.*sk-\" app/api/providers lib/providers lib/llm/router"
+          status: pass
+          summary: "Hits are raw-secret negative/test fixtures only; no .env.local write or process.env mutation remains in provider API routes."
+        - cmd: "npx tsc --noEmit --pretty false"
+          status: pass
+          summary: "Typecheck completed with exit 0."
+      evidence:
+        - "GET /api/providers returns configured/authMode/gatewayBackend/secretRef name only and does not include raw env values."
+        - "POST /api/providers/configure schema is strict and rejects raw apiKey request bodies."
+        - "POST validates Phase 1 auth/secret pairings before writeProviderConfig()."
+        - "Removed writeDevelopmentEnvLocal() and all configure-route process.env mutation."
+      failed_commands:
+        - cmd: "npm test -- app/api/providers"
+          outcome: blocked
+          summary: "Vitest found no test files because current vitest.config.ts includes only lib/**/*.test.ts and components/**/*.test.ts; app/**/*.test.ts is excluded by existing config."
+      remaining_blockers:
+        - "Exact board command npm test -- app/api/providers is blocked by the existing Vitest include config excluding app/**/*.test.ts. Behavior is verified via temporary app-test config; durable fix would require allowing vitest.config.ts or moving route tests into the existing include pattern."
+
+  - id: T709
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Update reference documentation for Phase 1 auth modes, secret references, ledger tables, API access labeling, direct-only runtime, manual routing metadata, and future gateway boundary."
+    allowed_files:
+      - docs/reference/provider-catalog.md
+      - docs/reference/database-schema.md
+      - docs/reference/api-routes.md
+    verify:
+      - cmd: "rg -n \"apiKey|\\.env.local|gateway sidecar|GoModel|Bifrost|subscription|API access|codex_session|oauth_device_flow|keychain_ref|gateway_virtual_key|fallback_chain|cheapest_compatible|quality_first\" docs/reference/provider-catalog.md docs/reference/database-schema.md docs/reference/api-routes.md"
+        expect: "docs reflect Phase 1 behavior and future gateway boundary; reserved terms are future/not implemented only"
+    stop_if:
+      - "Docs describe raw token pasting as supported."
+      - "Docs describe GoModel/Bifrost as implemented in Phase 1."
+      - "Docs describe reserved future auth/routing/gateway terms as implemented Phase 1 behavior."
+      - "Docs fail to capture blockers, incomplete work, or implemented behavior changes."
+    receipt:
+      result: done
+      summary: "Reference docs now describe Phase 1 auth modes, secret references, API access versus subscription/tool-session auth, direct-only gateway backend, manual routing metadata, future gateway boundaries, provider API route behavior, and the new router/ledger tables."
+      changed_files:
+        - docs/reference/provider-catalog.md
+        - docs/reference/database-schema.md
+        - docs/reference/api-routes.md
+      commands:
+        - cmd: "rg -n \"apiKey|\\.env.local|gateway sidecar|GoModel|Bifrost|subscription|API access|codex_session|oauth_device_flow|keychain_ref|gateway_virtual_key|fallback_chain|cheapest_compatible|quality_first\" docs/reference/provider-catalog.md docs/reference/database-schema.md docs/reference/api-routes.md"
+          status: pass
+          summary: "Hits are future/not implemented docs, negative historical apiKey handling, or explicit API-access labeling; no docs describe .env.local writes, GoModel/Bifrost, or reserved auth/routing modes as implemented Phase 1 behavior."
+        - cmd: "git status --short docs/reference/provider-catalog.md docs/reference/database-schema.md docs/reference/api-routes.md docs/goals/provider-auth-router-phase1/state.yaml"
+          status: pass
+          summary: "Reported only allowed docs plus untracked board state."
+      evidence:
+        - "provider-catalog.md labels env_key/local_cli_session/none_local and separates API access from subscription/tool-session auth."
+        - "database-schema.md documents llm_provider_configs, llm_models, llm_pricing_snapshots, llm_routing_policies, llm_requests, and llm_request_events."
+        - "api-routes.md no longer documents .env.local writes or raw apiKey request bodies as supported."
+        - "Gateway sidecars, GoModel, Bifrost, codex_session, oauth_device_flow, keychain_ref, gateway_virtual_key, fallback_chain, cheapest_compatible, and quality_first are documented only as future/not implemented."
+      remaining_blockers: []
+
+  - id: T710
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Code review after implementation slices. Find bugs, scope drift, missing tests, secret leaks, docs gaps, reserved-feature drift, and diff containment failures."
+    inputs:
+      - "Receipts from T702-T709"
+      - "git diff"
+      - "test output summaries"
+    expected_output:
+      - "Findings ordered by severity with file/line references."
+      - "Decision: ready_for_final_verification | needs_review_fixes | blocked."
+      - "Concrete allowed_files for T711 if review fixes are needed."
+      - "Explicit assessment of docs/plan/board receipt currency."
+      - "Explicit assessment of incomplete work, blockers, and next actions."
+      - "Explicit assessment that reserved future auth modes, gateway backends, and routing policies were not implemented."
+      - "Reserved-term scan hit classification: negative test | future/not implemented docs | drift."
+      - "If no review fixes are needed, explicit decision: ready_for_final_verification with no fix files."
+    verify:
+      - cmd: "git diff --name-only"
+        expect: "excluded UI/wizard/gateway files absent unless explicitly approved"
+      - cmd: "git diff --stat"
+        expect: "scope matches Phase 1"
+    stop_if:
+      - "Secret values appear in route output, config output, docs, tests, or fixtures."
+      - "Implementation widened into gateway sidecar or Provider Center redesign."
+      - "Implementation added runtime routing-policy evaluation."
+      - "Implementation accepted reserved future auth modes or non-direct gateway backends as executable Phase 1 behavior."
+      - "Reserved-term scan contains an unclassified hit or any hit classified as drift."
+      - "Partial implementation is being presented as complete."
+      - "Incomplete work lacks blocker evidence or next action."
+    receipt:
+      result: done
+      decision: needs_review_fixes
+      summary: "Judge review found three bounded issues before final verification: route tests are not included by the repo Vitest config, the live provider catalog still tells users to paste API keys, and user/developer docs still contain stale raw-key/.env.local provider setup instructions. Implementation code otherwise stays direct-only and rejects reserved auth/gateway/routing modes."
+      commands:
+        - cmd: "git diff --name-only"
+          status: pass
+          summary: "Full dirty diff includes excluded UI/wizard files from pre-existing dirty state; Phase 1 receipts changed only allowed Phase 1 files."
+        - cmd: "git diff --stat"
+          status: pass
+          summary: "Scope reviewed; Phase 1-owned changes are router/auth/config/routes/docs, with pre-existing dirty preview/provider files still present."
+        - cmd: "rg -n \"gomodel|bifrost|external_openai_compatible|gateway_virtual_key|codex_session|oauth_device_flow|keychain_ref|file_ref|fallback_chain|cheapest_compatible|quality_first\" lib app cli db docs/reference"
+          status: pass
+          summary: "Hits are negative tests or future/not implemented docs; no executable gateway/routing/auth drift found."
+        - cmd: "rg -n \"sk-[A-Za-z0-9]|apiKey.*sk-|ANTHROPIC_AUTH_TOKEN=.*|CLAUDE_CODE_OAUTH_TOKEN=.*\" ."
+          status: pass
+          summary: "Found fake test fixtures, stale user/developer docs, historical plan docs, and regex false positives; review fixes are required for live catalog and user-facing docs before final classification."
+      findings:
+        - severity: P1
+          file: vitest.config.ts
+          line: 8
+          title: "Route tests are excluded from normal Vitest runs"
+          detail: "app/api/providers/__tests__/providers-route.test.ts exists and passes with a temporary app-test config, but vitest.config.ts includes only lib/**/*.test.ts and components/**/*.test.ts. The board command npm test -- app/api/providers fails with no test files, and full npm test would skip the route contract."
+          fix: "Add app/**/*.test.ts to the Vitest include list."
+        - severity: P1
+          file: lib/providers/catalog.ts
+          line: 30
+          title: "Live provider catalog still asks users to paste API keys"
+          detail: "GET /api/providers now returns FALLBACK_PROVIDER_CATALOG, but OpenAI/Anthropic/Gemini/Groq setupInstructions and token placeholder fields still describe raw key pasting. That conflicts with Phase 1 secret-reference config and the strict configure route."
+          fix: "Rewrite API provider instructions to set provider-specific env vars and remove token placeholder fields from catalog output."
+        - severity: P2
+          file: docs/user/configuring-providers.md
+          line: 20
+          title: "User/developer docs still describe old raw-key configure flow"
+          detail: "Docs under docs/user, docs/guide, and docs/developer still reference --key sk..., SKILL_MALL_API_KEY as the provider config path, apiKey JSON, and .env.local writes for provider setup. These are stale against the implemented Phase 1 behavior."
+          fix: "Update user-facing provider setup docs to --key-env/provider-specific env vars and classify remaining historical plan hits during final verification."
+      reserved_term_classification:
+        negative_test:
+          - "lib/llm/router/__tests__/config.test.ts"
+          - "lib/providers/__tests__/config-resolution.test.ts"
+          - "lib/llm/router/__tests__/create-client.test.ts"
+          - "lib/llm/router/__tests__/request-ledger.test.ts"
+        future_not_implemented_docs:
+          - "docs/reference/provider-catalog.md"
+          - "docs/reference/database-schema.md"
+          - "docs/reference/api-routes.md"
+        drift: []
+      allowed_files_for_T711:
+        - vitest.config.ts
+        - lib/providers/catalog.ts
+        - app/api/providers/__tests__/providers-route.test.ts
+        - lib/llm/router/__tests__/config.test.ts
+        - lib/providers/__tests__/config-resolution.test.ts
+        - lib/providers/__tests__/providers.test.ts
+        - lib/providers/__tests__/catalog.test.ts
+        - lib/providers/config-store.ts
+        - lib/providers/index.ts
+        - docs/user/configuring-providers.md
+        - docs/user/using-the-cli.md
+        - docs/guide/quick-start.md
+        - docs/guide/tutorials/cli-tutorial.md
+        - docs/guide/troubleshooting.md
+        - docs/developer/api-reference.md
+        - docs/developer/cli-reference.md
+        - docs/developer/getting-started.md
+        - docs/developer/faq.md
+        - docs/developer/deployment.md
+        - docs/developer/architecture.md
+        - docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md
+      blockers:
+        - "T708 exact command npm test -- app/api/providers remains blocked until vitest.config.ts includes app/**/*.test.ts."
+
+  - id: T711
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Apply only T710-bounded code-review fixes, then run final verification and update receipts."
+    allowed_files:
+      - vitest.config.ts
+      - lib/providers/catalog.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - lib/llm/router/__tests__/config.test.ts
+      - lib/providers/__tests__/config-resolution.test.ts
+      - lib/providers/__tests__/providers.test.ts
+      - lib/providers/__tests__/catalog.test.ts
+      - lib/providers/config-store.ts
+      - lib/providers/index.ts
+      - docs/user/configuring-providers.md
+      - docs/user/using-the-cli.md
+      - docs/guide/quick-start.md
+      - docs/guide/tutorials/cli-tutorial.md
+      - docs/guide/troubleshooting.md
+      - docs/developer/api-reference.md
+      - docs/developer/cli-reference.md
+      - docs/developer/getting-started.md
+      - docs/developer/faq.md
+      - docs/developer/deployment.md
+      - docs/developer/architecture.md
+      - docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md
+    verify:
+      - cmd: "npm test -- lib/llm/router lib/providers"
+        expect: "exit 0 or documented pre-existing blocker"
+      - cmd: "npm test"
+        expect: "exit 0 or documented pre-existing blocker"
+      - cmd: "npx tsc --noEmit"
+        expect: "exit 0 or documented pre-existing blocker"
+      - cmd: "npm run lint"
+        expect: "exit 0 or documented blocker"
+      - cmd: "rg -n \"sk-[A-Za-z0-9]|apiKey.*sk-|ANTHROPIC_AUTH_TOKEN=.*|CLAUDE_CODE_OAUTH_TOKEN=.*\" ."
+        expect: "no real secret values"
+      - cmd: "rg -n \"gomodel|bifrost|external_openai_compatible|gateway_virtual_key|codex_session|oauth_device_flow|keychain_ref|file_ref|fallback_chain|cheapest_compatible|quality_first\" lib app cli db docs/reference"
+        expect: "reserved terms are absent from executable Phase 1 behavior or explicitly documented as future/not implemented"
+      - cmd: "git diff --name-only"
+        expect: "no excluded UI/wizard/gateway files changed by Phase 1 work"
+      - cmd: "git diff --cached --name-only"
+        expect: "empty unless user explicitly approved staging"
+      - cmd: "rg -n \"incomplete|blocked|next safe action|not completed|not complete\" docs/goals/provider-auth-router-phase1 docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md docs/reference"
+        expect: "blockers/incomplete work are documented when present"
+    stop_if:
+      - "T710 neither wrote concrete allowed_files nor recorded ready_for_final_verification with no fixes needed."
+      - "Review fixes require widening scope beyond T710 allowed files."
+      - "Final verification reveals a Phase 1-owned secret handling bug."
+      - "Final verification reveals gateway execution, runtime routing-policy evaluation, raw API-key storage, keychain/file-ref support, Codex OAuth automation, or Claude/Codex credential-file reading."
+      - "Reserved-term scan contains an unclassified hit or any hit classified as drift."
+      - "Final verification requires staging, commit, or push without user approval."
+      - "Any approved safe local Phase 1 task remains incomplete without blocker evidence."
+      - "Plan docs, reference docs, or board receipts are stale."
+      - "Final response would hand off partial work as complete."
+    receipt:
+      result: done
+      full_outcome_complete: true
+      summary: "Review fixes and final verification are complete. Vitest now includes app route tests; provider catalog and user/developer docs no longer present raw API-key paste/config as the Phase 1 provider path; focused tests, full tests, and typecheck pass. Lint remains blocked by pre-existing non-Phase-1 errors, documented below."
+      changed_files:
+        - vitest.config.ts
+        - lib/providers/catalog.ts
+        - app/api/providers/__tests__/providers-route.test.ts
+        - lib/llm/router/__tests__/config.test.ts
+        - lib/providers/__tests__/config-resolution.test.ts
+        - lib/providers/__tests__/providers.test.ts
+        - lib/providers/__tests__/catalog.test.ts
+        - lib/providers/config-store.ts
+        - lib/providers/index.ts
+        - docs/user/configuring-providers.md
+        - docs/user/using-the-cli.md
+        - docs/guide/quick-start.md
+        - docs/guide/tutorials/cli-tutorial.md
+        - docs/guide/troubleshooting.md
+        - docs/developer/api-reference.md
+        - docs/developer/cli-reference.md
+        - docs/developer/getting-started.md
+        - docs/developer/faq.md
+        - docs/developer/deployment.md
+        - docs/developer/architecture.md
+        - docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md
+      commands:
+        - cmd: "npm test -- app/api/providers"
+          status: pass
+          summary: "1 app route test file passed, 4 tests passed."
+        - cmd: "npm test -- lib/llm/router lib/providers app/api/providers"
+          status: pass
+          summary: "7 files passed, 52 tests passed."
+        - cmd: "npm test"
+          status: pass
+          summary: "33 files passed, 251 tests passed. One prior run had a transient codebase-extractor fixture ENOENT; isolated rerun and full rerun both passed."
+        - cmd: "npx tsc --noEmit --pretty false"
+          status: pass
+          summary: "Typecheck completed with exit 0."
+        - cmd: "rg -n \"sk-[A-Za-z0-9]|apiKey.*sk-|ANTHROPIC_AUTH_TOKEN=.*|CLAUDE_CODE_OAUTH_TOKEN=.*\" ."
+          status: pass
+          summary: "Hits are historical plan/research docs, GoalBuddy command strings, and regex false positives such as task-oriented/queue-microtask; no Phase 1-created executable code, tests, route output, or reference/user docs contain real secret values."
+        - cmd: "rg -n \"gomodel|bifrost|external_openai_compatible|gateway_virtual_key|codex_session|oauth_device_flow|keychain_ref|file_ref|fallback_chain|cheapest_compatible|quality_first\" lib app cli db docs/reference"
+          status: pass
+          summary: "Hits are negative tests or future/not implemented reference docs; no executable reserved gateway/auth/routing behavior found."
+        - cmd: "git diff --name-only"
+          status: pass
+          summary: "Full dirty diff still includes pre-existing excluded UI/wizard/provider recovery files; Phase 1-owned receipts identify the files changed by this run."
+        - cmd: "git diff --cached --name-only"
+          status: pass
+          summary: "No staged files."
+        - cmd: "rg -n \"incomplete|blocked|next safe action|not completed|not complete\" docs/goals/provider-auth-router-phase1 docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md docs/reference"
+          status: pass
+          summary: "Blocker/incomplete-work policy and T708/T711 blocker receipts are present."
+      failed_commands:
+        - cmd: "npm run lint"
+          outcome: blocked_pre_existing
+          summary: "Exit 1 from pre-existing lint errors outside Phase 1: components/skill-mall/skill-detail/SkillTabs.tsx:328, components/skill-mall/theme-provider.tsx:42, and scripts/migrate.js require-import errors at lines 4-6. Phase 1-owned warnings were cleaned."
+      reserved_term_classification:
+        negative_test:
+          - "lib/llm/router/__tests__/config.test.ts"
+          - "lib/providers/__tests__/config-resolution.test.ts"
+          - "lib/llm/router/__tests__/create-client.test.ts"
+          - "lib/llm/router/__tests__/request-ledger.test.ts"
+        future_not_implemented_docs:
+          - "docs/reference/provider-catalog.md"
+          - "docs/reference/database-schema.md"
+          - "docs/reference/api-routes.md"
+        drift: []
+      incomplete_work: []
+      remaining_blockers:
+        - "Repo-wide npm run lint is blocked by pre-existing lint errors outside Phase 1 scope; next safe action is a separate lint cleanup task/board for the listed files."
+      no_stage_commit_push: true
+
+  - id: T712
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Final PM/Judge audit for Provider/Auth Router Phase 1 completion after T711 review fixes and verification."
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      summary: "Approved Phase 1 work is complete with documented pre-existing lint blocker. Router/auth types, secret refs, migration, ledger, config resolution, direct-client wrapper, sanitized provider routes, app route tests, docs, review fixes, and final verification receipts are current. No staging, commit, or push occurred."
+      evidence:
+        - "Focused router/provider/app route tests passed after review fixes."
+        - "Full npm test passed on rerun: 33 files, 251 tests."
+        - "npx tsc --noEmit --pretty false passed."
+        - "npm run lint remains blocked by pre-existing non-Phase-1 lint errors documented in T711."
+        - "Reserved-term scan classified hits as negative tests or future/not implemented docs, with no drift."
+        - "Secret scan classified remaining hits as historical docs, GoalBuddy command strings, or regex false positives; no Phase 1-created executable code or route output contains real secrets."
+      blockers:
+        - "Pre-existing repo-wide lint errors remain outside Phase 1 scope; next safe action is a separate lint cleanup task/board."

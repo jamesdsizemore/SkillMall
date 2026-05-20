@@ -30,6 +30,8 @@ Available via:
 - Browser wizard (`/skills/create`)
 - CLI (`npx skill-mall create`)
 
+The browser wizard has an additional preview checkpoint after metadata selection. It calls `POST /api/preview-skill` to run Stage 3 only, then shows the generated `SKILL.md` in an editable text area before prompt files are generated.
+
 ---
 
 ## Stage 2: Research Engine (`lib/research-engine.ts`)
@@ -63,6 +65,8 @@ Available via:
 - Generates one sample file per tool via LLM call (parallel)
 
 **Output:** `InMemorySkillDirectory` — all files in memory, nothing written to disk
+
+In the browser wizard, Stage 3 can run by itself through `/api/preview-skill` so the user can review and edit the actual `SKILL.md` before selecting prompt options. Later preview and create routes rebuild the directory and replace `SKILL.md` with the reviewed content before validation.
 
 ---
 
@@ -101,7 +105,7 @@ Available via:
 
 ## Shared Infrastructure
 
-- **Provider abstraction** (`lib/providers/`): multi-provider LLM client (OpenAI, Claude Code CLI, Gemini, Groq, Ollama)
+- **Provider abstraction** (`lib/providers/`): Provider Center registry plus executable LLM clients. The broad `ProviderRegistryID` catalog includes API, gateway, local runtime, cloud-project, and custom OpenAI-compatible rows; executable `ProviderID` clients remain limited to implemented direct/router providers (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`). Model refresh follows each row's declared discovery strategy and does not assume universal `/v1/models` support.
 - **Validators** (`lib/validators.ts`): all Zod schemas for LLM output validation
 - **Quality Score** (`lib/quality-score.ts`): 5-dimension 0-100 rubric computed at catalog build time
 
@@ -111,7 +115,7 @@ Available via:
 
 The pipeline pauses after Stage 2 in all paths. No files are written until the user explicitly confirms the extracted research:
 
-- **Web wizard:** Step 2 requires expanding DETAILS on at least one tool, then clicking Confirm Research
+- **Web wizard:** Step 2 requires expanding DETAILS on at least one tool, then clicking Confirm Research. Step 3 generates a `SKILL.md` preview before Step 4. Step 4 edits are carried into prompt preview and final creation.
 - **CLI:** writes `research-result.json`, user reviews, runs `confirm-research <slug>`
 
 This gate is non-skippable. The pipeline cannot proceed to Stages 3–5 without user confirmation.

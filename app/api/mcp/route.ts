@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
-import path from "node:path";
-import { getAllSkills, getSkill, getSkillsByCategory } from "@/lib/skills";
+import {
+  getPromptFiles,
+  getSkill,
+  getSkillsDir,
+  getSkillsByCategory,
+  searchSkills,
+} from "@/lib/skills";
 import {
   deploySkillToAgents,
   resolveSkillDeploySource,
@@ -79,17 +84,7 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
     const query = String(params.query ?? "").toLowerCase();
     const category = params.category ? String(params.category) : undefined;
 
-    return getAllSkills()
-      .filter((s) => {
-        const matchesCat = !category || s.category === category;
-        const matchesQuery =
-          s.name.toLowerCase().includes(query) ||
-          s.description.toLowerCase().includes(query) ||
-          s.tags.some((t) => t.toLowerCase().includes(query)) ||
-          s.category.toLowerCase().includes(query);
-        return matchesCat && matchesQuery;
-      })
-      .slice(0, 20)
+    return searchSkills(query, { category, limit: 20 })
       .map((s) => ({
         slug: s.slug,
         category: s.category,
@@ -129,19 +124,13 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
   if (name === "get_prompts") {
     const category = String(params.category ?? "");
     const slug = String(params.slug ?? "");
-    const promptsDir = path.join(process.cwd(), "skills", category, slug, "resources", "prompts");
+    const prompts = getPromptFiles(category, slug);
 
-    if (!fs.existsSync(promptsDir)) {
+    if (prompts.length === 0) {
       return { prompts: [], message: `No prompts directory for ${category}/${slug}` };
     }
 
-    const files = fs.readdirSync(promptsDir).filter(f => f.endsWith(".md"));
-    return {
-      prompts: files.map(f => ({
-        file: f,
-        path: `resources/prompts/${f}`,
-      })),
-    };
+    return { prompts };
   }
 
   if (name === "deploy_skill") {
@@ -161,7 +150,7 @@ function handleTool(name: string, params: Record<string, unknown>): unknown {
 
     // Check filesystem writability before attempting deploy
     try {
-      fs.accessSync(path.join(process.cwd(), "skills"), fs.constants.R_OK);
+      fs.accessSync(getSkillsDir(), fs.constants.R_OK);
     } catch {
       return {
         error: "Filesystem is read-only — deploy is not available in this environment (e.g., Vercel serverless). Run deploy locally with the CLI.",

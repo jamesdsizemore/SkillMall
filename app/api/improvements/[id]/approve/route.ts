@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth/github'
+import { authenticationRequiredResponse, getSessionFromCookies } from '@/lib/auth/policy'
 import { applySuggestion } from '@/lib/self-improvement/applier'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers'
 
@@ -14,11 +13,9 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid suggestion ID' }, { status: 400 })
   }
 
-  const cookieStore = await cookies()
-  const token = cookieStore.get('sm_session')?.value
-  const session = token ? getSession(token) : null
+  const session = await getSessionFromCookies()
   if (!session) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    return authenticationRequiredResponse()
   }
 
   const body = await req.json().catch(() => ({})) as { skillSlug?: string; skillCategory?: string }

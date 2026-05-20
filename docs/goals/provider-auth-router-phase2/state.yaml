@@ -1,0 +1,637 @@
+version: 2
+active_task: null
+
+goal:
+  title: "Provider/Auth Router Phase 2"
+  slug: provider-auth-router-phase2
+  status: done
+  created_at: "2026-05-20"
+  goal_file: docs/goals/provider-auth-router-phase2/goal.md
+  plan_file: docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+  intake:
+    input_shape: existing_plan
+    authority: needs_approval
+    proof_type: test_review_artifact_source_backed_decision
+    existing_plan_facts:
+      - "Phase 2 extends the Phase 1 router/auth core."
+      - "SkillMall-native router/ledger/model/pricing contracts remain the product-owned layer."
+      - "Direct backend remains supported."
+      - "No hosted gateway/router/proxy/observability service may be required."
+      - "No extra paid gateway app layer may be added."
+      - "No duplicate gateway dashboard may become SkillMall's settings source of truth."
+      - "No raw ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, or Claude Code credential files may be copied into SkillMall config."
+      - "Do not implement every researched gateway."
+      - "Bifrost is the primary local gateway spike candidate."
+      - "GoModel is the fallback local gateway spike candidate."
+      - "new-api is rejected as default Phase 2 dependency because AGPL/full-product overlap is a known blocker."
+      - "LiteLLM, TensorZero, Portkey, labring/aiproxy, and GPT-Load remain references unless promoted by a Judge due a documented blocker."
+      - "Workspace is /Users/jamesdsizemore/Developer/skill-mall."
+      - "Branch is codex/agent-operating-contract-auth-token-skill."
+    completion_proof: "All approved tasks have receipts; source and maintainer evidence is current; gateway candidate decision is recorded; implementation, tests, docs, review, review fixes, final verification, secret scan, and diff containment are complete or blockers are documented with exact evidence and next action."
+  oracle:
+    signal: "GoalBuddy receipts plus final verification commands prove local gateway-aware router behavior, model/pricing refresh, cost tracking, routing-policy evaluation, sanitized provider API/CLI status, documentation currency, and scope containment."
+    final_proof: "T812 receipt reports final verification results, diff containment, docs/plan/board currency, completed work, incomplete work if any, blocker evidence if any, and next safe action if blocked; T811 Judge receipt reports ready_for_final_verification or accepted findings."
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+tasks:
+  - id: T801
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Approval gate and plan/source validation before implementation. Confirm user approval, branch, dirty tree, staged state, Phase 1 source facts, Phase 2 scope, and board alignment."
+    inputs:
+      - AGENTS.md
+      - docs/recovery/2026-05-19-provider-recovery-inventory.md
+      - docs/recovery/2026-05-19-skillmall-recovery-auth-token-plan.md
+      - docs/recovery/2026-05-19-provider-auth-supportability-report.md
+      - docs/recovery/2026-05-19-provider-auth-router-architecture-plan.md
+      - docs/recovery/2026-05-19-provider-auth-router-phase-1-implementation-plan.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+      - docs/goals/provider-auth-router-phase2/goal.md
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "git branch --show-current"
+        expect: "codex/agent-operating-contract-auth-token-skill recorded or mismatch documented"
+      - cmd: "git status --short"
+        expect: "dirty tree recorded without cleanup"
+      - cmd: "git diff --cached --name-only"
+        expect: "empty unless user explicitly staged files"
+      - cmd: "npx goalbuddy@0.3.7 doctor --target codex --goal-ready --json"
+        expect: "native /goal readiness recorded; if not ready, fallback PM execution path is documented"
+    stop_if:
+      - "User has not approved implementation."
+      - "Staged files exist without explicit user approval."
+      - "Plan allows hosted gateway infrastructure as required SkillMall infrastructure."
+      - "Plan requires implementing every researched gateway."
+      - "Plan allows raw ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, or Claude Code credential files in SkillMall config."
+      - "Board does not require complete work, blocker documentation, incomplete-work documentation, review fixes, final verification, and docs updates."
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      summary: "Approval gate passed for fallback PM execution. User invoked /goal for Phase 2, branch is codex/agent-operating-contract-auth-token-skill, staged diff is empty, dirty tree contains only the newly created Phase 2 plan/goal artifacts, and native Codex /goal runtime remains unavailable so this thread will execute the board one active task at a time."
+      evidence:
+        - "git branch --show-current => codex/agent-operating-contract-auth-token-skill"
+        - "git status --short => ?? docs/goals/provider-auth-router-phase2/ and ?? docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md"
+        - "git diff --cached --name-only => empty"
+        - "npx goalbuddy@0.3.7 doctor --target codex --goal-ready --json => plugin installed/enabled, Scout/Worker/Judge agents installed, native goals_feature_enabled=false"
+      blocked_tasks: []
+      required_board_updates:
+        - "Activate T802 for read-only current-source and maintainer-evidence mapping."
+
+  - id: T802
+    type: scout
+    assignee: Scout
+    status: done
+    objective: "Read-only current-source and maintainer evidence map. Confirm exact current router/provider/API files and recheck Bifrost, GoModel, LiteLLM, TensorZero, Portkey, new-api, labring/aiproxy, and GPT-Load from official docs/repos."
+    inputs:
+      - lib/llm/router/types.ts
+      - lib/llm/router/config.ts
+      - lib/llm/router/create-client.ts
+      - lib/llm/router/request-ledger.ts
+      - lib/llm/router/secret-refs.ts
+      - lib/providers/types.ts
+      - lib/providers/index.ts
+      - lib/providers/catalog.ts
+      - lib/providers/defaults.ts
+      - app/api/providers/route.ts
+      - app/api/providers/configure/route.ts
+      - cli/src/commands/configure.ts
+      - docs/reference/provider-catalog.md
+      - docs/reference/database-schema.md
+    expected_output:
+      - "Current source map."
+      - "Gateway candidate evidence matrix with license, runtime, local deployment, model list, pricing/cost, auth, logging, and dashboard/control-plane risk."
+      - "Hard reject list."
+      - "Decision inputs for T803."
+    verify:
+      - cmd: "rg -n \"GatewayBackend|LLMAuthMode|SecretRef|resolveRouterProviderConfig|createRouterLLMClient|llm_models|llm_pricing|llm_routing\" lib docs db app cli"
+        expect: "current call sites and schema/docs facts identified"
+      - cmd: "git status --short"
+        expect: "dirty files recorded"
+    stop_if:
+      - "Current source contradicts the Phase 2 plan in a way that changes architecture."
+      - "Official/maintainer evidence is unavailable for the candidate required by the plan."
+      - "No candidate can satisfy local/no-hosted/no-duplicate-product constraints."
+    receipt:
+      result: done
+      summary: "Current-source and maintainer-evidence mapping completed. Source still matches the Phase 1 direct-only router contract and has no implementation blocker. Bifrost and GoModel are locally viable without immediate hard rejection; Bifrost has the stronger model/pricing/catalog fit. new-api is hard-rejected as a default Phase 2 dependency due AGPL/full-product overlap. LiteLLM, TensorZero, Portkey, aiproxy, and GPT-Load remain references because their runtime/control-plane/logging/product-overlap risks are material for a SkillMall-owned local router."
+      evidence:
+        - "Source Scout confirmed resolveProviderConfig() -> createLLMClient(config) -> LLMClient.complete(prompt, options) remains the current public surface."
+        - "Source Scout confirmed Phase 1 executable constraints: auth modes env_key/local_cli_session/none_local, secret refs env/none, gateway backend direct, routing-policy metadata manual only."
+        - "Source Scout found no current-source blocker; it flagged stale OpenAI defaults/docs and provider route not using resolved config for live model refresh."
+        - "Maintainer Scout confirmed Bifrost Apache-2.0, local npx/Docker, OpenAI-compatible API, provider breadth, model catalog, pricing sync, custom pricing, budget/virtual-key support, and built-in UI/control-plane risk."
+        - "Maintainer Scout confirmed GoModel MIT, local Docker/admin UI, OpenAI-compatible gateway, usage endpoints, provider breadth, and risks around empty master key plus body/header logging examples."
+        - "Maintainer Scout confirmed new-api AGPL/full-product overlap hard reject for default dependency."
+        - "Maintainer Scout confirmed LiteLLM/TensorZero/Portkey/aiproxy/GPT-Load remain reference candidates with footprint, dashboard, logging, or normalized-router-fit risks."
+      contradictions:
+        - "Older architecture doc had GoModel primary/Bifrost fallback; current 2026-05-20 plan and board are the active authority and name Bifrost primary/GoModel fallback."
+        - "Current source/docs have stale OpenAI default/model-list drift that must be handled in model-refresh/docs tasks."
+        - "Provider API GET does not pass resolved config to getProviderCatalog(), so current live model refresh is not used in that route."
+      hard_rejects:
+        - "QuantumNous/new-api default adoption: AGPL/full-product/control-plane overlap."
+      ambiguity_requiring_judge:
+        - "Whether Bifrost's built-in web UI/monitoring can be subordinated enough to avoid duplicate source-of-truth drift."
+        - "Whether GoModel's logging/master-key risks are avoidable through SkillMall defaults if Bifrost is blocked."
+      commands:
+        - cmd: "rg -n \"GatewayBackend|LLMAuthMode|SecretRef|resolveRouterProviderConfig|createRouterLLMClient|llm_models|llm_pricing|llm_routing\" lib docs db app cli"
+          status: pass
+          summary: "Current router/provider/API/schema call sites and Phase 1 constraints identified."
+        - cmd: "git status --short"
+          status: pass
+          summary: "Dirty tree remained limited to the new Phase 2 plan/goal artifacts during read-only scouting."
+
+  - id: T803
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Select or block the Phase 2 gateway integration path using hard reject criteria. Do not start implementation until this decision is recorded."
+    inputs:
+      - "T802 receipt"
+      - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+    allowed_files:
+      - docs/goals/provider-auth-router-phase2/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+    decision_options:
+      - bifrost_local
+      - gomodel_local
+      - no_gateway_backend_yet
+    hard_reject_criteria:
+      - "Hosted account required for core use."
+      - "Extra paid gateway required."
+      - "License incompatible with intended integration."
+      - "Requires duplicate dashboard as source of truth."
+      - "Requires raw credential copying."
+      - "Logs prompts/responses/secrets by default without safe default override."
+      - "Cannot run locally from source/container without external SaaS."
+      - "Cannot integrate through OpenAI-compatible or clearly bounded adapter surface."
+    stop_if:
+      - "Decision would require implementing multiple gateway backends at once."
+      - "Decision would require a hosted app or paid gateway layer."
+      - "Decision would require raw token/session credential handling."
+      - "Decision evidence is not current and source-backed."
+    receipt:
+      result: done
+      decision: bifrost_local
+      full_outcome_complete: false
+      summary: "Selected bifrost_local as the Phase 2 gateway backend. Bifrost passes local/no-hosted/no-extra-paid-gateway checks, has Apache-2.0 licensing, local npx/Docker execution, OpenAI-compatible API, provider breadth, model catalog, pricing sync, custom pricing, budget controls, and virtual-key governance. SkillMall remains the source of truth; Bifrost UI/control plane is not allowed to replace SkillMall settings, ledger, docs, or sanitized status APIs."
+      evidence:
+        - "Bifrost repo/docs: Apache-2.0, local npx/Docker, OpenAI-compatible API, broad providers, model catalog, pricing sync, custom pricing, budget/virtual-key support."
+        - "GoModel remains fallback: MIT/local/usage endpoints/provider breadth, but weaker current pricing catalog evidence and logging/master-key safeguards require extra review."
+        - "new-api hard reject: AGPL/full-product/control-plane overlap."
+        - "LiteLLM/TensorZero/Portkey/aiproxy/GPT-Load reference-only due footprint, dashboard, logging, product-overlap, or normalized-router-fit risks."
+      changed_files:
+        - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      hard_rejects:
+        - "Hosted gateway required for core use: not triggered for Bifrost local mode."
+        - "Extra paid gateway required: not triggered for Bifrost local mode."
+        - "License incompatible with intended integration: not triggered for Apache-2.0 Bifrost."
+        - "Duplicate dashboard as source of truth: mitigated by requiring SkillMall source of truth and treating Bifrost UI as optional operator/debug surface."
+        - "Raw credential copying: blocked by Phase 2 secret-ref/virtual-key requirements."
+        - "Prompt/response/secret logging by default without safe override: must be tested/constrained in adapter/config tasks."
+      required_board_updates:
+        - "Activate T804 for router type, secret-ref, backend, auth-mode, and migration constraints."
+
+  - id: T804
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Extend router type, secret-ref, backend, auth-mode, and migration constraints for approved Phase 2 values only."
+    allowed_files:
+      - lib/llm/router/types.ts
+      - lib/llm/router/secret-refs.ts
+      - db/migrations/007_llm_router_phase2.sql
+      - lib/llm/router/__tests__/config.test.ts
+      - lib/llm/router/__tests__/gateway-adapter.test.ts
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/config.test.ts lib/llm/router/__tests__/gateway-adapter.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "T803 has not selected an implementation path."
+      - "Implementation accepts reserved auth modes without official-doc proof."
+      - "Implementation stores raw provider keys or gateway virtual keys."
+      - "Migration weakens Phase 1 constraints without tests."
+    receipt:
+      result: done
+      summary: "Router type/secret-ref/backend/policy contract and Phase 2 migration constraints were added for approved values only. Added gateway_virtual_key auth, gateway_virtual_key_ref secret refs, bifrost_local backend, and manual/fallback_chain/local_first/budget_guarded_manual policy modes. Migration 007 preserves Phase 1 rows while widening only the approved constraints."
+      changed_files:
+        - lib/llm/router/types.ts
+        - lib/llm/router/secret-refs.ts
+        - db/migrations/007_llm_router_phase2.sql
+        - lib/llm/router/__tests__/config.test.ts
+        - lib/llm/router/__tests__/gateway-adapter.test.ts
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/config.test.ts lib/llm/router/__tests__/gateway-adapter.test.ts"
+          status: pass
+          summary: "2 files passed, 18 tests passed."
+        - cmd: "git diff --name-only"
+          status: pass
+          summary: "Tracked diff limited to lib/llm/router/__tests__/config.test.ts, lib/llm/router/secret-refs.ts, and lib/llm/router/types.ts; untracked allowed migration/test/goal files are present."
+      evidence:
+        - "Reserved modes api_key/keychain_ref/codex_session/oauth_device_flow/file_ref remain rejected."
+        - "Unapproved backends gomodel_local/litellm_proxy/external_openai_compatible remain rejected."
+        - "Migration tests prove direct Phase 1 rows are preserved and bifrost_local/gateway_virtual_key rows are allowed."
+      remaining_blockers: []
+
+  - id: T805
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Implement selected local gateway adapter contract while preserving direct backend compatibility."
+    allowed_files:
+      - lib/llm/router/gateway-adapter.ts
+      - lib/llm/router/gateway-client.ts
+      - lib/llm/router/create-client.ts
+      - lib/llm/router/types.ts
+      - lib/llm/router/__tests__/gateway-adapter.test.ts
+      - lib/llm/router/__tests__/create-client.test.ts
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/gateway-adapter.test.ts lib/llm/router/__tests__/create-client.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "T803 decision is missing or blocked."
+      - "Direct backend behavior regresses."
+      - "Adapter requires hosted gateway account."
+      - "Adapter stores, logs, returns, or displays raw secrets."
+      - "Adapter turns the gateway dashboard into SkillMall's source of truth."
+    receipt:
+      result: done
+      summary: "Bifrost local gateway adapter contract was implemented behind createRouterLLMClient while preserving direct backend behavior. The adapter sends OpenAI-compatible chat completion requests to the local Bifrost base URL, uses gateway_virtual_key refs through runtime env lookup, extracts usage/cost metadata when available, and records that metadata in SkillMall's request ledger finish call."
+      changed_files:
+        - lib/llm/router/gateway-adapter.ts
+        - lib/llm/router/gateway-client.ts
+        - lib/llm/router/create-client.ts
+        - lib/llm/router/__tests__/gateway-adapter.test.ts
+        - lib/llm/router/__tests__/create-client.test.ts
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/gateway-adapter.test.ts lib/llm/router/__tests__/create-client.test.ts"
+          status: pass
+          summary: "2 files passed, 13 tests passed."
+        - cmd: "git diff --name-only"
+          status: pass
+          summary: "Tracked diff stayed inside router files and tests; untracked allowed migration/gateway/goal files are present."
+      evidence:
+        - "Direct backend tests still delegate to direct client and record routeBackend=direct."
+        - "bifrost_local test proves direct factory is not called, gateway factory is called, and ledger records gateway usage/cost metadata."
+        - "Adapter tests prove OpenAI-compatible request shape, cost header parsing, usage parsing, and no virtual key in returned metadata."
+      remaining_blockers: []
+
+  - id: T806
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Implement model refresh for configured providers and selected gateway backend, preserving static defaults as fallbacks only."
+    allowed_files:
+      - lib/llm/router/model-refresh.ts
+      - lib/providers/catalog.ts
+      - lib/providers/defaults.ts
+      - lib/llm/router/__tests__/model-refresh.test.ts
+      - docs/reference/provider-catalog.md
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/model-refresh.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "Model refresh requires hosted gateway infrastructure."
+      - "Model refresh treats static defaults as authoritative current catalogs."
+      - "Model refresh stores secret values or raw credential-bearing request headers."
+    receipt:
+      result: done
+      summary: "Model refresh was implemented for direct providers and bifrost_local. Bifrost refresh calls the local OpenAI-compatible /v1/models endpoint through a gateway virtual-key env reference, stores refreshed models in llm_models with source and last_checked_at, sanitizes raw metadata, and keeps static provider defaults as fallback labels."
+      changed_files:
+        - lib/llm/router/model-refresh.ts
+        - lib/llm/router/__tests__/model-refresh.test.ts
+        - docs/reference/provider-catalog.md
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/model-refresh.test.ts"
+          status: pass
+          summary: "1 file passed, 2 tests passed."
+        - cmd: "git diff --name-only"
+          status: pass
+          summary: "Tracked diff includes docs/reference/provider-catalog.md plus router files; untracked allowed model-refresh test/module files are present."
+      evidence:
+        - "Bifrost model refresh test proves /v1/models URL, Authorization header, model IDs, and no secret-bearing raw metadata storage."
+        - "llm_models row stores provider_id, model_id, source=live:bifrost_local, last_checked_at, and sanitized raw_json."
+      remaining_blockers: []
+
+  - id: T807
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Implement pricing refresh and cost estimation/capture with exact versus estimated cost labels."
+    allowed_files:
+      - lib/llm/router/pricing-refresh.ts
+      - lib/llm/router/costing.ts
+      - lib/llm/router/request-ledger.ts
+      - lib/llm/router/__tests__/pricing-refresh.test.ts
+      - lib/llm/router/__tests__/costing.test.ts
+      - docs/reference/database-schema.md
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/pricing-refresh.test.ts lib/llm/router/__tests__/costing.test.ts lib/llm/router/__tests__/request-ledger.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "Estimated costs would be presented as exact spend."
+      - "Pricing refresh requires hosted gateway account."
+      - "Request ledger begins storing prompt or response bodies by default."
+    receipt:
+      result: done
+      summary: "Pricing snapshot storage and request cost resolution were implemented. Provider/gateway-reported cost is recorded as actual spend, while local pricing snapshots produce estimated_cost_usd with explicit costSource labels. Pricing snapshots store source, source_url, timestamp, currency, and content hash."
+      changed_files:
+        - lib/llm/router/pricing-refresh.ts
+        - lib/llm/router/costing.ts
+        - lib/llm/router/__tests__/pricing-refresh.test.ts
+        - lib/llm/router/__tests__/costing.test.ts
+        - docs/reference/database-schema.md
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/pricing-refresh.test.ts lib/llm/router/__tests__/costing.test.ts lib/llm/router/__tests__/request-ledger.test.ts"
+          status: pass
+          summary: "3 files passed, 16 tests passed."
+      evidence:
+        - "Provider-reported cost test returns actualCostUsd with costSource=provider_reported."
+        - "Pricing snapshot estimate test returns estimatedCostUsd and never actualCostUsd."
+        - "Database docs now state estimated costs must not be presented as exact spend."
+      remaining_blockers: []
+
+  - id: T808
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Implement approved runtime routing-policy evaluation without hiding fallback attempts from the ledger."
+    allowed_files:
+      - lib/llm/router/routing-policy.ts
+      - lib/llm/router/create-client.ts
+      - lib/llm/router/request-ledger.ts
+      - lib/llm/router/__tests__/routing-policy.test.ts
+      - lib/llm/router/__tests__/create-client.test.ts
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/routing-policy.test.ts lib/llm/router/__tests__/create-client.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "Policy mode is not approved by the plan."
+      - "Policy hides failed attempts, fallback paths, or budget blocks from the ledger."
+      - "Policy implements quality_first or cheapest_compatible without required evidence."
+    receipt:
+      result: done
+      summary: "Approved runtime routing-policy evaluation was implemented for manual, fallback_chain, local_first, and budget_guarded_manual. Unapproved quality_first/cheapest-like modes remain rejected. createRouterLLMClient now records a routing.policy.selected event when routingPolicyId is configured so policy selection is visible in the ledger."
+      changed_files:
+        - lib/llm/router/routing-policy.ts
+        - lib/llm/router/create-client.ts
+        - lib/llm/router/__tests__/routing-policy.test.ts
+        - lib/llm/router/__tests__/create-client.test.ts
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "npm test -- lib/llm/router/__tests__/routing-policy.test.ts lib/llm/router/__tests__/create-client.test.ts"
+          status: pass
+          summary: "2 files passed, 12 tests passed."
+      evidence:
+        - "fallback_chain records selected plus skipped candidates."
+        - "local_first selects none_local candidates before API candidates."
+        - "budget_guarded_manual blocks when estimated cost exceeds remaining budget."
+        - "create-client test proves routing.policy.selected ledger event includes policy id, backend, and auth mode."
+      remaining_blockers: []
+
+  - id: T809
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Update provider API, configure route, config store, and CLI status/configuration paths with sanitized Phase 2 gateway/model/cost state."
+    allowed_files:
+      - app/api/providers/route.ts
+      - app/api/providers/configure/route.ts
+      - cli/src/commands/configure.ts
+      - lib/llm/router/config.ts
+      - lib/providers/config-store.ts
+      - lib/llm/router/__tests__/config.test.ts
+      - lib/providers/__tests__/config-resolution.test.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "sed -n '1,220p' node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md"
+        expect: "docs read before app route edits"
+      - cmd: "npm test -- app/api/providers/__tests__/providers-route.test.ts lib/providers/__tests__/config-resolution.test.ts"
+        expect: "exit 0"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "Route response returns raw provider API keys, gateway virtual keys, OAuth tokens, credential file paths, prompt bodies, or response bodies."
+      - "CLI/app config writes provider secrets to .env.local."
+      - "API access, gateway access, local runtime, and local tool-session auth are not labeled distinctly."
+    receipt:
+      result: done
+      summary: "Provider API/configure route, config-store, config resolution, and CLI config paths were updated for sanitized Phase 2 gateway state. Bifrost local config now uses gateway_virtual_key auth and gateway_virtual_key_ref secret refs, API responses label access type distinctly, provider GET uses resolved config for live catalog refresh, and raw API/key material remains rejected."
+      changed_files:
+        - app/api/providers/route.ts
+        - app/api/providers/configure/route.ts
+        - cli/src/commands/configure.ts
+        - lib/llm/router/config.ts
+        - lib/providers/config-store.ts
+        - lib/llm/router/__tests__/config.test.ts
+        - lib/providers/__tests__/config-resolution.test.ts
+        - app/api/providers/__tests__/providers-route.test.ts
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "sed -n '1,220p' node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md"
+          status: pass
+          summary: "Next.js route-handler docs read before route edits."
+        - cmd: "npm test -- app/api/providers/__tests__/providers-route.test.ts lib/providers/__tests__/config-resolution.test.ts"
+          status: pass
+          summary: "2 files passed, 17 tests passed."
+      evidence:
+        - "POST route test proves bifrost_local config stores only gateway_virtual_key_ref env variable name."
+        - "GET route test proves active API access status does not expose raw OPENAI_API_KEY value and includes accessLabel."
+        - "Config resolution test proves bifrost_local config resolves with baseURL/routingPolicyId and without raw virtual-key values."
+      remaining_blockers: []
+
+  - id: T810
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Update docs and board receipts so implementation behavior, blockers, gateway decision, and verification state are current."
+    allowed_files:
+      - docs/reference/provider-catalog.md
+      - docs/reference/database-schema.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+      - docs/goals/provider-auth-router-phase2/goal.md
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "node -e \"const fs=require('fs'); const files=['docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md','docs/goals/provider-auth-router-phase2/goal.md','docs/goals/provider-auth-router-phase2/state.yaml']; const bad=['T'+'ODO','T'+'BD','implement'+' later','pa'+'ste raw'+' token','pa'+'ste'+' token']; let hits=[]; for (const f of files) { const text=fs.readFileSync(f,'utf8'); for (const b of bad) if (text.includes(b)) hits.push(f+': '+b); } if (hits.length) { console.error(hits.join('\\n')); process.exit(1); }\""
+        expect: "no placeholders or raw-token-pasting language except negative constraints"
+      - cmd: "git diff --name-only"
+        expect: "only allowed files plus approved goal receipt updates"
+    stop_if:
+      - "Docs present raw token pasting as approved behavior."
+      - "Docs omit selected gateway decision or blockers."
+      - "Docs omit estimated versus exact cost labeling."
+      - "Docs/board receipts are stale versus implemented behavior."
+    receipt:
+      result: done
+      summary: "Documentation was updated to match implemented Phase 2 behavior through T809. Provider catalog now documents direct plus bifrost_local execution, gateway_virtual_key refs, model refresh, and fallback static defaults. Database schema docs now document Phase 2 auth/backend/policy constraints, model refresh, pricing snapshots, and exact-versus-estimated cost semantics. The implementation plan now records bifrost_local as the selected backend rather than a candidate."
+      changed_files:
+        - docs/reference/provider-catalog.md
+        - docs/reference/database-schema.md
+        - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+        - docs/goals/provider-auth-router-phase2/state.yaml
+      commands:
+        - cmd: "node -e \"const fs=require('fs'); const files=['docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md','docs/goals/provider-auth-router-phase2/goal.md','docs/goals/provider-auth-router-phase2/state.yaml']; const bad=['T'+'ODO','T'+'BD','implement'+' later','pa'+'ste raw'+' token','pa'+'ste'+' token']; let hits=[]; for (const f of files) { const text=fs.readFileSync(f,'utf8'); for (const b of bad) if (text.includes(b)) hits.push(f+': '+b); } if (hits.length) { console.error(hits.join('\\n')); process.exit(1); }\""
+          status: pass
+          summary: "No placeholders or raw-token-pasting language found in Phase 2 plan/goal/state."
+        - cmd: "git diff --name-only"
+          status: pass
+          summary: "Diff containment listed expected implementation and docs files; no excluded UI/wizard/preview files."
+      evidence:
+        - "provider-catalog.md now labels implemented auth modes and bifrost_local backend."
+        - "database-schema.md now distinguishes actual_cost_usd from estimated_cost_usd and lists approved Phase 2 policy modes."
+        - "implementation plan now states bifrost_local selected and GoModel/external backends deferred."
+      remaining_blockers: []
+
+  - id: T811
+    type: judge
+    assignee: Judge
+    status: blocked
+    objective: "Comprehensive code review and semantic drift review before final verification."
+    inputs:
+      - "All changed files"
+      - docs/recovery/2026-05-20-provider-auth-router-phase-2-implementation-plan.md
+      - docs/goals/provider-auth-router-phase2/goal.md
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "git diff --name-only"
+        expect: "diff containment reviewed"
+      - cmd: "git diff --stat"
+        expect: "blast radius reviewed"
+    stop_if:
+      - "Implementation deviates from selected gateway decision."
+      - "Implementation adds hosted dependency or extra paid gateway requirement."
+      - "Implementation leaks secrets or raw tokens."
+      - "Implementation changes excluded UI/wizard/preview files."
+      - "Tests/docs/receipts are missing or stale."
+      - "Partial work is being presented as complete."
+    receipt:
+      result: blocked
+      decision: not_complete
+      full_outcome_complete: false
+      summary: "Judge review blocked final verification. Diff containment passed and no excluded UI/wizard/preview files changed, but runtime Phase 2 behavior had blockers: ledger still rejected Phase 2 modes, routing-policy helpers were not wired into execution, gateway error bodies could be persisted, pricing estimation was not wired into runtime, Bifrost baseURL was not constrained to local/self-hosted values, and api-routes docs were stale."
+      evidence:
+        - "Blocker: default request ledger still asserted Phase 1 auth/backends for bifrost_local/gateway_virtual_key."
+        - "Blocker: evaluateRoutingPolicy existed but createRouterLLMClient did not load/evaluate policy rows or record attempts/blocks."
+        - "High: Bifrost adapter included upstream response body in thrown error, which createRouterLLMClient persisted as provider.error message."
+        - "High: pricing/cost helpers were not used in runtime finish metadata when gateway/provider cost was absent."
+        - "Medium: Bifrost baseURL accepted any URL despite local/no-hosted contract."
+        - "Medium: docs/reference/api-routes.md still described gateway virtual keys and Bifrost as future-only."
+      blocked_tasks:
+        - T812
+      required_board_updates:
+        - "Run bounded review-fix slice before final verification."
+
+  - id: T812
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Final verification, blocker documentation, and PR-readiness audit. Stop before stage/commit/push unless user explicitly approves."
+    verify:
+      - cmd: "npm test -- lib/llm/router lib/providers app/api/providers"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npm test"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npx tsc --noEmit --pretty false"
+        expect: "exit 0 or blocker classified"
+      - cmd: "npm run lint"
+        expect: "exit 0 or failures classified as PR-owned/pre-existing"
+      - cmd: "git diff --name-only"
+        expect: "no excluded files changed"
+      - cmd: "git diff --cached --name-only"
+        expect: "empty unless user explicitly approved staging"
+      - cmd: "rg -n \"sk-[A-Za-z0-9]|sk-ant|OPENAI_API_KEY=.*[A-Za-z0-9]|ANTHROPIC_API_KEY=.*[A-Za-z0-9]|CLAUDE_CODE_OAUTH_TOKEN=.*[A-Za-z0-9]|CODEX_ACCESS_TOKEN=.*[A-Za-z0-9]\" --glob '!node_modules/**' --glob '!package-lock.json'"
+        expect: "no real secrets in changed files; false positives classified"
+    stop_if:
+      - "Any PR-owned verification failure remains."
+      - "Any incomplete work lacks blocker evidence and next safe action."
+      - "Any stage/commit/push action is attempted without explicit user approval."
+    receipt:
+      result: done
+      decision: ready_for_commit_prep
+      full_outcome_complete: true
+      summary: "Final verification completed. The focused provider/router/API surface passed after fixing the T812-discovered unknown-provider regression caused by lazy router client creation. Full tests and TypeScript passed. Lint still fails only on pre-existing unrelated files outside the Phase 2 diff. Staged diff remains empty, no stage/commit/push was performed, and the changed-file secret scan found no real provider keys or session tokens."
+      verification:
+        - "npm test -- lib/llm/router lib/providers app/api/providers => 12 files, 92 tests passed."
+        - "npm test => 38 files, 290 tests passed."
+        - "npx tsc --noEmit --pretty false => exit 0."
+        - "npm run lint => exit 1 from pre-existing unrelated files: components/skill-mall/skill-detail/SkillTabs.tsx, components/skill-mall/theme-provider.tsx, scripts/migrate.js, plus existing warnings."
+        - "git diff --cached --name-only => empty."
+        - "changed-file strict secret scan => no matches."
+      final_fixes:
+        - "lib/providers/index.ts now preserves the existing createLLMClient unknown-provider throw contract even though router client construction is lazy."
+      incomplete_work:
+        - "No Phase 2 implementation work remains incomplete."
+      next_safe_action:
+        - "Review the diff, then stage/commit/push only after explicit approval."
+
+  - id: T811F
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Review-fix slice for T811 blockers. Fix Phase 2 ledger validators, runtime routing-policy wiring, gateway error sanitization, runtime cost estimation, local-only Bifrost base URL constraints, and stale API docs before re-review/final verification."
+    allowed_files:
+      - lib/llm/router/request-ledger.ts
+      - lib/llm/router/create-client.ts
+      - lib/llm/router/gateway-adapter.ts
+      - lib/llm/router/gateway-client.ts
+      - lib/llm/router/routing-policy.ts
+      - lib/llm/router/costing.ts
+      - lib/llm/router/pricing-refresh.ts
+      - lib/llm/router/__tests__/request-ledger.test.ts
+      - lib/llm/router/__tests__/create-client.test.ts
+      - lib/llm/router/__tests__/gateway-adapter.test.ts
+      - lib/llm/router/__tests__/routing-policy.test.ts
+      - lib/llm/router/__tests__/costing.test.ts
+      - app/api/providers/configure/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - cli/src/commands/configure.ts
+      - lib/llm/router/config.ts
+      - lib/providers/config-store.ts
+      - lib/providers/__tests__/config-resolution.test.ts
+      - docs/reference/api-routes.md
+      - docs/reference/provider-catalog.md
+      - docs/reference/database-schema.md
+      - docs/goals/provider-auth-router-phase2/state.yaml
+    verify:
+      - cmd: "npm test -- lib/llm/router/__tests__/request-ledger.test.ts lib/llm/router/__tests__/create-client.test.ts lib/llm/router/__tests__/gateway-adapter.test.ts lib/llm/router/__tests__/routing-policy.test.ts lib/llm/router/__tests__/costing.test.ts"
+        expect: "exit 0"
+      - cmd: "npm test -- app/api/providers/__tests__/providers-route.test.ts lib/providers/__tests__/config-resolution.test.ts"
+        expect: "exit 0"
+      - cmd: "rg -n 'Phase 1 supports only the `direct` gateway backend|gateway_virtual_key.*future/not implemented|Bifrost.*future/not implemented' docs/reference/api-routes.md docs/reference/provider-catalog.md docs/reference/database-schema.md"
+        expect: "no stale future-only Phase 2 language"
+    stop_if:
+      - "Fix requires changing excluded UI/wizard/preview files."
+      - "Fix requires hosted gateway infrastructure or raw token/session credentials."
+      - "Any raw upstream error body, prompt body, response body, provider key, or gateway virtual key can still be persisted or returned."
+    receipt:
+      result: done
+      summary: "T811 review-fix slice completed. Ledger helpers and migration tests now allow approved Phase 2 gateway/auth values while rejecting unapproved values; createRouterLLMClient now loads and applies routing policies at runtime, records selected/skipped/blocked attempts, blocks over-budget requests before constructing provider clients, and estimates gateway costs from pricing snapshots when provider-reported cost is absent. Bifrost gateway errors are sanitized and bifrost_local base URLs are restricted to localhost-class URLs through adapter, API route, config resolution, and config writes. API route docs now describe Phase 2 gateway_virtual_key and bifrost_local as implemented behavior instead of future-only behavior."
+      evidence:
+        - "npm test -- lib/llm/router/__tests__/request-ledger.test.ts lib/llm/router/__tests__/create-client.test.ts lib/llm/router/__tests__/gateway-adapter.test.ts lib/llm/router/__tests__/routing-policy.test.ts lib/llm/router/__tests__/costing.test.ts => 5 files, 38 tests passed."
+        - "npm test -- app/api/providers/__tests__/providers-route.test.ts lib/providers/__tests__/config-resolution.test.ts => 2 files, 20 tests passed."
+        - "rg -n 'Phase 1 supports only the `direct` gateway backend|gateway_virtual_key.*future/not implemented|Bifrost.*future/not implemented' docs/reference/api-routes.md docs/reference/provider-catalog.md docs/reference/database-schema.md => no stale docs matches."

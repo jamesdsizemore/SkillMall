@@ -156,7 +156,7 @@ curl http://localhost:3000/api/providers
 
 ### POST /api/providers/configure
 
-Writes LLM provider configuration to `.env.local`. Development only — not available in production.
+Writes non-secret LLM provider configuration to `~/.skill-mall/config.json`.
 
 **Authentication:** None required
 
@@ -164,15 +164,15 @@ Writes LLM provider configuration to `.env.local`. Development only — not avai
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `provider` | string | Yes | Provider ID (`openai`, `claude-code`, `gemini`, `groq`, `ollama`) |
-| `apiKey` | string | Depends | Required for openai, gemini, groq |
+| `provider` | string | Yes | Provider ID (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`) |
+| `authMode` | string | No | `env_key`, `local_cli_session`, or `none_local` |
+| `secretRef` | object | No | `{ "type": "env", "name": "OPENAI_API_KEY" }` or `{ "type": "none" }` |
 | `model` | string | No | Model name (defaults to provider default) |
-| `baseURL` | string | No | Custom base URL (for Ollama or proxies) |
 
 **Response:**
 
 ```json
-{ "success": true, "provider": "openai", "model": "gpt-4o" }
+{ "success": true, "provider": "openai", "model": "gpt-4o", "authMode": "env_key", "gatewayBackend": "direct" }
 ```
 
 **curl example:**
@@ -180,7 +180,7 @@ Writes LLM provider configuration to `.env.local`. Development only — not avai
 ```bash
 curl -X POST http://localhost:3000/api/providers/configure \
   -H "Content-Type: application/json" \
-  -d '{"provider": "openai", "apiKey": "sk-...", "model": "gpt-4o"}'
+  -d '{"provider": "openai", "authMode": "env_key", "secretRef": {"type": "env", "name": "OPENAI_API_KEY"}, "model": "gpt-4o"}'
 ```
 
 ---
@@ -246,6 +246,48 @@ curl -X POST http://localhost:3000/api/research \
 
 ---
 
+### POST /api/preview-skill
+
+Runs the Skill Builder on a reviewed `ResearchResult` and returns the generated skill directory without prompt files or disk writes. The browser wizard uses this route between metadata selection and the editable `SKILL.md` preview step.
+
+**Authentication:** None required
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `researchResult` | object | Yes | `ResearchResult` returned from `/api/research` |
+| `metadata` | object | Yes | Slug, category, tags, and target agents |
+| `selectedToolNames` | string[] | No | Tool names to include (defaults to all) |
+
+**Response:**
+
+```json
+{
+  "skillDirectory": {
+    "slug": "blue-ocean-strategy",
+    "category": "business",
+    "files": [
+      { "path": "SKILL.md", "content": "---\nname: blue-ocean-strategy\n..." },
+      { "path": "README.md", "content": "# Blue Ocean Strategy\n..." }
+    ]
+  },
+  "fileCount": 8,
+  "validation": { "valid": true, "errors": [], "warnings": [] }
+}
+```
+
+**Error responses:**
+
+| Status | error | Meaning |
+|---|---|---|
+| 400 | invalid_input | Request body failed schema validation |
+| 422 | invalid_skill_preview | Skill Builder did not produce a valid `SKILL.md` |
+| 422 | pipeline_failed | Skill Builder failed |
+| 503 | provider_not_configured | No LLM provider set up |
+
+---
+
 ### POST /api/confirm-research
 
 Runs the Skill Builder and Prompt Engine on a saved `ResearchResult` — produces skill files in memory without writing to disk.
@@ -256,22 +298,28 @@ Runs the Skill Builder and Prompt Engine on a saved `ResearchResult` — produce
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `slug` | string | Yes | Skill slug from `skill-builder-output/<slug>/research-result.json` |
-| `selectedTools` | string[] | No | Tool names to include (defaults to all) |
-| `metadata` | object | No | Override category, author, tags |
+| `researchResult` | object | Yes | `ResearchResult` returned from `/api/research` |
+| `metadata` | object | Yes | Slug, category, tags, and target agents |
+| `selectedToolNames` | string[] | No | Tool names to include (defaults to all) |
+| `selectedMetaTypes` | string[] | No | Meta prompt IDs to include (defaults to all standard meta prompts) |
+| `skillMdContent` | string | No | Reviewed `SKILL.md` content from `/api/preview-skill`; replaces generated `SKILL.md` before validation |
 
 **Response:**
 
 ```json
 {
-  "slug": "blue-ocean-strategy",
-  "files": [
-    { "path": "SKILL.md", "content": "---\nname: blue-ocean-strategy\n..." },
-    { "path": "README.md", "content": "# Blue Ocean Strategy\n..." },
-    { "path": "resources/templates/strategy-canvas.md", "content": "..." }
-  ],
-  "validation": { "valid": true, "errors": [], "warnings": [] },
-  "qualityScore": 87
+  "skillDirectory": {
+    "slug": "blue-ocean-strategy",
+    "category": "business",
+    "files": [
+      { "path": "SKILL.md", "content": "---\nname: blue-ocean-strategy\n..." },
+      { "path": "README.md", "content": "# Blue Ocean Strategy\n..." },
+      { "path": "resources/templates/strategy-canvas.md", "content": "..." }
+    ]
+  },
+  "promptCount": 8,
+  "fileCount": 16,
+  "validation": { "valid": true, "errors": [], "warnings": [] }
 }
 ```
 
@@ -279,8 +327,8 @@ Runs the Skill Builder and Prompt Engine on a saved `ResearchResult` — produce
 
 | Status | error | Meaning |
 |---|---|---|
-| 400 | invalid_input | Missing slug or invalid metadata |
-| 404 | research_not_found | `skill-builder-output/<slug>/research-result.json` not found |
+| 400 | invalid_input | Request body failed schema validation |
+| 422 | pipeline_failed | Skill Builder or Prompt Engine failed |
 | 503 | provider_not_configured | No LLM provider set up |
 
 **curl example:**
@@ -288,14 +336,14 @@ Runs the Skill Builder and Prompt Engine on a saved `ResearchResult` — produce
 ```bash
 curl -X POST http://localhost:3000/api/confirm-research \
   -H "Content-Type: application/json" \
-  -d '{"slug": "blue-ocean-strategy"}'
+  -d '{"researchResult": {...}, "metadata": {"slug": "blue-ocean-strategy", "category": "business", "tags": ["strategy"], "targetAgents": ["claude-code"]}, "skillMdContent": "---\nname: blue-ocean-strategy\n..."}'
 ```
 
 ---
 
 ### POST /api/create-skill
 
-Full pipeline: research → build → validate → atomic write to `skills/`.
+Builds the reviewed skill directory and writes it atomically to `skills/`.
 
 **Authentication:** None required
 
@@ -303,21 +351,20 @@ Full pipeline: research → build → validate → atomic write to `skills/`.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `topic` | string | Yes | Domain or methodology |
-| `sourceUrls` | string[] | No | Source URLs for research |
-| `category` | string | No | Target category (default: `business`) |
-| `author` | string | No | GitHub login |
-| `targetAgents` | string[] | No | Agents to target |
+| `researchResult` | object | Yes | `ResearchResult` returned from `/api/research` |
+| `metadata` | object | Yes | Slug, category, tags, and target agents |
+| `selectedToolNames` | string[] | No | Tool names to include (defaults to all) |
+| `selectedMetaTypes` | string[] | No | Meta prompt IDs to include |
+| `skillMdContent` | string | No | Reviewed `SKILL.md` content; replaces generated `SKILL.md` before validation and disk write |
 
 **Response:**
 
 ```json
 {
   "slug": "blue-ocean-strategy",
-  "category": "business",
-  "filesWritten": 12,
-  "qualityScore": 87,
-  "path": "skills/business/blue-ocean-strategy"
+  "path": "/absolute/path/to/skills/business/blue-ocean-strategy",
+  "fileCount": 16,
+  "promptCount": 8
 }
 ```
 
@@ -335,7 +382,7 @@ Full pipeline: research → build → validate → atomic write to `skills/`.
 ```bash
 curl -X POST http://localhost:3000/api/create-skill \
   -H "Content-Type: application/json" \
-  -d '{"topic": "Blue Ocean Strategy", "sourceUrls": ["https://blueoceanstrategy.com/tools/"], "category": "business"}'
+  -d '{"researchResult": {...}, "metadata": {"slug": "blue-ocean-strategy", "category": "business", "tags": ["strategy"], "targetAgents": ["claude-code"]}, "skillMdContent": "---\nname: blue-ocean-strategy\n..."}'
 ```
 
 ---
@@ -1027,7 +1074,7 @@ curl -X POST http://localhost:3000/api/retrieve \
 
 ## Full Route Index
 
-All 29 routes documented in this reference:
+All 30 routes documented in this reference:
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
@@ -1035,8 +1082,9 @@ All 29 routes documented in this reference:
 | GET | /api/auth/callback/github | None (validates CSRF) | Complete OAuth |
 | POST | /api/auth/logout | sm_session | Destroy session |
 | GET | /api/providers | None | List LLM providers |
-| POST | /api/providers/configure | None (dev only) | Write .env.local config |
+| POST | /api/providers/configure | None | Write non-secret provider config |
 | POST | /api/research | None | Research Engine extraction |
+| POST | /api/preview-skill | None | Build editable `SKILL.md` preview |
 | POST | /api/confirm-research | None | Build skill files in memory |
 | POST | /api/create-skill | None | Full pipeline + write |
 | POST | /api/optimize-prompt | None | 4-dimension prompt audit |
@@ -1343,13 +1391,15 @@ Several routes have filesystem requirements that make them incompatible with Ver
 |---|---|---|
 | GET /api/providers | Yes | Read-only |
 | POST /api/research | Yes | No filesystem writes |
+| POST /api/preview-skill | Yes | No filesystem writes |
+| POST /api/confirm-research | Yes | No filesystem writes |
 | GET /api/mcp (list) | Yes | Read-only |
 | POST /api/create-skill | **No** | Writes to `skills/` |
 | POST /api/fork-skill | **No** | Writes to `skills/` |
 | POST /api/regen-prompt | **No** | Writes to `skills/` |
 | POST /api/create-chain | **No** | Writes to `skills/chains/` |
 | POST /api/improvements/[id]/approve | **No** | Writes SKILL.md |
-| POST /api/providers/configure | **No** | Writes .env.local |
+| POST /api/providers/configure | **No** | Writes non-secret provider config |
 | POST /api/retrieve | **No** | Reads SQLite knowledge_chunks |
 
 For Vercel deployments, the catalog browsing experience works fully. Skill creation, chain building, and improvement suggestions require a deployment with a writable filesystem (Railway, Fly.io, VPS). See [deployment.md](./deployment.md) for platform-specific guidance.

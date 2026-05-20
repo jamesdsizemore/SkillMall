@@ -2,7 +2,9 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 
-const SKILLS_DIR = path.join(process.cwd(), "skills");
+export interface SkillCatalogOptions {
+  repoRoot?: string;
+}
 
 export type Skill = {
   slug: string;
@@ -17,6 +19,7 @@ export type Skill = {
   linked_skills: string[];
   content: string;
   path: string;
+  hasReadme: boolean;
   hasScripts: boolean;
   hasTemplates: boolean;
   hasSamples: boolean;
@@ -28,9 +31,20 @@ export type Category = {
   skills: Skill[];
 };
 
-// Parse tags from either a comma-separated string ("tag-one, tag-two")
-// or a YAML array — both are valid per the SkillMall template.
-function parseTags(raw: unknown): string[] {
+export type PromptFileInfo = {
+  file: string;
+  path: string;
+};
+
+function getRepoRoot(options: SkillCatalogOptions = {}): string {
+  return options.repoRoot ?? process.cwd();
+}
+
+export function getSkillsDir(options: SkillCatalogOptions = {}): string {
+  return path.join(getRepoRoot(options), "skills");
+}
+
+function parseStringList(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
   if (typeof raw === "string") {
     return raw
@@ -41,23 +55,11 @@ function parseTags(raw: unknown): string[] {
   return [];
 }
 
-// Parse linked-skills from either a comma-separated string or array.
-function parseLinkedSkills(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
-  if (typeof raw === "string") {
-    return raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function parseSkill(filePath: string): Skill | null {
+function parseSkill(filePath: string, skillsDir: string): Skill | null {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
     const { data, content } = matter(raw);
-    const rel = path.relative(SKILLS_DIR, filePath);
+    const rel = path.relative(skillsDir, filePath);
     const parts = rel.split(path.sep);
     const dirCategory = parts[0];
     const slug = parts[1];
@@ -69,6 +71,7 @@ function parseSkill(filePath: string): Skill | null {
     const meta =
       data.metadata && typeof data.metadata === "object" ? data.metadata : {};
 
+    const hasReadme = fs.existsSync(path.join(dir, "README.md"));
     const hasScripts =
       fs.existsSync(path.join(dir, "scripts")) &&
       fs.readdirSync(path.join(dir, "scripts")).some((f) => f !== ".gitkeep");
@@ -102,6 +105,7 @@ function parseSkill(filePath: string): Skill | null {
       ),
       content,
       path: rel,
+      hasReadme,
       hasScripts,
       hasTemplates,
       hasSamples,
@@ -113,18 +117,27 @@ function parseSkill(filePath: string): Skill | null {
   }
 }
 
-export function getAllSkills(): Skill[] {
+export function parseTags(raw: unknown): string[] {
+  return parseStringList(raw);
+}
+
+export function parseLinkedSkills(raw: unknown): string[] {
+  return parseStringList(raw);
+}
+
+export function getAllSkills(options: SkillCatalogOptions = {}): Skill[] {
+  const skillsDir = getSkillsDir(options);
   const skills: Skill[] = [];
 
-  if (!fs.existsSync(SKILLS_DIR)) return skills;
+  if (!fs.existsSync(skillsDir)) return skills;
 
   const categories = fs
-    .readdirSync(SKILLS_DIR)
+    .readdirSync(skillsDir)
     .filter((d) => d !== "_template" && !d.startsWith("."))
-    .filter((d) => fs.statSync(path.join(SKILLS_DIR, d)).isDirectory());
+    .filter((d) => fs.statSync(path.join(skillsDir, d)).isDirectory());
 
   for (const cat of categories) {
-    const catDir = path.join(SKILLS_DIR, cat);
+    const catDir = path.join(skillsDir, cat);
     const skillDirs = fs
       .readdirSync(catDir)
       .filter((d) => !d.startsWith("."))
@@ -133,7 +146,7 @@ export function getAllSkills(): Skill[] {
     for (const skillDir of skillDirs) {
       const skillFile = path.join(catDir, skillDir, "SKILL.md");
       if (fs.existsSync(skillFile)) {
-        const skill = parseSkill(skillFile);
+        const skill = parseSkill(skillFile, skillsDir);
         if (skill) skills.push(skill);
       }
     }
@@ -142,8 +155,8 @@ export function getAllSkills(): Skill[] {
   return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function getSkillsByCategory(): Category[] {
-  const skills = getAllSkills();
+export function getSkillsByCategory(options: SkillCatalogOptions = {}): Category[] {
+  const skills = getAllSkills(options);
   const map = new Map<string, Skill[]>();
 
   for (const skill of skills) {
@@ -157,16 +170,60 @@ export function getSkillsByCategory(): Category[] {
     .map(([slug, skills]) => ({ slug, skills }));
 }
 
-export function getSkill(category: string, slug: string): Skill | null {
-  const filePath = path.join(SKILLS_DIR, category, slug, "SKILL.md");
+export function getSkill(category: string, slug: string, options: SkillCatalogOptions = {}): Skill | null {
+  const skillsDir = getSkillsDir(options);
+  const filePath = path.join(skillsDir, category, slug, "SKILL.md");
   if (!fs.existsSync(filePath)) return null;
-  return parseSkill(filePath);
+  return parseSkill(filePath, skillsDir);
 }
 
-export function getSkillReadme(category: string, slug: string): string | null {
-  const filePath = path.join(SKILLS_DIR, category, slug, "README.md");
+export function getSkillReadme(category: string, slug: string, options: SkillCatalogOptions = {}): string | null {
+  const filePath = path.join(getSkillsDir(options), category, slug, "README.md");
   if (!fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, "utf-8");
+}
+
+export function getSkillDir(category: string, slug: string, options: SkillCatalogOptions = {}): string {
+  return path.join(getSkillsDir(options), category, slug);
+}
+
+export function searchSkills(
+  query: string,
+  options: SkillCatalogOptions & { category?: string; limit?: number } = {}
+): Skill[] {
+  const normalizedQuery = query.toLowerCase();
+  const skills = getAllSkills(options);
+
+  return skills
+    .filter((skill) => {
+      const matchesCategory = !options.category || skill.category === options.category;
+      const matchesQuery =
+        skill.name.toLowerCase().includes(normalizedQuery) ||
+        skill.description.toLowerCase().includes(normalizedQuery) ||
+        skill.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery)) ||
+        skill.category.toLowerCase().includes(normalizedQuery);
+      return matchesCategory && matchesQuery;
+    })
+    .slice(0, options.limit ?? 20);
+}
+
+export function getPromptFiles(
+  category: string,
+  slug: string,
+  options: SkillCatalogOptions = {}
+): PromptFileInfo[] {
+  const promptsDir = path.join(getSkillDir(category, slug, options), "resources", "prompts");
+
+  if (!fs.existsSync(promptsDir)) return [];
+
+  return fs
+    .readdirSync(promptsDir)
+    .filter((file) => file.endsWith(".md"))
+    .sort()
+    .map((file) => ({
+      file,
+      path: `resources/prompts/${file}`,
+    }));
 }
 
 /**
@@ -180,7 +237,7 @@ export function getFrameworkSkillCounts(): Record<string, number> {
 
   for (const skill of skills) {
     const promptsDir = path.join(
-      SKILLS_DIR, skill.category, skill.slug, "resources", "prompts"
+      getSkillsDir(), skill.category, skill.slug, "resources", "prompts"
     );
     if (!fs.existsSync(promptsDir)) continue;
 

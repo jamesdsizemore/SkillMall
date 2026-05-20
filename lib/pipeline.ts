@@ -90,6 +90,18 @@ export function validateSkillDirectory(dir: InMemorySkillDirectory): ValidationR
   return { valid: errors.length === 0, errors, warnings };
 }
 
+export function replaceSkillMdContent(
+  dir: InMemorySkillDirectory,
+  content: string
+): InMemorySkillDirectory {
+  return {
+    ...dir,
+    files: dir.files.map((file) =>
+      file.path === "SKILL.md" ? { ...file, content } : file
+    ),
+  };
+}
+
 // ─── Atomic write ─────────────────────────────────────────────────────────
 
 export async function atomicWrite(

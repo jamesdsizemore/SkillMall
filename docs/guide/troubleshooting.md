@@ -50,13 +50,14 @@ The research pipeline and skill builder both depend on a configured LLM provider
 **Fix:**
 1. Switch to a provider that supports embeddings for any retrieval-dependent features. OpenAI is the recommended option:
    ```
-   npx skill-mall configure --provider openai --key sk-...
+   export OPENAI_API_KEY="your-openai-api-key"
+   npx skill-mall configure --provider openai --key-env OPENAI_API_KEY
    ```
 2. If you want to keep Claude Code as your main provider for skill creation, set a separate `SKILL_MALL_EMBEDDINGS_PROVIDER` environment variable in `.env.local`:
    ```
    SKILL_MALL_PROVIDER=claude-code
    SKILL_MALL_EMBEDDINGS_PROVIDER=openai
-   SKILL_MALL_API_KEY=sk-...
+   OPENAI_API_KEY=your-openai-api-key
    ```
 3. Restart the development server after editing `.env.local`.
 
@@ -73,7 +74,7 @@ The research pipeline and skill builder both depend on a configured LLM provider
    ```
    cat ~/.skill-mall/config.json
    ```
-   The `apiKey` value should be a bare string with no spaces.
+   The `secretRef.name` value should name the environment variable that contains your API key.
 2. Test the key directly against the provider's API to isolate the issue from SkillMall:
    - OpenAI: `curl https://api.openai.com/v1/models -H "Authorization: Bearer YOUR_KEY"`
    - Gemini: `curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY"`
@@ -81,7 +82,8 @@ The research pipeline and skill builder both depend on a configured LLM provider
    If these return `401`, the key itself is invalid — generate a new one from the provider's dashboard.
 3. Reconfigure with the new key:
    ```
-   npx skill-mall configure --provider openai --key sk-NEW_KEY_HERE
+   export OPENAI_API_KEY="your-new-openai-api-key"
+   npx skill-mall configure --provider openai --key-env OPENAI_API_KEY
    ```
 4. For Groq, make sure the selected model is available in your Groq account tier. The default `llama-3.3-70b-versatile` requires an active Groq account.
 
@@ -210,6 +212,20 @@ The browser-based creation wizard at `http://localhost:3000/skills/create` runs 
 5. Hard-refresh the wizard page (Cmd+Shift+R / Ctrl+Shift+R) if the UI appears frozen. The API call may have completed but the UI state got stuck.
 
 **If none work:** Kill and restart `npm run dev`, clear the browser cache, and retry with a single short URL. If the hang persists beyond 3 minutes with a fast provider and a single URL, check the Next.js server output for unhandled promise rejections or timeout errors.
+
+---
+
+**Problem:** Step 4 `SKILL.md` preview is blank or the wizard stays on metadata
+
+**What it means:** The wizard calls `/api/preview-skill` when you click `[ PREVIEW SKILL → ]` from the metadata step. That route must generate an in-memory skill directory containing a valid `SKILL.md`. If the route fails or the generated directory is invalid, the wizard stays on Step 3 and shows an error instead of advancing to an empty editor.
+
+**Fix:**
+1. Confirm an LLM provider is configured. A missing provider returns `provider_not_configured` and links back to `/settings/providers`.
+2. Check the development server output for the `/api/preview-skill` request. The route returns `invalid_skill_preview` when validation fails and `pipeline_failed` when generation throws.
+3. If the error mentions `SKILL.md`, retry with a narrower topic or fewer selected tools. Very broad research results can produce low-quality or invalid generated frontmatter.
+4. If you edited the Step 4 text and final creation fails later, check the validation error. The edited `SKILL.md` is validated again before disk write.
+
+**If none work:** Copy the `/api/preview-skill` response from the browser network tab, redact any sensitive values, and inspect the `validation.errors` array. The first error usually identifies the missing or invalid frontmatter field.
 
 ---
 
