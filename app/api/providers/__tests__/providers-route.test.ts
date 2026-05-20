@@ -708,6 +708,214 @@ describe('provider API routes', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('policy route upserts, lists, disables, and rejects prompt or raw secret fields', async () => {
+    const db = createProviderDb()
+    mocks.getDb.mockReturnValue(db)
+
+    const { GET, POST } = await import('../policies/route')
+    const createResponse = await POST(
+      postRequest('http://localhost/api/providers/policies', {
+        id: 'budget-openai',
+        name: 'Budget OpenAI',
+        mode: 'budget_guarded_manual',
+        rules: {
+          candidates: [
+            {
+              id: 'api',
+              estimatedCostUsd: 0.02,
+              config: {
+                provider: 'openai',
+                providerRegistryId: 'openai',
+                model: 'gpt-4o-mini',
+                authMode: 'env_key',
+                secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
+                gatewayBackend: 'direct',
+              },
+            },
+          ],
+        },
+        budget: { remainingUsd: 0.01, monthlyBudgetUsd: 20 },
+      }) as never
+    )
+    const created = await createResponse.json()
+
+    expect(createResponse.status).toBe(200)
+    expect(created).toMatchObject({
+      success: true,
+      policy: {
+        id: 'budget-openai',
+        mode: 'budget_guarded_manual',
+        budget: {
+          remainingUsd: 0.01,
+          limitUsd: 20,
+        },
+      },
+    })
+
+    const listResponse = await GET()
+    expect(await listResponse.json()).toMatchObject({
+      supportedModes: ['manual', 'fallback_chain', 'local_first', 'budget_guarded_manual'],
+      policies: [
+        expect.objectContaining({
+          id: 'budget-openai',
+          enabled: true,
+        }),
+      ],
+    })
+
+    const disableResponse = await POST(
+      postRequest('http://localhost/api/providers/policies', {
+        action: 'disable',
+        id: 'budget-openai',
+      }) as never
+    )
+    expect(await disableResponse.json()).toMatchObject({
+      success: true,
+      policy: {
+        id: 'budget-openai',
+        enabled: false,
+      },
+    })
+
+    const rejected = await POST(
+      postRequest('http://localhost/api/providers/policies', {
+        id: 'bad-policy',
+        name: 'Bad policy',
+        mode: 'manual',
+        rules: {
+          prompt: 'do not store this',
+          candidates: [
+            {
+              config: {
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                api_key: 'raw-secret',
+              },
+            },
+          ],
+        },
+      }) as never
+    )
+    const rejectedJson = await rejected.json()
+
+    expect(rejected.status).toBe(400)
+    expect(rejectedJson.error).toBe('policy_field_rejected')
+    expect(JSON.stringify(rejectedJson)).not.toContain('do not store this')
+    expect(JSON.stringify(rejectedJson)).not.toContain('raw-secret')
+  })
+
+  it('policy route activates an existing policy through the current provider config', async () => {
+    process.env.SKILL_MALL_PROVIDER = 'openai'
+    const db = createProviderDb()
+    mocks.getDb.mockReturnValue(db)
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'openai',
+      providerRegistryId: 'openai',
+      executionKind: 'direct',
+      model: 'gpt-4o-mini',
+      authMode: 'env_key',
+      secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
+      gatewayBackend: 'direct',
+      routingPolicyId: 'manual-openai',
+      path: '/Users/test/.skill-mall/config.json',
+    })
+
+    const { POST } = await import('../policies/route')
+    await POST(
+      postRequest('http://localhost/api/providers/policies', {
+        id: 'manual-openai',
+        name: 'Manual OpenAI',
+        mode: 'manual',
+      }) as never
+    )
+    const activateResponse = await POST(
+      postRequest('http://localhost/api/providers/policies', {
+        action: 'activate',
+        id: 'manual-openai',
+      }) as never
+    )
+    const json = await activateResponse.json()
+
+    expect(activateResponse.status).toBe(200)
+    expect(json).toMatchObject({
+      success: true,
+      activated: true,
+      routingPolicyId: 'manual-openai',
+      activeProviderRegistryId: 'openai',
+    })
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        providerRegistryId: 'openai',
+        routingPolicyId: 'manual-openai',
+      })
+    )
+    expect(JSON.stringify(json)).not.toContain('/Users/test/.skill-mall/config.json')
+  })
+
+  it('policy simulation route evaluates locally without provider requests or prompt storage', async () => {
+    process.env.SKILL_MALL_PROVIDER = 'openai'
+    const db = createProviderDb()
+    mocks.getDb.mockReturnValue(db)
+
+    const { POST: savePolicy } = await import('../policies/route')
+    await savePolicy(
+      postRequest('http://localhost/api/providers/policies', {
+        id: 'budget-openai',
+        name: 'Budget OpenAI',
+        mode: 'budget_guarded_manual',
+        rules: {
+          candidates: [
+            {
+              id: 'api',
+              config: {
+                provider: 'openai',
+                providerRegistryId: 'openai',
+                model: 'gpt-4o-mini',
+                authMode: 'env_key',
+                secretRef: { type: 'env', name: 'OPENAI_API_KEY' },
+                gatewayBackend: 'direct',
+              },
+            },
+          ],
+        },
+        budget: { remainingUsd: 0.01 },
+      }) as never
+    )
+
+    const { POST } = await import('../policies/simulate/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/policies/simulate', {
+        id: 'budget-openai',
+        estimatedCostUsd: 0.02,
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      simulation: true,
+      providerRequestSent: false,
+      promptStored: false,
+      responseStored: false,
+      blocked: true,
+      selected: null,
+      policyId: 'budget-openai',
+    })
+    expect(fetch).not.toHaveBeenCalled()
+
+    const rejected = await POST(
+      postRequest('http://localhost/api/providers/policies/simulate', {
+        id: 'budget-openai',
+        session_token: 'do not store this',
+      }) as never
+    )
+    const rejectedJson = await rejected.json()
+    expect(rejected.status).toBe(400)
+    expect(rejectedJson.error).toBe('policy_field_rejected')
+    expect(JSON.stringify(rejectedJson)).not.toContain('do not store this')
+  })
+
   it('usage route labels actual and estimated cost distinctly', async () => {
     const prepare = vi.fn((sql: string) => {
       if (sql.includes('GROUP BY provider_id')) {

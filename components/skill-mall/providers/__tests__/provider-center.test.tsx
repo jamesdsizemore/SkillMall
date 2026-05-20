@@ -234,6 +234,57 @@ describe("Provider Center UI", () => {
     expect(html).toContain("locally_estimated_cost");
   });
 
+  it("renders routing policy and budget controls without unsupported modes", () => {
+    const html = renderToStaticMarkup(
+      <ProviderCenter
+        initialData={{
+          ...providersResponse,
+          routingPolicyId: "budget-openai",
+        }}
+        initialUsage={usageResponse}
+        initialPolicies={{
+          supportedModes: ["manual", "fallback_chain", "local_first", "budget_guarded_manual"],
+          unsupportedModes: ["cheapest_compatible", "quality_first", "semantic_router"],
+          policies: [
+            {
+              id: "budget-openai",
+              name: "Budget OpenAI",
+              mode: "budget_guarded_manual",
+              rules: {
+                candidates: [
+                  {
+                    id: "api",
+                    config: {
+                      provider: "openai",
+                      providerRegistryId: "openai",
+                      model: "model-a",
+                      authMode: "env_key",
+                      secretRef: { type: "env", name: "OPENAI_API_REF" },
+                      gatewayBackend: "direct",
+                    },
+                    estimatedCostUsd: 0.02,
+                  },
+                ],
+              },
+              budget: { remainingUsd: 0.01, limitUsd: 20 },
+              enabled: true,
+              createdAt: "2026-05-20T10:00:00.000Z",
+              updatedAt: "2026-05-20T10:00:00.000Z",
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(html).toContain("ROUTING POLICY + BUDGET");
+    expect(html).toContain("Budget OpenAI");
+    expect(html).toContain("budget_guarded_manual");
+    expect(html).toContain("SAVE POLICY");
+    expect(html).toContain("SIMULATE");
+    expect(html).not.toContain("quality_first");
+    expect(html).not.toContain("semantic_router");
+  });
+
   it("uses the configured active model instead of the routing policy or fallback model", () => {
     const configuredOpenAI = provider({
       id: "openai",

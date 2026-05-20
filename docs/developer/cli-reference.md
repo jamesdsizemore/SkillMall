@@ -12,6 +12,7 @@ Complete reference for all `npx skill-mall` commands. Every command documented w
 
 - [configure](#configure)
 - [providers](#providers)
+- [policies](#policies)
 - [create](#create)
 - [confirm-research](#confirm-research)
 - [deploy](#deploy)
@@ -178,6 +179,66 @@ npx skill-mall providers test --provider claude-code
 ```
 
 **Exit codes:** 0 on success, 1 on invalid provider, raw secret flag usage, failed live model refresh, or unsupported pricing source selection.
+
+---
+
+## policies
+
+Manage local routing policies and budget controls.
+
+```bash
+npx skill-mall policies <list|show|upsert|enable|disable|activate|simulate> [options]
+```
+
+`provider-policies` is also accepted as an alias.
+
+Supported modes are:
+
+- `manual`
+- `fallback_chain`
+- `local_first`
+- `budget_guarded_manual`
+
+`cheapest_compatible`, `quality_first`, semantic routing, learned routing, and complexity routing are not implemented.
+
+**Options:**
+
+| Flag | Required | Description |
+|---|---|---|
+| `--id <id>` | Yes except `list` | Routing policy id |
+| `--name <name>` | Yes for `upsert` | Human-readable policy name |
+| `--mode <mode>` | Yes for `upsert` | Supported routing mode |
+| `--candidate-current` | No | Add the current provider/model as the policy candidate |
+| `--remaining-usd <n>` | No | Remaining budget used by budget checks |
+| `--limit-usd <n>` | No | Budget limit metadata |
+| `--estimated-cost-usd <n>` | No | Numeric estimate for candidate metadata or simulation |
+| `--json` | No | Print JSON |
+
+Policy commands reject raw keys, tokens, credential paths, prompts, messages, responses, and outputs. Use configured provider references and numeric estimates.
+
+**Examples:**
+
+```bash
+npx skill-mall policies list
+```
+
+```bash
+npx skill-mall policies upsert \
+  --id budget-openai \
+  --name "Budget OpenAI" \
+  --mode budget_guarded_manual \
+  --candidate-current \
+  --remaining-usd 10 \
+  --limit-usd 20
+```
+
+```bash
+npx skill-mall policies activate --id budget-openai
+npx skill-mall policies simulate --id budget-openai --estimated-cost-usd 0.02
+npx skill-mall policies disable --id budget-openai
+```
+
+**Exit codes:** 0 on success, 1 on invalid policy, unsupported mode, unsafe raw input flag, missing provider config for candidate/activation/simulation, or local database failure.
 
 ---
 
@@ -968,6 +1029,7 @@ npx skill-mall attach-knowledge ai/skill-creator ./docs/
 | Command | Primary use | Requires LLM? | Requires auth? |
 |---|---|---|---|
 | `configure` | Set up LLM provider | No | No |
+| `policies` | Manage routing policies and budgets | No | No |
 | `create` | Research + generate skill | Yes | No |
 | `confirm-research` | Build from saved research | Yes | No |
 | `deploy` | Copy skill to agent | No | No |

@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
 
 ### llm_routing_policies
 
-Stores routing-policy metadata. Phase 2 supports bounded runtime evaluation for approved modes.
+Stores routing-policy metadata. Phase 2 added bounded runtime evaluation for approved modes. Phase 5 adds app/API/CLI management and local-only policy simulation over this same table.
 
 Allowed modes:
 
@@ -220,6 +220,10 @@ Allowed modes:
 - `budget_guarded_manual`
 
 Future/not implemented modes include `cheapest_compatible`, `quality_first`, and semantic/eval-based routing.
+
+`rules_json` stores sanitized routing candidates. Candidate configs may contain provider/model/auth-mode/secret-reference/base-URL metadata, but must not contain raw keys, raw tokens, copied credential contents, credential-file paths, prompt bodies, response bodies, message arrays, or output content.
+
+`budget_json` stores normalized numeric budget metadata. Phase 5 recognizes `remainingUsd` and `limitUsd` for policy management. The usage summary also recognizes legacy snake-case and monthly-budget aliases for display.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_routing_policies (
