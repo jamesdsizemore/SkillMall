@@ -2,6 +2,8 @@ import type {
   ProviderDiscoveryStrategy,
   ProviderRegistryEntry,
 } from './types'
+import { refreshProviderModelSource } from './model-sources'
+import type { SecretRef } from '../llm/router/types'
 
 export type ModelDiscoveryStatus =
   | 'live'
@@ -10,16 +12,22 @@ export type ModelDiscoveryStatus =
   | 'account_context_required'
   | 'cloud_project_context_required'
   | 'local_runtime_required'
+  | 'secret_required'
+  | 'source_backed_static'
   | 'manual_models'
   | 'static_fallback'
   | 'planned_source_review'
 
-export type ModelDiscoverySource = 'live' | 'manual' | 'fallback' | 'none'
+export type ModelDiscoverySource = 'live' | 'source_backed_static' | 'manual' | 'fallback' | 'none'
 
 export interface ModelDiscoveryOptions {
   baseUrl?: string
   apiKey?: string
+  secretRef?: SecretRef
+  project?: Record<string, string | undefined>
   manualModels?: string[]
+  fetchFn?: (input: string, init?: RequestInit) => Promise<Response>
+  now?: () => Date
 }
 
 export interface ModelDiscoveryResult {
@@ -48,10 +56,6 @@ export interface ModelDiscoveryPlan {
 
 function uniqueNonEmpty(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
-}
-
-function joinUrl(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 }
 
 function isModelObject(value: unknown): value is { id: string } {
@@ -110,9 +114,15 @@ export function modelDiscoveryPlanForEntry(entry: ProviderRegistryEntry): ModelD
     case 'local_runtime_models':
       return {
         ...base,
-        canRefreshNow: false,
+        canRefreshNow: true,
         requiresLocalRuntime: true,
-        message: 'Refresh requires a configured local runtime endpoint.',
+        message: 'Refresh uses the configured local runtime endpoint and provider-specific local API.',
+      }
+    case 'source_backed_static_models':
+      return {
+        ...base,
+        canRefreshNow: true,
+        message: 'Refresh uses source-backed static model labels; no live model-list endpoint is assumed.',
       }
     case 'manual_custom_models':
       return {
@@ -141,104 +151,28 @@ export async function discoverProviderModels(
   entry: ProviderRegistryEntry,
   options: ModelDiscoveryOptions = {}
 ): Promise<ModelDiscoveryResult> {
-  switch (entry.discoveryStrategy) {
-    case 'openai_compatible_models': {
-      if (!options.baseUrl) {
-        return {
-          strategy: entry.discoveryStrategy,
-          status: 'endpoint_required',
-          source: 'none',
-          authoritative: false,
-          models: [],
-          networkCalled: false,
-          message: 'A configured OpenAI-compatible base URL is required before probing models.',
-        }
-      }
+  const result = await refreshProviderModelSource({
+    providerRegistryId: entry.id,
+    baseURL: options.baseUrl,
+    apiKey: options.apiKey,
+    secretRef: options.secretRef,
+    project: options.project,
+    manualModels: options.manualModels,
+    fetchFn: options.fetchFn,
+    now: options.now,
+  })
 
-      const headers: Record<string, string> = {}
-      if (options.apiKey) headers.authorization = `Bearer ${options.apiKey}`
-      const response = await fetch(joinUrl(options.baseUrl, '/models'), { headers })
-      if (!response.ok) throw new Error(`Model discovery failed with HTTP ${response.status}`)
-
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'live',
-        source: 'live',
-        authoritative: true,
-        models: normalizeOpenAICompatibleModels(await response.json()),
-        networkCalled: true,
-      }
-    }
-    case 'official_provider_models':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'provider_specific_required',
-        source: 'none',
-        authoritative: false,
-        models: [],
-        networkCalled: false,
-        message: 'Provider-specific model discovery adapter required; no generic /v1/models call attempted.',
-      }
-    case 'account_scoped_models':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'account_context_required',
-        source: 'none',
-        authoritative: false,
-        models: [],
-        networkCalled: false,
-        message: 'Account context is required before model discovery.',
-      }
-    case 'cloud_project_scoped_models':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'cloud_project_context_required',
-        source: 'none',
-        authoritative: false,
-        models: [],
-        networkCalled: false,
-        message: 'Cloud project/resource/region/deployment context is required before model discovery.',
-      }
-    case 'local_runtime_models':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'local_runtime_required',
-        source: 'none',
-        authoritative: false,
-        models: [],
-        networkCalled: false,
-        message: 'A configured local runtime endpoint is required before model discovery.',
-      }
-    case 'manual_custom_models':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'manual_models',
-        source: 'manual',
-        authoritative: true,
-        models: uniqueNonEmpty(options.manualModels ?? []),
-        networkCalled: false,
-        message: 'Manual model labels are used unless the user explicitly probes the configured endpoint.',
-      }
-    case 'static_fallback_only':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'static_fallback',
-        source: 'fallback',
-        authoritative: false,
-        models: entry.fallbackModels,
-        networkCalled: false,
-        message: 'Static fallback labels are not authoritative live provider catalogs.',
-      }
-    case 'planned_provider_source_review':
-      return {
-        strategy: entry.discoveryStrategy,
-        status: 'planned_source_review',
-        source: 'none',
-        authoritative: false,
-        models: [],
-        networkCalled: false,
-        liveCallable: false,
-        message: entry.evidenceNote,
-      }
+  const discoveryResult: ModelDiscoveryResult = {
+    strategy: result.strategy,
+    status: result.status,
+    source: result.source,
+    authoritative: result.authoritative,
+    models: result.models.map((model) => model.modelId),
+    networkCalled: result.networkCalled,
   }
+
+  if (result.status === 'planned_source_review') discoveryResult.liveCallable = false
+  if (result.blocker) discoveryResult.message = result.blocker
+
+  return discoveryResult
 }

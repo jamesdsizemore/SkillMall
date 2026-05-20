@@ -58,6 +58,8 @@ describe('createRouterLLMClient', () => {
       {
         operation: 'skill.preview',
         providerId: 'openai',
+        providerRegistryId: 'openai',
+        executionKind: 'direct',
         modelId: 'gpt-4o-mini',
         authMode: 'env_key',
         routeBackend: 'direct',
@@ -246,6 +248,8 @@ describe('createRouterLLMClient', () => {
         requestId: 'request-1',
         eventType: 'provider.error',
         providerId: 'openai',
+        providerRegistryId: 'openai',
+        executionKind: 'direct',
         modelId: 'gpt-4o-mini',
         message: 'provider failed',
       },
@@ -312,6 +316,8 @@ describe('createRouterLLMClient', () => {
       {
         operation: 'skill.preview',
         providerId: 'openai',
+        providerRegistryId: 'openai',
+        executionKind: 'bifrost_local',
         modelId: 'gpt-4o-mini',
         authMode: 'gateway_virtual_key',
         routeBackend: 'bifrost_local',

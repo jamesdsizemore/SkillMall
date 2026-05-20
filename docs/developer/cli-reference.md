@@ -66,7 +66,7 @@ Raw `--key` values are rejected. Use `--key-env` or `--gateway-key-env` secret r
 
 The selected auth/config mode must match the selected Provider Center row. For example, `openai` cannot be configured as `local_cli_session`, and `anthropic` cannot be configured with `gateway_virtual_key_ref` unless a later approved phase changes that row's access modes.
 
-Executable Provider Center rows persist through the shared router config store. Registry-only rows such as `openrouter`, cloud/project rows, planned-source-review rows, and `custom_openai_compatible` return metadata/status output without widening executable `ProviderID` support or writing a runnable provider config.
+Executable Provider Center rows persist through the shared router config store. Registry-only OpenAI-compatible rows such as `openrouter`, `deepseek`, `kimi_moonshot`, and `custom_openai_compatible` can persist as registry targets through the shared OpenAI-compatible execution path without widening executable `ProviderID` support. Cloud/project rows and unsupported rows return metadata/status output until their required context or adapter support exists.
 
 **Examples:**
 
@@ -97,11 +97,19 @@ npx skill-mall configure --provider openai \
   --gateway-key-env BIFROST_VIRTUAL_KEY \
   --base-url http://localhost:8080/v1
 
-# Custom OpenAI-compatible metadata row (does not persist executable ProviderID)
+# OpenRouter registry target through the shared OpenAI-compatible execution path
+npx skill-mall configure \
+  --provider-registry-id openrouter \
+  --key-env OPENROUTER_API_KEY \
+  --base-url https://openrouter.ai/api/v1 \
+  --model openai/gpt-5
+
+# Custom OpenAI-compatible registry target
 npx skill-mall configure \
   --provider-registry-id custom_openai_compatible \
+  --key-env CUSTOM_LLM_API_KEY \
   --base-url http://localhost:1234/v1 \
-  --manual-models local-model-a,local-model-b
+  --model local-model-a
 ```
 
 **Expected output:**
@@ -118,15 +126,15 @@ npx skill-mall configure \
 
 ## providers
 
-Provider Center parity commands for catalog, status, model refresh, and safe readiness checks.
+Provider Center parity commands for catalog, status, model refresh, pricing refresh, and safe readiness checks.
 
 ```
-npx skill-mall providers <list|status|refresh-models|test> [options]
+npx skill-mall providers <list|status|refresh-models|refresh-pricing|test> [options]
 ```
 
 These commands use the shared Provider Center registry. The catalog includes OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The executable direct/router set remains `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`.
 
-Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. This currently includes Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
+Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. Source-backed/static rows and OpenAI-compatible registry targets may be configured only through the shared registry-target execution path; this does not add new executable `ProviderID` values.
 
 **Flags:**
 
@@ -136,14 +144,18 @@ Planned-source-review rows are visible but not live-callable until official evid
 | `--provider-registry-id <id>` | No | Provider Center registry row ID |
 | `--key-env <env>` | No | Environment variable reference for model refresh auth |
 | `--base-url <url>` | No | Endpoint for OpenAI-compatible model refresh |
+| `--source <name>` | No | Pricing source: `portkey_models` or `litellm_model_prices` |
+| `--model-ids <a,b>` | No | Limit pricing refresh to selected model IDs |
 | `--manual-models <a,b>` | No | Manual model labels for custom rows |
 | `--json` | No | Print machine-readable JSON |
 
 `providers list` prints all shared registry rows with Provider Center status, access label, and the active configured row marker.
 
-`providers status` shows the active provider status, or a selected row when `--provider` / `--provider-registry-id` is supplied.
+`providers status` shows the active provider status, or a selected row when `--provider` / `--provider-registry-id` is supplied. It includes the row's model source, cached model count, last checked timestamp, stale status, and source/discovery blocker.
 
 `providers refresh-models` uses the shared model-discovery contract. OpenAI-compatible rows can probe the active configured endpoint or an explicitly supplied `--base-url`; unconfigured registry rows return `endpoint_required` without probing public default endpoints. Provider-specific, cloud/project, local-runtime, static, manual, and planned-source-review rows return the correct status labels without assuming generic `/v1/models` support.
+
+`providers refresh-pricing` uses the same source-backed pricing normalization as the Provider Center API. The default source is Portkey Models for provider rows with a configured public pricing file. `--source litellm_model_prices` refreshes from LiteLLM's public model pricing file. Source license and source URL are printed with the snapshot count. Arbitrary source URL overrides are not accepted.
 
 `providers test` performs the same safe status/readiness check as Provider Center. It does not echo prompts, responses, raw secrets, browser tokens, session tokens, or credential files.
 
@@ -158,10 +170,14 @@ npx skill-mall providers refresh-models \
   --provider-registry-id custom_openai_compatible \
   --base-url http://localhost:1234/v1 \
   --manual-models local-model-a,local-model-b
+npx skill-mall providers refresh-pricing --provider openrouter
+npx skill-mall providers refresh-pricing \
+  --source litellm_model_prices \
+  --model-ids openai/gpt-5,anthropic/claude-sonnet-4
 npx skill-mall providers test --provider claude-code
 ```
 
-**Exit codes:** 0 on success, 1 on invalid provider, raw secret flag usage, or failed live model refresh.
+**Exit codes:** 0 on success, 1 on invalid provider, raw secret flag usage, failed live model refresh, or unsupported pricing source selection.
 
 ---
 

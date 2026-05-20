@@ -10,9 +10,11 @@ Secret-reference names must be environment-variable-style names, not paths. `OPE
 
 The Provider Center has a broad `ProviderRegistryID` catalog. It includes OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.
 
-The executable direct/router `ProviderID` set remains narrower: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows can appear in Provider Center and CLI status output without becoming live direct clients.
+The executable direct/router `ProviderID` set remains narrower: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows can appear in Provider Center and CLI status output without becoming direct clients.
 
-Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. This currently includes Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
+OpenAI-compatible registry rows such as OpenRouter, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, xAI, Together AI, Cerebras, DeepInfra, Alibaba/DashScope/Qwen, Z.AI, and custom endpoints execute through a generic SkillMall-owned OpenAI-compatible target. They do not get added as one-off `ProviderID` values.
+
+Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. Phase 4 promotes Alibaba/DashScope/Qwen and Z.AI as source-backed/configured OpenAI-compatible rows, Perplexity as a source-backed catalog row with execution still gated, and DeepInfra as a provider-specific model-list row with OpenAI-compatible execution profile. Ambiguous managed NVIDIA NIM variants remain out of scope.
 
 ## Executable Providers
 
@@ -54,6 +56,32 @@ npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.
 The web Provider Center uses the same contract: it records the environment variable name and status, never the API key value.
 
 Provider Center also enforces the selected provider row's allowed auth modes. API providers use API-key references, Claude Code uses `local_cli_session`, Ollama uses `none_local`, and gateway virtual-key configuration is available only on rows that explicitly support gateway access.
+
+## OpenAI-Compatible Registry Providers
+
+For registry providers that expose an OpenAI-compatible chat API, configure an environment variable reference and a base URL. SkillMall stores the target as `providerRegistryId` plus `executionKind: "openai_compatible"` in `~/.skill-mall/config.json`; it does not add a new `ProviderID` for each provider.
+
+```json
+{
+  "provider": "openai",
+  "activeProviderRegistryId": "openrouter",
+  "model": "openai/gpt-5-mini",
+  "providerTargets": {
+    "openrouter": {
+      "provider": "openai",
+      "providerRegistryId": "openrouter",
+      "executionKind": "openai_compatible",
+      "model": "openai/gpt-5-mini",
+      "authMode": "env_key",
+      "secretRef": { "type": "env", "name": "OPENROUTER_API_KEY" },
+      "gatewayBackend": "direct",
+      "baseURL": "https://openrouter.ai/api/v1"
+    }
+  }
+}
+```
+
+Provider rows that require user-specific regional/account endpoints, such as Alibaba/DashScope/Qwen and Z.AI, must be configured with an explicit base URL. SkillMall still uses source-backed static/manual model labels unless an official durable model-list endpoint is proven.
 
 ## Claude Code CLI
 
@@ -97,9 +125,21 @@ Bifrost local is an optional local gateway backend. It is not SkillMall's source
 ```json
 {
   "provider": "openai",
+  "activeProviderRegistryId": "openai",
   "model": "gpt-4o",
   "providers": {
     "openai": {
+      "model": "gpt-4o",
+      "authMode": "env_key",
+      "secretRef": { "type": "env", "name": "OPENAI_API_KEY" },
+      "gatewayBackend": "direct"
+    }
+  },
+  "providerTargets": {
+    "openai": {
+      "provider": "openai",
+      "providerRegistryId": "openai",
+      "executionKind": "direct",
       "model": "gpt-4o",
       "authMode": "env_key",
       "secretRef": { "type": "env", "name": "OPENAI_API_KEY" },

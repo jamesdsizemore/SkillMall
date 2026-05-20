@@ -154,6 +154,40 @@ describe('router provider config resolution', () => {
     })
   })
 
+  it('resolves active OpenAI-compatible registry targets without widening ProviderID', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        provider: 'openai',
+        activeProviderRegistryId: 'openrouter',
+        providerTargets: {
+          openrouter: {
+            provider: 'openai',
+            providerRegistryId: 'openrouter',
+            executionKind: 'openai_compatible',
+            model: 'openai/gpt-5-mini',
+            authMode: 'env_key',
+            secretRef: { type: 'env', name: 'OPENROUTER_API_KEY' },
+            gatewayBackend: 'direct',
+            baseURL: 'https://openrouter.ai/api/v1',
+          },
+        },
+      })
+    )
+
+    const config = resolveRouterProviderConfig()
+    expect(config).toMatchObject({
+      provider: 'openai',
+      providerRegistryId: 'openrouter',
+      executionKind: 'openai_compatible',
+      model: 'openai/gpt-5-mini',
+      authMode: 'env_key',
+      secretRef: { type: 'env', name: 'OPENROUTER_API_KEY' },
+      gatewayBackend: 'direct',
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+  })
+
   it('rejects remote bifrost local gateway base URLs in config files', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
@@ -253,6 +287,38 @@ describe('router provider config resolution', () => {
     expect(written).toContain('"type": "gateway_virtual_key_ref"')
     expect(written).toContain('"name": "BIFROST_VIRTUAL_KEY"')
     expect(written).not.toContain('redacted-virtual-key')
+  })
+
+  it('writes target-aware OpenAI-compatible registry config without raw keys', async () => {
+    vi.spyOn(fsPromises, 'readFile').mockRejectedValue(new Error('missing'))
+    vi.spyOn(fsPromises, 'mkdir').mockResolvedValue(undefined)
+    const writeFile = vi.spyOn(fsPromises, 'writeFile').mockResolvedValue(undefined)
+
+    const result = await writeProviderConfig({
+      provider: 'openai',
+      providerRegistryId: 'openrouter',
+      executionKind: 'openai_compatible',
+      model: 'openai/gpt-5-mini',
+      authMode: 'env_key',
+      secretRef: { type: 'env', name: 'OPENROUTER_API_KEY' },
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+
+    expect(result).toMatchObject({
+      provider: 'openai',
+      providerRegistryId: 'openrouter',
+      executionKind: 'openai_compatible',
+      model: 'openai/gpt-5-mini',
+      authMode: 'env_key',
+      secretRef: { type: 'env', name: 'OPENROUTER_API_KEY' },
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+    const written = String(writeFile.mock.calls[0]?.[1])
+    expect(written).toContain('"activeProviderRegistryId": "openrouter"')
+    expect(written).toContain('"providerTargets"')
+    expect(written).toContain('"executionKind": "openai_compatible"')
+    expect(written).toContain('"name": "OPENROUTER_API_KEY"')
+    expect(written).not.toContain('raw')
   })
 
   it('refuses to write remote bifrost local gateway base URLs', async () => {

@@ -14,6 +14,8 @@
 
 **Implementation prerequisite:** Phase 4 must start from updated `main` after the completed PR queue cleanup. `main` now includes Phase 3 PR #9 (`f288c6b`) and the older architecture/refactor PR queue through `bb03dc6`.
 
+**Implementation status:** Implementation is now being executed through `docs/goals/provider-auth-router-phase4/state.yaml`. T1001 through T1008 receipts record the current implemented behavior: source-backed model adapters, registry model snapshots, executable OpenAI-compatible registry targets, source-backed pricing refresh, Provider Center parity, and CLI parity. Sections labeled "Current Source Facts" below describe the pre-implementation Phase 3 baseline that Phase 4 was designed to change; the GoalBuddy receipts are the live status source during implementation.
+
 ---
 
 ## Approval Boundary
@@ -55,9 +57,9 @@ That was the right safety boundary for Phase 3. It is not the final product beha
 - Planned-source-review rows may become live only after current official docs or maintainer repos prove the exact model discovery and execution contract.
 - Incomplete work and blockers must be documented in the board receipts before handoff.
 
-## Current Source Facts
+## Current Source Facts At Phase 4 Start
 
-Phase 4 starts from updated `main` at or after `bb03dc6`, which includes Phase 3 PR #9 and the completed PR queue cleanup.
+Phase 4 started from updated `main` at or after `bb03dc6`, which includes Phase 3 PR #9 and the completed PR queue cleanup. The bullets in this section are the pre-implementation baseline, not the current post-T1008 implementation state.
 
 Important current files and limits:
 
@@ -212,6 +214,84 @@ Phase 4 must upgrade the existing Provider Center flows:
 - CLI provider commands use the same adapter contracts as the app, not a duplicated provider list.
 - Safe provider test remains metadata/readiness-only unless a provider is executable and configured.
 
+## T1003 Locked Implementation Contract
+
+The Phase 4 Judge rejected Worker release until the exact persistence and execution contracts were written into this plan and board. Workers must treat this section as binding.
+
+### Model Source Adapter Contract
+
+Add shared model-source adapters that return:
+
+- `providerRegistryId`
+- `modelId`
+- `displayName`
+- `source`: `live`, `source_backed_static`, `manual`, or `fallback`
+- `authoritative`
+- `sourceName`
+- `sourceUrl`
+- `fetchedAt`
+- `blocker`
+- sanitized `raw` metadata
+
+Inputs may include only `providerRegistryId`, `baseURL`, `secretRef`, account/project context, and `manualModels`. Generic `/v1/models` probing is allowed only for rows whose strategy is `openai_compatible_models` or explicitly configured custom OpenAI-compatible endpoints. Provider-specific, account-scoped, cloud-project, local-runtime, source-backed static, manual, and planned rows must not be probed generically.
+
+### Executable Registry Provider Contract
+
+Introduce `ProviderExecutionTarget` or `RouterExecutionTarget` with:
+
+- `providerRegistryId`
+- `executionKind`
+- optional `directProviderId`
+- `baseURL`
+- `model`
+- `authMode`
+- `secretRef`
+- `gatewayBackend`
+- `routingPolicyId`
+
+`ProviderID` remains narrow. Broad registry rows execute through `executionKind = openai_compatible`, not by adding one `ProviderID` value per provider row.
+
+### Config Store Contract
+
+`~/.skill-mall/config.json` becomes target-aware:
+
+- add `activeProviderRegistryId`
+- add `providerTargets` keyed by `ProviderRegistryID`
+- preserve legacy `provider` and `providers` migration/compatibility for direct providers
+- store only secret references
+- reject raw key/token/session/browser-token/credential-path/credential-file fields
+
+### Database And Ledger Contract
+
+Add migration `008_provider_auth_router_phase4.sql` to make registry identity explicit. Add `provider_registry_id` and `execution_kind` to `llm_provider_configs`, `llm_models`, `llm_pricing_snapshots`, `llm_requests`, and `llm_request_events` where appropriate. Rebuild constrained tables if SQLite requires it.
+
+`provider_id` may remain as legacy/direct adapter identity. `provider_registry_id` is the broad Provider Center identity. `execution_kind` distinguishes `direct`, `openai_compatible`, `bifrost_local`, `local_runtime`, `source_backed_static`, and blocked/status-only cases where needed.
+
+`startLLMRequest`, `finishLLMRequest`, and request-event inputs must carry `providerRegistryId` and `executionKind` when available. Ledger metadata must continue to strip prompt/response/request/response bodies and must never store raw secrets, browser/session tokens, credential paths, or copied credential material.
+
+### Pricing Source Contract
+
+Primary pricing source is Portkey Models repository/static JSON, not Portkey Gateway. Normalize Portkey `pricing_config.pay_as_you_go` / `batch_config` records, remembering that prices are in cents per token, into SkillMall `ModelPricing` values in USD per million tokens. Store source name, source URL, fetched timestamp, currency, hash, provider registry ID, and license evidence.
+
+LiteLLM `model_prices_and_context_window.json` is fallback/reference only. Provider docs are supplemental only when data can be normalized and maintained. No hosted gateway API key, hosted dashboard, or paid external app may be required for pricing refresh.
+
+### Provider Promotion And Blocker Contract
+
+Promote in Phase 4:
+
+- Anthropic, Gemini, Cohere, and Ollama through provider-specific/local adapters.
+- DeepInfra through official models-list schema normalization.
+- Perplexity for source-backed model/pricing discovery, with execution gated until tested against supported API semantics.
+
+Keep bounded or blocked:
+
+- Fireworks remains account-scoped until account context exists.
+- Alibaba/DashScope and Z.AI may be executable through configured OpenAI-compatible endpoints, but use source-backed static/manual discovery unless a durable official model-list endpoint is proven.
+- Bifrost remains optional local gateway, not required infrastructure or source of truth.
+- GoModel remains reference only.
+- AWS Bedrock, Azure OpenAI, and Google Vertex require cloud/project context.
+- Replicate remains limited/status-only unless stable official discovery is implemented.
+
 ## Out Of Scope For Phase 4
 
 - Hosted gateway setup as required infrastructure.
@@ -275,12 +355,15 @@ Likely creates:
   - Request/response, secret reference, usage/cost, error, and no prompt/response ledger leakage tests.
 - `app/api/providers/pricing/refresh/route.ts`
   - Manual pricing refresh endpoint.
+- `db/migrations/008_provider_auth_router_phase4.sql`
+  - Adds registry identity and execution-kind columns required by Phase 4.
 
 Likely modifies:
 
 - `lib/providers/types.ts`
 - `lib/providers/registry.ts`
 - `lib/providers/model-discovery.ts`
+- `lib/providers/model-sources.ts`
 - `lib/providers/config-store.ts`
 - `lib/providers/catalog.ts`
 - `lib/providers/index.ts`
@@ -290,6 +373,7 @@ Likely modifies:
 - `lib/llm/router/model-refresh.ts`
 - `lib/llm/router/pricing-refresh.ts`
 - `lib/llm/router/request-ledger.ts`
+- `lib/llm/router/usage-summary.ts`
 - `app/api/providers/route.ts`
 - `app/api/providers/configure/route.ts`
 - `app/api/providers/models/refresh/route.ts`
@@ -411,7 +495,9 @@ npm test -- lib/providers/model-sources lib/providers/__tests__/model-discovery.
 
 **Files:**
 
+- Create or modify `db/migrations/008_provider_auth_router_phase4.sql`
 - Modify `lib/llm/router/model-refresh.ts`
+- Modify `lib/llm/router/__tests__/model-refresh.test.ts`
 - Modify `app/api/providers/models/refresh/route.ts`
 - Modify `app/api/providers/route.ts`
 - Modify `app/api/providers/__tests__/providers-route.test.ts`
@@ -421,6 +507,7 @@ npm test -- lib/providers/model-sources lib/providers/__tests__/model-discovery.
 - [ ] Write route tests proving registry-only rows can refresh and persist model snapshots when source-backed.
 - [ ] Write route tests proving planned rows return blockers without writes.
 - [ ] Write tests proving `llm_models.raw_json` strips key/token/secret-like fields.
+- [ ] Write tests proving `provider_registry_id` and `execution_kind` are persisted for registry model snapshots.
 - [ ] Write tests proving `GET /api/providers` returns model count, source, timestamp, stale flag, and blocker/status.
 - [ ] Implement persistent refresh for registry model sources.
 - [ ] Preserve existing direct/Bifrost refresh behavior.
@@ -438,15 +525,19 @@ npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers/__t
 
 - Create or modify `lib/llm/router/openai-compatible-client.ts`
 - Create `lib/llm/router/__tests__/openai-compatible-client.test.ts`
+- Create or modify `db/migrations/008_provider_auth_router_phase4.sql`
 - Modify `lib/llm/router/types.ts`
 - Modify `lib/llm/router/config.ts`
 - Modify `lib/llm/router/create-client.ts`
+- Modify `lib/llm/router/request-ledger.ts`
+- Modify `lib/llm/router/usage-summary.ts`
 - Modify `lib/providers/config-store.ts`
 - Modify `lib/providers/index.ts`
 - Modify `app/api/providers/configure/route.ts`
 - Modify `app/api/providers/test/route.ts`
 - Modify `app/api/providers/__tests__/providers-route.test.ts`
 - Modify `docs/reference/provider-catalog.md`
+- Modify `docs/reference/database-schema.md`
 - Modify `docs/user/configuring-providers.md`
 
 - [ ] Write tests proving OpenRouter/DeepSeek/Mistral-style registry rows persist executable config through the generic OpenAI-compatible backend.
@@ -454,6 +545,7 @@ npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers/__t
 - [ ] Write tests proving configured base URL and secret ref are required for endpoint-required rows.
 - [ ] Write tests proving raw key/token/path fields are rejected.
 - [ ] Write tests proving request ledger rows include registry provider ID, model ID, route backend, auth mode, usage, latency, and estimated/actual cost labels without prompt/response bodies.
+- [ ] Write tests proving provider configs are target-aware with `activeProviderRegistryId` and `providerTargets` while preserving legacy direct-provider compatibility.
 - [ ] Implement the generic execution path.
 - [ ] Keep existing direct providers working.
 - [ ] Run focused router/API tests.
@@ -470,7 +562,9 @@ npm test -- lib/llm/router/__tests__/openai-compatible-client.test.ts lib/llm/ro
 
 - Create `lib/providers/pricing-sources.ts`
 - Create `lib/providers/__tests__/pricing-sources.test.ts`
+- Create or modify `db/migrations/008_provider_auth_router_phase4.sql`
 - Modify `lib/llm/router/pricing-refresh.ts`
+- Modify `lib/llm/router/__tests__/pricing-refresh.test.ts`
 - Create `app/api/providers/pricing/refresh/route.ts`
 - Modify `app/api/providers/usage/route.ts`
 - Modify `app/api/providers/__tests__/providers-route.test.ts`
@@ -480,6 +574,7 @@ npm test -- lib/llm/router/__tests__/openai-compatible-client.test.ts lib/llm/ro
 - [ ] Write fixture tests for the selected pricing source schema.
 - [ ] Write tests proving no hosted gateway API key is required for pricing refresh.
 - [ ] Write tests proving model/pricing records store source URL, source name, timestamp, hash, currency, input/output/cache/reasoning prices where present.
+- [ ] Write tests proving `provider_registry_id` and `execution_kind` are stored for pricing snapshots.
 - [ ] Write tests proving pricing refresh is cache-first and failure-tolerant.
 - [ ] Implement pricing source normalization into `ModelPricing`.
 - [ ] Implement manual pricing refresh route.

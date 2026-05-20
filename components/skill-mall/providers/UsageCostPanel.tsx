@@ -1,4 +1,4 @@
-import type { UsageResponse } from "./ProviderCenter";
+import type { ProviderActionState, UsageResponse } from "./ProviderCenter";
 
 type RichUsageSummary = {
   request_count: number;
@@ -55,9 +55,13 @@ function formatLatency(value: number | null | undefined): string {
 export function UsageCostPanel({
   usage,
   activeProviderId,
+  pricingState,
+  onRefreshPricing,
 }: {
   usage: UsageResponse;
   activeProviderId: string | null;
+  pricingState?: ProviderActionState;
+  onRefreshPricing?: () => void;
 }) {
   const richUsage = usage as RichUsageResponse;
   const summary = richUsage.summary;
@@ -84,6 +88,28 @@ export function UsageCostPanel({
         </div>
         <p className="border border-sm-border px-2 py-1 text-[9px] tracking-widest text-sm-secondary font-label">
           [ {activeProviderId ? activeProviderId.toUpperCase() : "ALL PROVIDERS"} ]
+        </p>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-3 border border-sm-border-subtle px-3 py-2">
+        <button
+          type="button"
+          onClick={onRefreshPricing}
+          disabled={!onRefreshPricing || pricingState?.status === "running"}
+          className="border border-sm-border px-3 py-1.5 text-[9px] tracking-widest text-sm-secondary transition-colors hover:border-sm-display hover:text-sm-display disabled:opacity-30 font-label"
+        >
+          {pricingState?.status === "running" ? "[ REFRESHING PRICING... ]" : "[ REFRESH PRICING ]"}
+        </button>
+        <p
+          className={`text-[9px] tracking-widest font-label ${
+            pricingState?.status === "error"
+              ? "text-sm-accent"
+              : pricingState?.status === "success"
+                ? "text-sm-blue"
+                : "text-sm-secondary"
+          }`}
+        >
+          [ PRICING SOURCE: {(pricingState?.message ?? "source-backed snapshots; local estimates remain separate from actual spend").toUpperCase()} ]
         </p>
       </div>
 

@@ -10,6 +10,18 @@ function StateLine({ label, state }: { label: string; state: ProviderActionState
   );
 }
 
+function formatCheckedAt(value: string | null | undefined): string {
+  if (!value) return "never";
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(parsed));
+}
+
 export function ModelRefreshPanel({
   provider,
   refreshState,
@@ -38,6 +50,7 @@ export function ModelRefreshPanel({
   const testDisabled = testState.status === "running";
   const models = provider.modelStatus.models.slice(0, 8);
   const activeModel = provider.configStatus.activeModel ?? "model pending";
+  const modelCount = provider.modelStatus.modelCount ?? provider.modelStatus.models.length;
 
   return (
     <section className="border border-sm-border bg-sm-surface p-4">
@@ -51,7 +64,7 @@ export function ModelRefreshPanel({
         </p>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid gap-2 sm:grid-cols-4">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ STRATEGY ]</p>
           <p className="truncate text-sm text-sm-primary">{provider.modelStatus.strategy.replace(/_/g, " ")}</p>
@@ -59,6 +72,10 @@ export function ModelRefreshPanel({
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ ACTIVE MODEL ]</p>
           <p className="truncate text-sm text-sm-primary">{provider.configStatus.configured ? activeModel : "not configured"}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ MODEL COUNT ]</p>
+          <p className="truncate text-sm text-sm-primary">{modelCount}</p>
         </div>
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ SECRET STATUS ]</p>
@@ -69,6 +86,23 @@ export function ModelRefreshPanel({
                 : "reference missing"
               : "not configured"}
           </p>
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ LAST CHECKED ]</p>
+          <p className="truncate text-sm text-sm-primary">{formatCheckedAt(provider.modelStatus.lastCheckedAt)}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ CACHE STATE ]</p>
+          <p className={`truncate text-sm ${provider.modelStatus.stale ? "text-sm-accent" : "text-sm-primary"}`}>
+            {provider.modelStatus.stale ? "stale or fallback" : "fresh source cache"}
+          </p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ BLOCKER ]</p>
+          <p className="truncate text-sm text-sm-primary">{provider.modelStatus.blocker ?? "none recorded"}</p>
         </div>
       </div>
 

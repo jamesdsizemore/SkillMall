@@ -18,16 +18,18 @@ import {
   getProviderRegistryEntry,
   providerRegistryIdForExecutableProvider,
 } from './registry'
-import type { GatewayBackend, LLMAuthMode, SecretRef } from '../llm/router/types'
+import type { GatewayBackend, LLMAuthMode, RouterExecutionKind, SecretRef } from '../llm/router/types'
 import { DEFAULT_MODELS } from './defaults'
-import type { ProviderID } from './types'
+import type { ProviderID, ProviderRegistryID } from './types'
 
 export const USER_CONFIG_PATH = path.join(os.homedir(), '.skill-mall', 'config.json')
 
 type RawProviderConfig = {
   provider?: ProviderID
+  activeProviderRegistryId?: ProviderRegistryID
   model?: string
   providers?: Record<string, StoredRouterProviderConfig>
+  providerTargets?: Record<string, StoredRouterProviderConfig>
 }
 
 async function readRawConfig(): Promise<RawProviderConfig> {
@@ -40,6 +42,8 @@ async function readRawConfig(): Promise<RawProviderConfig> {
 
 export async function writeProviderConfig(input: {
   provider: ProviderID
+  providerRegistryId?: ProviderRegistryID
+  executionKind?: RouterExecutionKind
   authMode?: LLMAuthMode
   secretRef?: SecretRef
   keyEnv?: string
@@ -50,6 +54,8 @@ export async function writeProviderConfig(input: {
   routingPolicyId?: string
 }): Promise<{
   provider: ProviderID
+  providerRegistryId: ProviderRegistryID
+  executionKind: RouterExecutionKind
   authMode: LLMAuthMode
   secretRef?: SecretRef
   apiKey?: undefined
@@ -65,19 +71,24 @@ export async function writeProviderConfig(input: {
 
   const existing = await readRawConfig()
   const providers = existing.providers ?? {}
+  const providerTargets = existing.providerTargets ?? {}
   const previousProviderConfig = providers[input.provider] ?? {}
-  const model = input.model ?? previousProviderConfig.model ?? DEFAULT_MODELS[input.provider]
+  const providerRegistryId = input.providerRegistryId ?? providerRegistryIdForExecutableProvider(input.provider)
+  const previousTargetConfig = providerTargets[providerRegistryId] ?? {}
+  const previousConfig = { ...previousProviderConfig, ...previousTargetConfig }
+  const model = input.model ?? previousConfig.model ?? DEFAULT_MODELS[input.provider]
   const authMode = assertRouterAuthMode(input.authMode ?? defaultAuthModeForProvider(input.provider))
-  const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(input.provider))
+  const registryEntry = getProviderRegistryEntry(providerRegistryId)
   if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
-  const gatewayBackend = assertRouterGatewayBackend(input.gatewayBackend ?? previousProviderConfig.gatewayBackend)
+  const gatewayBackend = assertRouterGatewayBackend(input.gatewayBackend ?? previousConfig.gatewayBackend)
+  const executionKind = input.executionKind ?? (gatewayBackend === 'bifrost_local' ? 'bifrost_local' : 'direct')
   const baseURL =
     input.baseURL ??
-    (gatewayBackend === 'bifrost_local' ? previousProviderConfig.baseURL : undefined)
+    (gatewayBackend === 'bifrost_local' || executionKind === 'openai_compatible' ? previousConfig.baseURL : undefined)
   if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(baseURL)
   const rawSecretRef =
     input.secretRef ??
-    (input.keyEnv ? { type: 'env', name: input.keyEnv } : previousProviderConfig.secretRef) ??
+    (input.keyEnv ? { type: 'env', name: input.keyEnv } : previousConfig.secretRef) ??
     (authMode === 'env_key'
       ? defaultSecretRefForProvider(input.provider)
       : authMode === 'gateway_virtual_key'
@@ -87,6 +98,8 @@ export async function writeProviderConfig(input: {
 
   const safePreviousProviderConfig = { ...previousProviderConfig }
   delete safePreviousProviderConfig.apiKey
+  const safePreviousTargetConfig = { ...previousTargetConfig }
+  delete safePreviousTargetConfig.apiKey
 
   providers[input.provider] = {
     ...safePreviousProviderConfig,
@@ -98,15 +111,41 @@ export async function writeProviderConfig(input: {
     ...(input.routingPolicyId ? { routingPolicyId: input.routingPolicyId } : {}),
   }
 
+  providerTargets[providerRegistryId] = {
+    ...safePreviousTargetConfig,
+    provider: input.provider,
+    providerRegistryId,
+    executionKind,
+    model,
+    authMode,
+    secretRef,
+    gatewayBackend,
+    ...(baseURL ? { baseURL } : { baseURL: undefined }),
+    ...(input.routingPolicyId ? { routingPolicyId: input.routingPolicyId } : {}),
+  }
+
   await fs.mkdir(path.dirname(USER_CONFIG_PATH), { recursive: true })
   await fs.writeFile(
     USER_CONFIG_PATH,
-    JSON.stringify({ ...existing, provider: input.provider, model, providers }, null, 2) + '\n',
+    JSON.stringify(
+      {
+        ...existing,
+        provider: input.provider,
+        activeProviderRegistryId: providerRegistryId,
+        model,
+        providers,
+        providerTargets,
+      },
+      null,
+      2
+    ) + '\n',
     'utf-8'
   )
 
   return {
     provider: input.provider,
+    providerRegistryId,
+    executionKind,
     authMode,
     secretRef,
     apiKey: undefined,

@@ -11,6 +11,7 @@ function provider(overrides: Partial<ProviderRow>): ProviderRow {
     name: "OpenAI API",
     accessModes: ["api_access", "gateway_virtual_key"],
     accessLabel: "API access or gateway access",
+    authLabel: "Environment variable API key reference",
     setupUrl: "https://example.com/setup",
     officialSourceUrl: "https://example.com/source",
     discoveryStrategy: "openai_compatible_models",
@@ -42,6 +43,9 @@ function provider(overrides: Partial<ProviderRow>): ProviderRow {
       source: "fallback",
       authoritative: false,
       stale: true,
+      modelCount: 1,
+      lastCheckedAt: null,
+      blocker: "Refresh by probing the configured models endpoint.",
       models: ["model-a"],
       refresh: {
         strategy: "openai_compatible_models",
@@ -69,6 +73,7 @@ const providersResponse: ProvidersResponse = {
   configured: true,
   activeProvider: "openai",
   activeProviderRegistryId: "openai",
+  executionKind: "direct",
   activeModel: "model-a",
   authMode: "env_key",
   gatewayBackend: "direct",
@@ -200,6 +205,11 @@ describe("Provider Center UI", () => {
     expect(html).toContain("Gateway access");
     expect(html).toContain("Cloud project");
     expect(html).toContain("Custom OpenAI-compatible");
+    expect(html).toContain("AUTH CONTRACT");
+    expect(html).toContain("MODEL COUNT");
+    expect(html).toContain("LAST CHECKED");
+    expect(html).toContain("CACHE STATE");
+    expect(html).toContain("BLOCKER");
   });
 
   it("does not render raw secret fields or unsafe credential prompts", () => {
@@ -218,6 +228,8 @@ describe("Provider Center UI", () => {
 
     expect(html).toContain("ACTUAL COST USD");
     expect(html).toContain("ESTIMATED COST USD");
+    expect(html).toContain("REFRESH PRICING");
+    expect(html).toContain("PRICING SOURCE");
     expect(html).toContain("provider_or_gateway_reported_actual_cost");
     expect(html).toContain("locally_estimated_cost");
   });
@@ -318,7 +330,7 @@ describe("Provider Center UI", () => {
     );
 
     expect(html).toContain("GATEWAY VIRTUAL-KEY REF NAME");
-    expect(html).toContain("LOCAL ENDPOINT / BASE URL");
+    expect(html).toContain("OPENAI-COMPATIBLE BASE URL");
     expect(html).toContain("MODEL LABEL");
     expect(html).toContain("MANUAL MODEL LABELS");
     expect(html).toContain("ROUTING POLICY");

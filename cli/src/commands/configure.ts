@@ -4,6 +4,7 @@ import {
   PROVIDER_REGISTRY,
   assertAuthModeAllowedForProvider,
   getProviderRegistryEntry,
+  providerRegistryIdForExecutableProvider,
 } from "../../../lib/providers/registry";
 import { discoverProviderModels } from "../../../lib/providers/model-discovery";
 import { writeProviderConfig } from "../../../lib/providers/config-store";
@@ -107,6 +108,12 @@ function registryEntryForExecutableProvider(provider: ProviderID): ProviderRegis
   return entry;
 }
 
+function registryExecutionProvider(entry: ProviderRegistryEntry): ProviderID | null {
+  if (entry.executableProviderId) return entry.executableProviderId;
+  if (entry.gatewayProfile?.kind === "openai_compatible") return "openai";
+  return null;
+}
+
 function authModeFromFlags(
   flags: ConfigureArgs,
   entry: ProviderRegistryEntry,
@@ -179,6 +186,60 @@ async function configureNonInteractive(flags: ConfigureArgs): Promise<void> {
   const resolvedAuthMode = authMode ?? (provider ? defaultAuthModeForProvider(provider) : undefined);
   if (resolvedAuthMode) assertAuthModeAllowedForProvider(entry, resolvedAuthMode);
   if (authMode) validateSecretRefForAuthMode(authMode, secretRef);
+
+  const openAICompatibleExecutionProvider = registryExecutionProvider(entry);
+  const directProviderMatch = Boolean(provider && entry.executableProviderId === provider);
+  const canPersistRegistryTarget = Boolean(
+    !directProviderMatch &&
+      openAICompatibleExecutionProvider &&
+      entry.gatewayProfile?.kind === "openai_compatible" &&
+      (authMode ?? "env_key") === "env_key"
+  );
+  const resolvedBaseURL =
+    flags.baseURL ?? (entry.gatewayProfile?.requiresUserEndpoint ? undefined : entry.gatewayProfile?.defaultBaseUrl);
+
+  if (canPersistRegistryTarget && !resolvedBaseURL) {
+    console.error(pc.red("  OpenAI-compatible registry execution requires --base-url for this provider row."));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (canPersistRegistryTarget && !secretRef) {
+    console.error(pc.red("  OpenAI-compatible registry execution requires --key-env ENV_VAR_NAME."));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (canPersistRegistryTarget && openAICompatibleExecutionProvider) {
+    const saved = await writeProviderConfig({
+      provider: openAICompatibleExecutionProvider,
+      providerRegistryId: entry.id,
+      executionKind:
+        entry.id === providerRegistryIdForExecutableProvider(openAICompatibleExecutionProvider)
+          ? "direct"
+          : "openai_compatible",
+      model: flags.model,
+      authMode: "env_key",
+      secretRef,
+      gatewayBackend,
+      baseURL: resolvedBaseURL,
+      routingPolicyId: flags.routingPolicyId,
+    });
+
+    console.log(pc.green("  Provider configured: ") + `${entry.name} (${saved.providerRegistryId}) / ${saved.model}`);
+    console.log(`  Execution: ${saved.executionKind} via ${saved.provider}`);
+    console.log(`  Config written to: ${saved.path}`);
+    console.log(`  Access: ${entry.accessLabel}`);
+    if (saved.secretRef) {
+      const status = secretStatus(saved.secretRef);
+      console.log(
+        `  Secret: ${saved.secretRef.type}` +
+          ("name" in saved.secretRef ? ` ${saved.secretRef.name}` : "") +
+          (status ? ` (${status.valuePresent ? "present" : "missing"})` : "")
+      );
+    }
+    return;
+  }
 
   if (provider) {
     const saved = await writeProviderConfig({

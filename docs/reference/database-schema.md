@@ -2,7 +2,7 @@
 
 SkillMall Phase 2 uses SQLite via `better-sqlite3`. No cloud database. No Supabase. The database file lives at `data/skillmall.db` (gitignored) and is created automatically on first run.
 
-Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. Phase 2 expands those tables for local Bifrost gateway execution, model refresh, pricing snapshots, and routing-policy evaluation. Phase 3 exposes those records through the Provider Center, model refresh/status actions, safe provider tests, and grouped usage/cost summaries. These tables are local-only and do not introduce a hosted gateway, hosted observability service, or cloud database.
+Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. Phase 2 expands those tables for local Bifrost gateway execution, model refresh, pricing snapshots, and routing-policy evaluation. Phase 3 exposes those records through the Provider Center, model refresh/status actions, safe provider tests, and grouped usage/cost summaries. Phase 4 adds explicit `provider_registry_id` and `execution_kind` metadata so broad Provider Center rows can cache models/pricing without widening the narrow executable `ProviderID` union. These tables are local-only and do not introduce a hosted gateway, hosted observability service, or cloud database.
 
 The database stores provider IDs, auth modes, secret references, model snapshots, pricing snapshots, request metadata, and routing/budget state. It must not store raw ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, raw API key values, or credential-file paths.
 
@@ -138,6 +138,8 @@ Reserved future auth/gateway modes such as `codex_session`, `oauth_device_flow`,
 CREATE TABLE IF NOT EXISTS llm_provider_configs (
   id TEXT PRIMARY KEY,
   provider_id TEXT NOT NULL,
+  provider_registry_id TEXT,
+  execution_kind TEXT NOT NULL DEFAULT 'direct',
   auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key')),
   secret_ref_type TEXT CHECK (secret_ref_type IS NULL OR secret_ref_type IN ('env', 'none', 'gateway_virtual_key_ref')),
   secret_ref TEXT,
@@ -156,12 +158,14 @@ The migration also enforces auth/secret pairing: `env_key` requires an env secre
 
 ### llm_models
 
-Caches model metadata by provider. Phase 3 model refresh follows each Provider Center row's declared `discoveryStrategy`. OpenAI-compatible rows may probe configured endpoints, provider-specific rows require dedicated adapters, cloud-project rows require project/resource context, local runtime rows require local runtime status, manual rows use manual labels, and planned-source-review rows are visible but not live-callable. Static provider defaults remain fallbacks only.
+Caches model metadata by provider. Phase 4 model refresh follows each Provider Center row's declared `discoveryStrategy`. OpenAI-compatible rows may probe configured endpoints, implemented provider-specific rows use official provider adapters, cloud-project rows require project/resource context, local runtime rows require local runtime endpoints, source-backed static rows use documented/static labels, manual rows use manual labels, and planned-source-review rows are visible but not live-callable. Static provider defaults remain fallbacks only.
 
 ```sql
 CREATE TABLE IF NOT EXISTS llm_models (
   id TEXT PRIMARY KEY,
   provider_id TEXT NOT NULL,
+  provider_registry_id TEXT NOT NULL,
+  execution_kind TEXT NOT NULL DEFAULT 'direct',
   model_id TEXT NOT NULL,
   display_name TEXT,
   capabilities_json TEXT NOT NULL DEFAULT '{}',
@@ -172,7 +176,7 @@ CREATE TABLE IF NOT EXISTS llm_models (
   raw_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(provider_id, model_id)
+  UNIQUE(provider_registry_id, model_id)
 );
 ```
 
@@ -180,7 +184,7 @@ CREATE TABLE IF NOT EXISTS llm_models (
 
 ### llm_pricing_snapshots
 
-Stores local pricing snapshots for cost estimation. Phase 1 does not implement provider-wide automatic price refresh.
+Stores local pricing snapshots for cost estimation. Phase 4 can populate these rows from source-backed public pricing data. Portkey Models repository/static JSON is the primary source; LiteLLM model pricing JSON is fallback/reference data. Neither source requires hosted gateway credentials.
 
 Phase 2 uses these rows for local estimated-cost calculation when a provider or selected gateway does not report an exact request cost. Provider/gateway-reported costs are recorded as `actual_cost_usd`; locally calculated costs are recorded as `estimated_cost_usd` and must never be presented as exact spend.
 
@@ -188,6 +192,8 @@ Phase 2 uses these rows for local estimated-cost calculation when a provider or 
 CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_id TEXT NOT NULL,
+  provider_registry_id TEXT,
+  execution_kind TEXT,
   model_id TEXT NOT NULL,
   pricing_json TEXT NOT NULL,
   currency TEXT NOT NULL DEFAULT 'USD',
@@ -197,6 +203,8 @@ CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
   hash TEXT
 );
 ```
+
+`pricing_json` stores normalized USD-per-million token fields and may include source license evidence such as `sourceLicense`. `provider_registry_id` and `execution_kind` preserve broad Provider Center attribution separately from the legacy/direct `provider_id`.
 
 ---
 
@@ -243,6 +251,8 @@ CREATE TABLE IF NOT EXISTS llm_requests (
   id TEXT PRIMARY KEY,
   operation TEXT NOT NULL,
   provider_id TEXT NOT NULL,
+  provider_registry_id TEXT,
+  execution_kind TEXT,
   model_id TEXT,
   route_backend TEXT NOT NULL DEFAULT 'direct' CHECK (route_backend IN ('direct', 'bifrost_local')),
   auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key')),
@@ -275,6 +285,8 @@ CREATE TABLE IF NOT EXISTS llm_request_events (
   request_id TEXT NOT NULL REFERENCES llm_requests(id),
   event_type TEXT NOT NULL,
   provider_id TEXT,
+  provider_registry_id TEXT,
+  execution_kind TEXT,
   model_id TEXT,
   message TEXT,
   metadata_json TEXT NOT NULL DEFAULT '{}',

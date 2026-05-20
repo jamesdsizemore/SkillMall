@@ -9,9 +9,11 @@ import { defaultAuthModeForProvider } from './config'
 import type { LLMRequestFinishInput, LLMRequestStartInput } from './types'
 import type { CompletionOptions, LLMClient, ProviderConfig } from '../../providers/types'
 import { createGatewayLLMClient, type GatewayBackedLLMClient, type GatewayLLMClientFactory } from './gateway-client'
+import { createOpenAICompatibleLLMClient } from './openai-compatible-client'
 import { getLatestPricingSnapshot, type PricingSnapshotRecord } from './pricing-refresh'
 import { resolveRequestCost } from './costing'
 import { evaluateRoutingPolicy, loadRoutingPolicy, RoutingPolicyError, type RoutingDecision, type RoutingPolicy } from './routing-policy'
+import { providerRegistryIdForExecutableProvider } from '../../providers/registry'
 
 export type DirectLLMClientFactory = (config: ProviderConfig) => LLMClient
 export type PricingSnapshotLookup = (
@@ -57,6 +59,8 @@ export function createRouterLLMClient(
   const selectedConfig = routingDecision.config
   const authMode = assertRouterAuthMode(selectedConfig.authMode ?? defaultAuthModeForProvider(selectedConfig.provider))
   const routeBackend = assertRouterGatewayBackend(selectedConfig.gatewayBackend)
+  const providerRegistryId = selectedConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(selectedConfig.provider)
+  const executionKind = selectedConfig.executionKind ?? (routeBackend === 'bifrost_local' ? 'bifrost_local' : 'direct')
 
   return {
     provider: selectedConfig.provider,
@@ -64,6 +68,8 @@ export function createRouterLLMClient(
       const started = ledger.start({
         operation: options?.operation ?? 'unknown',
         providerId: selectedConfig.provider,
+        providerRegistryId,
+        executionKind,
         modelId: selectedConfig.model,
         authMode,
         routeBackend,
@@ -88,7 +94,9 @@ export function createRouterLLMClient(
 
       try {
         const executionClient =
-          routeBackend === 'direct'
+          executionKind === 'openai_compatible'
+            ? createOpenAICompatibleLLMClient({ ...selectedConfig, authMode, executionKind, providerRegistryId })
+            : routeBackend === 'direct'
             ? directFactory(selectedConfig)
             : gatewayFactory({ ...selectedConfig, authMode, gatewayBackend: routeBackend })
 
@@ -97,7 +105,9 @@ export function createRouterLLMClient(
             prompt,
             options
           )
-          const pricing = pricingLookup(selectedConfig.provider, selectedConfig.model)
+          const pricing =
+            pricingLookup(providerRegistryId, selectedConfig.model) ??
+            pricingLookup(selectedConfig.provider, selectedConfig.model)
           const resolvedCost = resolveRequestCost({
             providerReportedCostUsd: output.actualCostUsd,
             usage: output.usage,
@@ -130,6 +140,8 @@ export function createRouterLLMClient(
           requestId: started.requestId,
           eventType: 'provider.error',
           providerId: selectedConfig.provider,
+          providerRegistryId,
+          executionKind,
           modelId: selectedConfig.model,
           message: errorMessageFor(error),
         })

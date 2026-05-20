@@ -105,7 +105,7 @@ In the browser wizard, Stage 3 can run by itself through `/api/preview-skill` so
 
 ## Shared Infrastructure
 
-- **Provider abstraction** (`lib/providers/`): Provider Center registry plus executable LLM clients. The broad `ProviderRegistryID` catalog includes API, gateway, local runtime, cloud-project, and custom OpenAI-compatible rows; executable `ProviderID` clients remain limited to implemented direct/router providers (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`). Model refresh follows each row's declared discovery strategy and does not assume universal `/v1/models` support.
+- **Provider abstraction** (`lib/providers/`): Provider Center registry plus executable LLM clients. The broad `ProviderRegistryID` catalog includes API, gateway, local runtime, cloud-project, and custom OpenAI-compatible rows; executable `ProviderID` clients remain limited to implemented direct/router providers (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`). OpenAI-compatible registry rows execute through a shared registry-target path with `providerRegistryId` and `executionKind`, not through widened `ProviderID` values. Model refresh follows each row's declared discovery strategy and does not assume universal `/v1/models` support.
 - **Validators** (`lib/validators.ts`): all Zod schemas for LLM output validation
 - **Quality Score** (`lib/quality-score.ts`): 5-dimension 0-100 rubric computed at catalog build time
 

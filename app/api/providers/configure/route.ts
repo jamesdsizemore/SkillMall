@@ -11,12 +11,13 @@ import { assertLocalBifrostBaseURL } from '@/lib/llm/router/gateway-adapter'
 import {
   assertAuthModeAllowedForProvider,
   getProviderRegistryEntry,
+  PROVIDER_REGISTRY,
   providerRegistryIdForExecutableProvider,
 } from '@/lib/providers/registry'
 import { discoverProviderModels } from '@/lib/providers/model-discovery'
 import { defaultAuthModeForProvider } from '@/lib/llm/router/config'
 import type { LLMAuthMode, SecretRef } from '@/lib/llm/router/types'
-import type { ProviderID } from '@/lib/providers/types'
+import type { ProviderID, ProviderRegistryID } from '@/lib/providers/types'
 
 const executableProviders = new Set<ProviderID>([
   'openai',
@@ -27,35 +28,7 @@ const executableProviders = new Set<ProviderID>([
   'ollama',
 ])
 
-const registryIds = [
-  'openai',
-  'anthropic',
-  'claude_code',
-  'gemini',
-  'groq',
-  'ollama',
-  'openrouter',
-  'alibaba_dashscope_qwen',
-  'huggingface',
-  'zai',
-  'minimax',
-  'kimi_moonshot',
-  'deepseek',
-  'mistral',
-  'cohere',
-  'xai',
-  'aws_bedrock',
-  'azure_openai',
-  'google_vertex_ai',
-  'together_ai',
-  'fireworks',
-  'replicate',
-  'nvidia_nim',
-  'perplexity',
-  'deepinfra',
-  'cerebras',
-  'custom_openai_compatible',
-] as const
+const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegistryID, ...ProviderRegistryID[]]
 
 const forbiddenSecretFieldNames = new Set([
   'apiKey',
@@ -142,6 +115,12 @@ function executableProviderFromInput(value: string | undefined): ProviderID | nu
   return value && executableProviders.has(value as ProviderID) ? (value as ProviderID) : null
 }
 
+function registryExecutionProvider(registryEntry: NonNullable<ReturnType<typeof getProviderRegistryEntry>>): ProviderID | null {
+  if (registryEntry.executableProviderId) return registryEntry.executableProviderId
+  if (registryEntry.gatewayProfile?.kind === 'openai_compatible') return 'openai'
+  return null
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const rejectedFields = rejectedRawSecretFields(body)
@@ -188,11 +167,88 @@ export async function POST(req: NextRequest) {
       validateSecretRefForAuthMode(authMode, secretRef)
     }
 
+    if (parsed.data.provider && !provider) {
+      return NextResponse.json(
+        {
+          error: 'unsupported_executable_provider',
+          message: 'Provider Center registry rows do not widen executable ProviderID support.',
+        },
+        { status: 400 }
+      )
+    }
+
+    const openAICompatibleExecutionProvider = registryExecutionProvider(registryEntry)
+    const directProviderMatch = Boolean(provider && registryEntry.executableProviderId === provider)
+    const canPersistRegistryTarget = Boolean(
+      !directProviderMatch &&
+      openAICompatibleExecutionProvider &&
+      registryEntry.gatewayProfile?.kind === 'openai_compatible' &&
+      (authMode ?? 'env_key') === 'env_key'
+    )
+    const resolvedBaseURL =
+      parsed.data.baseURL ??
+      (registryEntry.gatewayProfile?.requiresUserEndpoint ? undefined : registryEntry.gatewayProfile?.defaultBaseUrl)
+
+    if (canPersistRegistryTarget && !resolvedBaseURL) {
+      return NextResponse.json(
+        {
+          error: 'invalid_provider_config',
+          message: 'OpenAI-compatible registry execution requires a configured baseURL for this provider row.',
+        },
+        { status: 400 }
+      )
+    }
+
+    if (canPersistRegistryTarget && !secretRef) {
+      return NextResponse.json(
+        {
+          error: 'invalid_provider_config',
+          message: 'OpenAI-compatible registry execution requires an env secret reference for this provider row.',
+        },
+        { status: 400 }
+      )
+    }
+
+    if (canPersistRegistryTarget && openAICompatibleExecutionProvider) {
+      const resolvedAuthMode = authMode ?? 'env_key'
+      assertAuthModeAllowedForProvider(registryEntry, resolvedAuthMode)
+      const saved = await writeProviderConfig({
+        provider: openAICompatibleExecutionProvider,
+        providerRegistryId: registryEntry.id,
+        executionKind: registryEntry.id === providerRegistryIdForExecutableProvider(openAICompatibleExecutionProvider)
+          ? 'direct'
+          : 'openai_compatible',
+        model: parsed.data.model,
+        authMode: resolvedAuthMode,
+        secretRef,
+        gatewayBackend,
+        baseURL: resolvedBaseURL,
+        routingPolicyId: parsed.data.routingPolicyId,
+      })
+
+      return NextResponse.json({
+        success: true,
+        persisted: true,
+        providerRegistryId: saved.providerRegistryId,
+        provider: saved.provider,
+        executionKind: saved.executionKind,
+        model: saved.model,
+        authMode: saved.authMode,
+        gatewayBackend: saved.gatewayBackend,
+        secretRef: saved.secretRef ?? null,
+        secretStatus: sanitizeSecretStatus(saved.secretRef),
+        baseURL: saved.baseURL ?? null,
+        routingPolicyId: saved.routingPolicyId ?? null,
+      })
+    }
+
     if (provider && registryEntry.executableProviderId === provider) {
       const resolvedAuthMode = authMode ?? defaultAuthModeForProvider(provider)
       assertAuthModeAllowedForProvider(registryEntry, resolvedAuthMode)
       const saved = await writeProviderConfig({
         provider,
+        providerRegistryId: registryEntry.id,
+        executionKind: gatewayBackend === 'bifrost_local' ? 'bifrost_local' : 'direct',
         model: parsed.data.model,
         authMode,
         secretRef,
@@ -206,6 +262,7 @@ export async function POST(req: NextRequest) {
         persisted: true,
         providerRegistryId: registryEntry.id,
         provider: saved.provider,
+        executionKind: saved.executionKind,
         model: saved.model,
         authMode: saved.authMode,
         gatewayBackend: saved.gatewayBackend,
@@ -214,16 +271,6 @@ export async function POST(req: NextRequest) {
         baseURL: saved.baseURL ?? null,
         routingPolicyId: saved.routingPolicyId ?? null,
       })
-    }
-
-    if (parsed.data.provider && !provider) {
-      return NextResponse.json(
-        {
-          error: 'unsupported_executable_provider',
-          message: 'Provider Center registry rows do not widen executable ProviderID support.',
-        },
-        { status: 400 }
-      )
     }
 
     const discovery = await discoverProviderModels(registryEntry, {

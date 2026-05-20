@@ -10,8 +10,9 @@ clients.
 - Registry inclusion does not imply direct router execution.
 - Planned-source-review rows are visible in the catalog but are not live-callable.
 
-The registry lives in `lib/providers/registry.ts`. Model discovery contracts live
-in `lib/providers/model-discovery.ts`.
+The registry lives in `lib/providers/registry.ts`. Shared model-source adapters
+live in `lib/providers/model-sources.ts`; `lib/providers/model-discovery.ts`
+keeps the older discovery facade aligned with those adapters.
 
 The broad catalog intentionally covers OpenAI, Anthropic, Claude Code, Gemini,
 Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax,
@@ -42,6 +43,15 @@ Current executable providers:
 Do not add a broad Provider Center row to `ProviderID` unless an executable
 adapter is implemented and tested for that provider.
 
+OpenAI-compatible registry rows can execute through a generic SkillMall-owned
+execution target without becoming `ProviderID` values. The stored config keeps
+`provider: "openai"` as the implementation adapter identity, plus
+`providerRegistryId` for the broad Provider Center row and
+`executionKind: "openai_compatible"`. Request ledger rows store the same
+`provider_registry_id` and `execution_kind`, so usage/cost attribution can point
+at OpenRouter, DeepSeek, Mistral, custom endpoints, and similar rows without
+pretending they are direct `ProviderID` members.
+
 ## Registry Row Contract
 
 Every provider row declares:
@@ -63,7 +73,8 @@ Discovery strategies:
 | `official_provider_models` | Requires a provider-specific official models adapter. |
 | `account_scoped_models` | Requires account/provider context before discovery. |
 | `cloud_project_scoped_models` | Requires project, resource, region, or deployment context before discovery. |
-| `local_runtime_models` | Requires a configured local runtime endpoint. |
+| `local_runtime_models` | Requires a configured local runtime endpoint and uses the provider-specific local API. |
+| `source_backed_static_models` | Uses source-backed static or manual labels when no durable live model-list endpoint is proven. |
 | `manual_custom_models` | Uses manual model labels by default; endpoint probing is optional. |
 | `static_fallback_only` | Displays fallback labels only; not authoritative. |
 | `planned_provider_source_review` | Visible catalog row; live discovery/test disabled until primary-source evidence is recorded. |
@@ -73,9 +84,12 @@ provider catalogs.
 
 Planned-source-review rows are visible so users can see intended coverage, but
 they must not become live-callable until official evidence and adapter support
-are added. This covers Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra
-until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM
-variants.
+are added. Rows promoted from that state must carry the exact safe behavior:
+DeepInfra uses a provider-specific official models-list adapter, while
+Alibaba/DashScope/Qwen, Z.AI, and Perplexity use source-backed static/manual
+labels unless a durable official live model-list endpoint is proven. Ambiguous
+managed NVIDIA NIM variants remain out of scope; the NIM row covers local or
+container runtime endpoints only.
 
 ## Provider Rows
 
@@ -88,9 +102,9 @@ variants.
 | `groq` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | `groq` |
 | `ollama` | `active_configurable` / `local_runtime` | `local_runtime_models` | `ollama` |
 | `openrouter` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
-| `alibaba_dashscope_qwen` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `alibaba_dashscope_qwen` | `active_configurable` / `gateway_configurable_openai_compatible` | `source_backed_static_models` | none |
 | `huggingface` | `active_configurable` / `active_configurable` | `official_provider_models` | none |
-| `zai` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `zai` | `active_configurable` / `gateway_configurable_openai_compatible` | `source_backed_static_models` | none |
 | `minimax` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
 | `kimi_moonshot` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
 | `deepseek` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
@@ -104,20 +118,24 @@ variants.
 | `fireworks` | `active_configurable` / `active_configurable` | `account_scoped_models` | none |
 | `replicate` | `active_configurable` / `active_configurable` | `official_provider_models` | none |
 | `nvidia_nim` | `status_only` / `local_runtime` | `local_runtime_models` | none |
-| `perplexity` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
-| `deepinfra` | `planned_source_review` / `planned_provider_source_review` | `planned_provider_source_review` | none |
+| `perplexity` | `active_configurable` / `active_configurable` | `source_backed_static_models` | none |
+| `deepinfra` | `active_configurable` / `gateway_configurable_openai_compatible` | `official_provider_models` | none |
 | `cerebras` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | none |
 | `custom_openai_compatible` | `active_configurable` / `custom_openai_compatible` | `manual_custom_models` | none |
 
 ## Model Discovery Behavior
 
-`discoverProviderModels()` is intentionally conservative:
+`refreshProviderModelSource()` is the shared adapter layer used by the discovery
+facade and later refresh flows. It is intentionally conservative:
 
 - OpenAI-compatible rows call only the configured base URL's `/models` endpoint.
-- Official-provider rows return `provider_specific_required` until a dedicated
-  adapter is implemented.
+- Official-provider rows call only implemented provider-specific adapters such as
+  Anthropic, Gemini, Cohere, Hugging Face, and DeepInfra; unsupported official
+  rows return `provider_specific_required`.
 - Account-scoped, cloud-project-scoped, local-runtime, manual, static fallback,
   and planned-source-review strategies do not make network calls by default.
+- Source-backed static rows return authoritative source-labeled records without
+  probing a generic endpoint.
 - Planned-source-review rows return `planned_source_review`, `liveCallable:
   false`, and an evidence note.
 

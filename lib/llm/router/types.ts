@@ -10,6 +10,15 @@ export const PHASE2_GATEWAY_BACKENDS = [...PHASE1_GATEWAY_BACKENDS, 'bifrost_loc
 
 export type GatewayBackend = (typeof PHASE2_GATEWAY_BACKENDS)[number]
 
+export type RouterExecutionKind =
+  | 'direct'
+  | 'openai_compatible'
+  | 'bifrost_local'
+  | 'local_runtime'
+  | 'source_backed_static'
+  | 'manual'
+  | 'fallback'
+
 export const PHASE2_ROUTING_POLICY_MODES = [
   'manual',
   'fallback_chain',
@@ -28,6 +37,8 @@ export type SecretRef =
 
 export interface RouterProviderConfig {
   provider: string
+  providerRegistryId?: string
+  executionKind?: RouterExecutionKind
   model: string
   authMode: LLMAuthMode
   secretRef?: SecretRef
@@ -39,6 +50,8 @@ export interface RouterProviderConfig {
 export interface LLMRequestStartInput {
   operation: string
   providerId: string
+  providerRegistryId?: string
+  executionKind?: RouterExecutionKind
   modelId?: string
   authMode: LLMAuthMode
   routeBackend?: GatewayBackend
@@ -64,6 +77,8 @@ export interface LLMRequestEventInput {
   requestId: string
   eventType: string
   providerId?: string
+  providerRegistryId?: string
+  executionKind?: RouterExecutionKind
   modelId?: string
   message?: string
   metadata?: Record<string, unknown>

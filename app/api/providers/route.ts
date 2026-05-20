@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { ConfigError } from '@/lib/providers'
+import { getDb } from '@/lib/db/client'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
 import type { SecretRef } from '@/lib/llm/router/types'
-import type { ProviderRegistryEntry } from '@/lib/providers/types'
+import type { ProviderRegistryEntry, ProviderRegistryID } from '@/lib/providers/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,9 +46,71 @@ function sanitizedGatewayProfile(entry: ProviderRegistryEntry) {
   }
 }
 
-function providerRow(entry: ProviderRegistryEntry, active: ReturnType<typeof activeStatus> | null) {
+type CachedModelStatus = {
+  source: string
+  models: string[]
+  modelCount: number
+  lastCheckedAt: string | null
+  stale: boolean
+}
+
+function isStale(lastCheckedAt: string | null): boolean {
+  if (!lastCheckedAt) return true
+  const checked = Date.parse(lastCheckedAt)
+  if (!Number.isFinite(checked)) return true
+  return Date.now() - checked > 24 * 60 * 60 * 1000
+}
+
+function loadCachedModelStatuses(): Map<ProviderRegistryID, CachedModelStatus> {
+  try {
+    const rows = getDb().prepare(`
+      SELECT provider_registry_id, model_id, source, last_checked_at
+      FROM llm_models
+      WHERE provider_registry_id IS NOT NULL
+      ORDER BY provider_registry_id, model_id
+    `).all() as Array<{
+      provider_registry_id: ProviderRegistryID
+      model_id: string
+      source: string
+      last_checked_at: string | null
+    }>
+
+    const statuses = new Map<ProviderRegistryID, CachedModelStatus>()
+    for (const row of rows) {
+      const current = statuses.get(row.provider_registry_id) ?? {
+        source: row.source,
+        models: [],
+        modelCount: 0,
+        lastCheckedAt: row.last_checked_at,
+        stale: isStale(row.last_checked_at),
+      }
+      current.models.push(row.model_id)
+      current.modelCount = current.models.length
+      if (
+        row.last_checked_at &&
+        (!current.lastCheckedAt || Date.parse(row.last_checked_at) > Date.parse(current.lastCheckedAt))
+      ) {
+        current.lastCheckedAt = row.last_checked_at
+        current.source = row.source
+        current.stale = isStale(row.last_checked_at)
+      }
+      statuses.set(row.provider_registry_id, current)
+    }
+    return statuses
+  } catch {
+    return new Map()
+  }
+}
+
+function providerRow(
+  entry: ProviderRegistryEntry,
+  active: ReturnType<typeof activeStatus> | null,
+  cachedModels: Map<ProviderRegistryID, CachedModelStatus>
+) {
   const discoveryPlan = modelDiscoveryPlanForEntry(entry)
   const isConfigured = active?.activeProviderRegistryId === entry.id
+  const cachedModelStatus = cachedModels.get(entry.id)
+  const fallbackSource = entry.fallbackModels.length > 0 ? 'fallback' : 'none'
 
   return {
     id: entry.id,
@@ -78,10 +141,13 @@ function providerRow(entry: ProviderRegistryEntry, active: ReturnType<typeof act
     },
     modelStatus: {
       strategy: entry.discoveryStrategy,
-      source: entry.fallbackModels.length > 0 ? 'fallback' : 'none',
-      authoritative: false,
-      stale: true,
-      models: entry.fallbackModels,
+      source: cachedModelStatus?.source ?? fallbackSource,
+      authoritative: Boolean(cachedModelStatus),
+      stale: cachedModelStatus?.stale ?? true,
+      modelCount: cachedModelStatus?.modelCount ?? entry.fallbackModels.length,
+      lastCheckedAt: cachedModelStatus?.lastCheckedAt ?? null,
+      blocker: cachedModelStatus ? null : discoveryPlan.message,
+      models: cachedModelStatus?.models ?? entry.fallbackModels,
       refresh: discoveryPlan,
     },
     costStatus: {
@@ -94,13 +160,14 @@ function providerRow(entry: ProviderRegistryEntry, active: ReturnType<typeof act
 
 function activeStatus() {
   const config = resolveRouterProviderConfig()
-  const activeProviderRegistryId = providerRegistryIdForExecutableProvider(config.provider)
+  const activeProviderRegistryId = config.providerRegistryId ?? providerRegistryIdForExecutableProvider(config.provider)
   const activeAccessLabel = accessLabel(config.authMode, config.gatewayBackend)
 
   return {
     configured: true,
     activeProvider: config.provider,
     activeProviderRegistryId,
+    executionKind: config.executionKind,
     activeModel: config.model,
     authMode: config.authMode,
     gatewayBackend: config.gatewayBackend,
@@ -131,18 +198,19 @@ function emptyStatus() {
 }
 
 export async function GET() {
+  const cachedModels = loadCachedModelStatuses()
   try {
     const active = activeStatus()
     return NextResponse.json({
       ...active,
-      providers: PROVIDER_REGISTRY.map((entry) => providerRow(entry, active)),
+      providers: PROVIDER_REGISTRY.map((entry) => providerRow(entry, active, cachedModels)),
     })
   } catch (err) {
     if (err instanceof ConfigError) {
       const active = emptyStatus()
       return NextResponse.json({
         ...active,
-        providers: PROVIDER_REGISTRY.map((entry) => providerRow(entry, null)),
+        providers: PROVIDER_REGISTRY.map((entry) => providerRow(entry, null, cachedModels)),
       })
     }
     return NextResponse.json({ error: 'internal_error' }, { status: 500 })

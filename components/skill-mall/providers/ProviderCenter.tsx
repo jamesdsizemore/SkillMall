@@ -26,6 +26,7 @@ export type ProviderRow = {
   name: string;
   accessModes: ProviderAccessMode[];
   accessLabel: string;
+  authLabel: string;
   setupUrl: string;
   officialSourceUrl: string;
   discoveryStrategy: string;
@@ -57,6 +58,9 @@ export type ProviderRow = {
     source: string;
     authoritative: boolean;
     stale: boolean;
+    modelCount?: number;
+    lastCheckedAt?: string | null;
+    blocker?: string | null;
     models: string[];
     refresh: {
       strategy: string;
@@ -82,6 +86,7 @@ export type ProvidersResponse = {
   configured: boolean;
   activeProvider: string | null;
   activeProviderRegistryId: string | null;
+  executionKind?: string | null;
   activeModel: string | null;
   authMode: string | null;
   gatewayBackend: string | null;
@@ -174,9 +179,11 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
     ? "local_cli_session"
     : provider.accessModes.includes("local_runtime")
       ? "none_local"
-      : provider.accessModes.includes("gateway_virtual_key")
-        ? "gateway_virtual_key_ref"
-        : "env_key";
+      : provider.accessModes.includes("api_access") || provider.accessModes.includes("custom_openai_compatible")
+        ? "env_key"
+        : provider.accessModes.includes("gateway_virtual_key")
+          ? "gateway_virtual_key_ref"
+          : "env_key";
 
   return {
     configMode:
@@ -242,6 +249,7 @@ export function ProviderCenter({
   const [loadState, setLoadState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [configureState, setConfigureState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [refreshState, setRefreshState] = useState<ProviderActionState>({ status: "idle", message: null });
+  const [pricingState, setPricingState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [testState, setTestState] = useState<ProviderActionState>({ status: "idle", message: null });
 
   const selectedProvider = useMemo(
@@ -333,6 +341,7 @@ export function ProviderCenter({
     setDraft(draftForProvider(provider));
     setConfigureState({ status: "idle", message: null });
     setRefreshState({ status: "idle", message: null });
+    setPricingState({ status: "idle", message: null });
     setTestState({ status: "idle", message: null });
   };
 
@@ -405,10 +414,45 @@ export function ProviderCenter({
         status: "success",
         message: `${discovery.status ?? "status"} / ${(discovery.models ?? []).length} models`,
       });
+      await loadProviders();
     } catch (error) {
       setRefreshState({
         status: "error",
         message: error instanceof Error ? error.message : "Model refresh failed",
+      });
+    }
+  };
+
+  const refreshPricing = async () => {
+    if (!selectedProvider) return;
+    setPricingState({ status: "running", message: "Refreshing pricing snapshots" });
+    try {
+      const response = await fetch("/api/providers/pricing/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerRegistryId: selectedProvider.id,
+          source: "portkey_models",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Pricing refresh failed"));
+      if (result.refreshed === false) {
+        setPricingState({
+          status: "error",
+          message: actionMessage(result, "No pricing snapshots refreshed"),
+        });
+        return;
+      }
+      setPricingState({
+        status: "success",
+        message: `${result.snapshotCount ?? 0} pricing snapshots from ${result.source ?? "source"}`,
+      });
+      await loadUsage();
+    } catch (error) {
+      setPricingState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Pricing refresh failed",
       });
     }
   };
@@ -485,7 +529,12 @@ export function ProviderCenter({
             onRefresh={refreshModels}
             onTest={testProvider}
           />
-          <UsageCostPanel usage={usage ?? emptyUsage} activeProviderId={selectedProvider?.id ?? null} />
+          <UsageCostPanel
+            usage={usage ?? emptyUsage}
+            activeProviderId={selectedProvider?.id ?? null}
+            pricingState={pricingState}
+            onRefreshPricing={refreshPricing}
+          />
         </div>
       </div>
     </section>

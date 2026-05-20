@@ -66,11 +66,11 @@ The central insight is that the web wizard and the CLI are two UIs for the same 
 
 ## The Provider Abstraction
 
-SkillMall separates the broad Provider Center catalog from executable LLM clients. The Provider Center uses `ProviderRegistryID` rows for API providers, local tools, local runtimes, cloud-project providers, gateway-compatible providers, and custom OpenAI-compatible endpoints. The executable router still uses a narrower `ProviderID` set for clients that are implemented and tested today.
+SkillMall separates the broad Provider Center catalog from executable LLM clients. The Provider Center uses `ProviderRegistryID` rows for API providers, local tools, local runtimes, cloud-project providers, gateway-compatible providers, and custom OpenAI-compatible endpoints. The executable router still uses a narrower `ProviderID` set for direct clients that are implemented and tested today.
 
-Current executable direct/router providers are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows such as OpenRouter, Hugging Face, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, Cerebras, and custom OpenAI-compatible endpoints can appear in Provider Center without becoming executable direct clients.
+Current executable direct/router providers are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only OpenAI-compatible rows such as OpenRouter, DeepSeek, Kimi/Moonshot, Mistral, xAI, Together AI, Cerebras, DeepInfra, Alibaba/DashScope/Qwen, Z.AI, and custom endpoints can execute through the shared OpenAI-compatible target while remaining broad `ProviderRegistryID` rows. They do not become direct `ProviderID` clients.
 
-Planned-source-review rows are visible but not live-callable until primary-source evidence and adapter support are added: Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
+Planned-source-review rows are visible but not live-callable until primary-source evidence and adapter support are added. Phase 4 promotes Alibaba/DashScope/Qwen and Z.AI to source-backed/static OpenAI-compatible configuration behavior, Perplexity to a source-backed catalog row with execution gated, and DeepInfra to a provider-specific model-list adapter plus OpenAI-compatible execution profile. Ambiguous managed NVIDIA NIM variants remain out of scope.
 
 ### The LLMClient Interface
 
@@ -193,8 +193,9 @@ This means `claude` must be in `$PATH` for the claude-code provider to work.
 1. Add or update the `ProviderRegistryID` row in `lib/providers/registry.ts`.
 2. Choose the correct `discoveryStrategy` in `lib/providers/model-discovery.ts`; do not assume `/v1/models`.
 3. If the provider is executable, add the narrow `ProviderID`, client implementation, factory case, tests, and config-store support.
-4. If the provider is registry-only, keep it metadata/status-only until an adapter exists.
-5. Update Provider Center docs, API docs, and CLI examples with the secret-reference boundary.
+4. If the provider is OpenAI-compatible, prefer the shared registry-target execution path with explicit `providerRegistryId`, `executionKind`, env secret reference, and base URL.
+5. If the provider is registry-only but not supported by the shared execution path, keep it metadata/status-only until an adapter exists.
+6. Update Provider Center docs, API docs, and CLI examples with the secret-reference boundary.
 
 Broad catalog support is not the same as executable direct-client support.
 

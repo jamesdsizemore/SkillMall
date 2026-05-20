@@ -20,11 +20,18 @@ npx skill-mall configure --provider claude-code --model claude-sonnet-4-6
 # API access through environment variable references
 npx skill-mall configure --provider openai --key-env OPENAI_API_KEY --model gpt-4o
 npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.3-70b-versatile
+
+# Registry-only OpenAI-compatible row executed through the shared OpenAI-compatible client
+npx skill-mall configure \
+  --provider-registry-id openrouter \
+  --key-env OPENROUTER_API_KEY \
+  --base-url https://openrouter.ai/api/v1 \
+  --model openai/gpt-5
 ```
 
 `configure` writes to `~/.skill-mall/config.json`. It stores the provider, model, auth mode, gateway backend, and secret reference name. It does not store raw API keys.
 
-The executable direct/router providers are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Broader Provider Center rows such as `openrouter`, cloud providers, planned-source-review rows, and `custom_openai_compatible` can return metadata/status without widening executable `ProviderID` support.
+The executable direct/router providers are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Broader OpenAI-compatible Provider Center rows can be persisted as registry targets through the shared OpenAI-compatible execution path without widening executable `ProviderID` support. Cloud/project rows, local-session rows, local-runtime rows, and unsupported rows still return metadata/status until their required context is supplied.
 
 ## providers
 
@@ -39,10 +46,14 @@ npx skill-mall providers refresh-models \
   --provider-registry-id custom_openai_compatible \
   --base-url http://localhost:1234/v1 \
   --manual-models local-a,local-b
+npx skill-mall providers refresh-pricing --provider openrouter
+npx skill-mall providers refresh-pricing \
+  --source litellm_model_prices \
+  --model-ids openai/gpt-5,anthropic/claude-sonnet-4
 npx skill-mall providers test --provider claude-code
 ```
 
-`providers refresh-models` follows the row's declared discovery strategy and does not assume universal `/v1/models` support. `providers test` performs safe readiness checks without echoing raw secrets, browser tokens, session tokens, credential-file contents, prompts, or responses.
+`providers status` shows model source, cached model count, stale status, and any source/discovery blocker. `providers refresh-models` follows the row's declared discovery strategy and does not assume universal `/v1/models` support. `providers refresh-pricing` stores source-backed pricing snapshots from allowed public sources such as Portkey Models or LiteLLM model prices. `providers test` performs safe readiness checks without echoing raw secrets, browser tokens, session tokens, credential-file contents, prompts, or responses.
 
 ## create
 

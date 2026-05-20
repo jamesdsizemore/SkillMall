@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { fetchBifrostModels, refreshProviderModels } from '../model-refresh'
+import { fetchBifrostModels, refreshProviderModels, refreshRegistryProviderModels } from '../model-refresh'
 
 const phase1MigrationSql = fs.readFileSync(
   path.join(process.cwd(), 'db/migrations/006_llm_router_core.sql'),
@@ -11,6 +11,10 @@ const phase1MigrationSql = fs.readFileSync(
 )
 const phase2MigrationSql = fs.readFileSync(
   path.join(process.cwd(), 'db/migrations/007_llm_router_phase2.sql'),
+  'utf-8'
+)
+const phase4MigrationSql = fs.readFileSync(
+  path.join(process.cwd(), 'db/migrations/008_provider_auth_router_phase4.sql'),
   'utf-8'
 )
 const tempDbs: Array<{ db: Database.Database; file: string }> = []
@@ -21,6 +25,7 @@ function createDb(): Database.Database {
   db.pragma('foreign_keys = ON')
   db.exec(phase1MigrationSql)
   db.exec(phase2MigrationSql)
+  db.exec(phase4MigrationSql)
   tempDbs.push({ db, file })
   return db
 }
@@ -109,8 +114,10 @@ describe('refreshProviderModels', () => {
       fetchFn
     )
 
-    const row = db.prepare('SELECT provider_id, model_id, source, last_checked_at, raw_json FROM llm_models').get() as {
+    const row = db.prepare('SELECT provider_id, provider_registry_id, execution_kind, model_id, source, last_checked_at, raw_json FROM llm_models').get() as {
       provider_id: string
+      provider_registry_id: string
+      execution_kind: string
       model_id: string
       source: string
       last_checked_at: string
@@ -119,10 +126,78 @@ describe('refreshProviderModels', () => {
 
     expect(result.source).toBe('live:bifrost_local')
     expect(row.provider_id).toBe('openai')
+    expect(row.provider_registry_id).toBe('openai')
+    expect(row.execution_kind).toBe('bifrost_local')
     expect(row.model_id).toBe('openai/gpt-4o-mini')
     expect(row.source).toBe('live:bifrost_local')
     expect(row.last_checked_at).toBeTruthy()
     expect(row.raw_json).toContain('openai/gpt-4o-mini')
     expect(row.raw_json).not.toContain('must-not-store')
+  })
+
+  it('stores source-backed registry models with provider registry identity and sanitized raw metadata', async () => {
+    const db = createDb()
+
+    const result = await refreshRegistryProviderModels(
+      {
+        providerRegistryId: 'zai',
+        now: () => new Date('2026-05-20T12:00:00.000Z'),
+      },
+      db
+    )
+
+    const rows = db.prepare(`
+      SELECT provider_id, provider_registry_id, execution_kind, model_id, source, raw_json
+      FROM llm_models
+      ORDER BY model_id
+    `).all() as Array<{
+      provider_id: string
+      provider_registry_id: string
+      execution_kind: string
+      model_id: string
+      source: string
+      raw_json: string
+    }>
+
+    expect(result).toMatchObject({
+      providerId: 'zai',
+      providerRegistryId: 'zai',
+      executionKind: 'source_backed_static',
+      status: 'source_backed_static',
+      source: 'source_backed_static',
+      networkCalled: false,
+      persistedCount: 2,
+    })
+    expect(rows.map((row) => row.model_id)).toEqual(['glm-4.6', 'glm-5.1'])
+    expect(rows.every((row) => row.provider_registry_id === 'zai')).toBe(true)
+    expect(rows.every((row) => row.execution_kind === 'source_backed_static')).toBe(true)
+    expect(rows.every((row) => row.source === 'source_backed_static')).toBe(true)
+    expect(rows.map((row) => row.raw_json).join('\n')).not.toMatch(/secret|token|credential|authorization/i)
+  })
+
+  it('returns blockers without writing snapshots for registry rows that lack required context', async () => {
+    const db = createDb()
+    const fetchFn = async () => {
+      throw new Error('must not call network')
+    }
+
+    const result = await refreshRegistryProviderModels(
+      {
+        providerRegistryId: 'fireworks',
+        fetchFn,
+      },
+      db
+    )
+
+    const count = db.prepare('SELECT COUNT(*) as count FROM llm_models').get() as { count: number }
+
+    expect(result).toMatchObject({
+      providerRegistryId: 'fireworks',
+      status: 'account_context_required',
+      networkCalled: false,
+      persistedCount: 0,
+    })
+    expect(result.blocker).toContain('accountId')
+    expect(count.count).toBe(0)
   })
 })
