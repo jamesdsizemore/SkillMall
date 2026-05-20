@@ -278,6 +278,35 @@ Workers are not alone in the codebase. They must not revert other work, must res
 
 ---
 
+## T103 Locked Implementation Contract
+
+The Phase 5 Judge locks this contract before Worker release:
+
+- Phase 5 implements product controls for existing supported modes only: `manual`, `fallback_chain`, `local_first`, and `budget_guarded_manual`.
+- `cheapest_compatible` remains future/not implemented in Phase 5. Current source has pricing snapshots but no complete capability-matching contract for automatic cheapest routing. Implementing it now would invite unsafe guesses.
+- `quality_first`, semantic routing, learned routing, and complexity routing remain out of scope.
+- Policy simulation must be local-only. It may evaluate stored policy rules, candidates, configured provider/model metadata, budget fields, and caller-provided numeric estimated cost. It must not call provider clients.
+- Policy simulation inputs must not include prompt or response text. Numeric estimates are allowed; raw prompt/response bodies are not.
+- API, CLI, UI, docs, and router must use one shared supported-mode list from `lib/llm/router/types.ts` or a helper derived from it.
+- Policy CRUD stores `rules_json` and `budget_json` in `llm_routing_policies`; no schema migration is required unless implementation discovers a real missing field and records the reason in `state.yaml`.
+- Provider activation remains the existing provider-config `routingPolicyId` field; Phase 5 may add an activation helper but must not create a second active-policy store.
+- Budget status must continue to distinguish actual provider/gateway costs from local estimates.
+- UI changes are limited to Provider Center policy/budget controls and must preserve the existing Provider Center structure.
+- CLI changes should add a policy-focused command path under the existing CLI instead of replacing provider configuration.
+- Documentation updates are part of completion, not follow-up work.
+
+Worker ownership is locked as follows:
+
+- Shared policy/budget service: `lib/llm/router/routing-policy.ts`, `lib/llm/router/types.ts`, `lib/llm/router/config.ts`, `lib/llm/router/usage-summary.ts`, optional new `lib/llm/router/routing-policy-store.ts`, optional new `lib/llm/router/routing-policy-simulation.ts`, and focused router tests.
+- API management surface: `app/api/providers/policies/**`, `app/api/providers/configure/route.ts` only if activation requires tightening, provider route tests, and API docs.
+- Provider Center controls: `components/skill-mall/providers/**` only.
+- CLI parity: `cli/src/index.ts`, `cli/src/commands/providers.ts`, optional new `cli/src/commands/provider-policies.ts`, and CLI docs.
+- Docs: API, database, CLI, user configuration docs, and this plan only.
+
+Any Worker that needs files outside its allowed set must stop, record the need, and return to PM/Judge instead of widening scope silently.
+
+---
+
 ## Verification Commands
 
 The implementation agent must refine these to exact changed-file scopes, but the final verification set must include:

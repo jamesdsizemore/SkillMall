@@ -5,6 +5,7 @@ import { ProviderCatalogList } from "./ProviderCatalogList";
 import { ProviderConfigPanel } from "./ProviderConfigPanel";
 import { ModelRefreshPanel } from "./ModelRefreshPanel";
 import { UsageCostPanel } from "./UsageCostPanel";
+import { PolicyControlPanel } from "./PolicyControlPanel";
 
 export type ProviderAccessMode =
   | "api_access"
@@ -99,6 +100,42 @@ export type ProvidersResponse = {
   providers: ProviderRow[];
 };
 
+export type RoutingPolicyRow = {
+  id: string;
+  name: string;
+  mode: string;
+  rules: {
+    candidates?: Array<{
+      id: string;
+      config: {
+        provider: string;
+        providerRegistryId?: string;
+        executionKind?: string;
+        model: string;
+        authMode?: string;
+        secretRef?: { type: string; name?: string };
+        gatewayBackend?: string;
+        baseURL?: string;
+      };
+      enabled?: boolean;
+      estimatedCostUsd?: number;
+    }>;
+  };
+  budget: {
+    remainingUsd?: number;
+    limitUsd?: number;
+  };
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RoutingPoliciesResponse = {
+  policies: RoutingPolicyRow[];
+  supportedModes: string[];
+  unsupportedModes: string[];
+};
+
 export type UsageResponse = {
   available: boolean;
   summary: UsageSummary;
@@ -151,6 +188,12 @@ const emptyUsage: UsageResponse = {
     actual_cost_usd: "provider_or_gateway_reported_actual_cost",
     estimated_cost_usd: "locally_estimated_cost",
   },
+};
+
+const emptyPolicies: RoutingPoliciesResponse = {
+  policies: [],
+  supportedModes: ["manual", "fallback_chain", "local_first", "budget_guarded_manual"],
+  unsupportedModes: ["cheapest_compatible", "quality_first", "semantic_router"],
 };
 
 function fallbackEnvName(provider: ProviderRow | null): string {
@@ -234,12 +277,15 @@ function canRefreshProviderWithDraft(provider: ProviderRow | null, draft: Provid
 export function ProviderCenter({
   initialData = null,
   initialUsage = null,
+  initialPolicies = null,
 }: {
   initialData?: ProvidersResponse | null;
   initialUsage?: UsageResponse | null;
+  initialPolicies?: RoutingPoliciesResponse | null;
 }) {
   const [data, setData] = useState<ProvidersResponse | null>(initialData);
   const [usage, setUsage] = useState<UsageResponse | null>(initialUsage);
+  const [policies, setPolicies] = useState<RoutingPoliciesResponse>(initialPolicies ?? emptyPolicies);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
     initialData?.activeProviderRegistryId ?? initialData?.providers[0]?.id ?? ""
   );
@@ -251,6 +297,7 @@ export function ProviderCenter({
   const [refreshState, setRefreshState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [pricingState, setPricingState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [testState, setTestState] = useState<ProviderActionState>({ status: "idle", message: null });
+  const [policyState, setPolicyState] = useState<ProviderActionState>({ status: "idle", message: null });
 
   const selectedProvider = useMemo(
     () => data?.providers.find((provider) => provider.id === selectedProviderId) ?? null,
@@ -287,6 +334,16 @@ export function ProviderCenter({
       setUsage(response.ok ? payload : emptyUsage);
     } catch {
       setUsage(emptyUsage);
+    }
+  };
+
+  const loadPolicies = async () => {
+    try {
+      const response = await fetch("/api/providers/policies");
+      const payload = (await response.json()) as RoutingPoliciesResponse;
+      if (response.ok) setPolicies(payload);
+    } catch {
+      setPolicies(emptyPolicies);
     }
   };
 
@@ -336,6 +393,24 @@ export function ProviderCenter({
     };
   }, [initialUsage]);
 
+  useEffect(() => {
+    if (initialPolicies) return;
+    let cancelled = false;
+    async function loadInitialPolicies() {
+      try {
+        const response = await fetch("/api/providers/policies");
+        const payload = (await response.json()) as RoutingPoliciesResponse;
+        if (!cancelled && response.ok) setPolicies(payload);
+      } catch {
+        if (!cancelled) setPolicies(emptyPolicies);
+      }
+    }
+    void loadInitialPolicies();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPolicies]);
+
   const handleSelectProvider = (provider: ProviderRow) => {
     setSelectedProviderId(provider.id);
     setDraft(draftForProvider(provider));
@@ -343,6 +418,7 @@ export function ProviderCenter({
     setRefreshState({ status: "idle", message: null });
     setPricingState({ status: "idle", message: null });
     setTestState({ status: "idle", message: null });
+    setPolicyState({ status: "idle", message: null });
   };
 
   const configureProvider = async () => {
@@ -477,6 +553,96 @@ export function ProviderCenter({
     }
   };
 
+  const savePolicy = async (payload: unknown) => {
+    setPolicyState({ status: "running", message: "Saving routing policy" });
+    try {
+      const response = await fetch("/api/providers/policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Routing policy save failed"));
+      setPolicyState({ status: "success", message: `Saved ${result.policy?.id ?? "policy"}` });
+      await loadPolicies();
+      await loadUsage();
+    } catch (error) {
+      setPolicyState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Routing policy save failed",
+      });
+    }
+  };
+
+  const activatePolicy = async (id: string) => {
+    setPolicyState({ status: "running", message: "Activating routing policy" });
+    try {
+      const response = await fetch("/api/providers/policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "activate", id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Routing policy activation failed"));
+      setPolicyState({ status: "success", message: `Activated ${result.routingPolicyId ?? id}` });
+      setDraft({ ...draft, routingPolicyId: result.routingPolicyId ?? id });
+      await loadProviders();
+      await loadUsage();
+    } catch (error) {
+      setPolicyState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Routing policy activation failed",
+      });
+    }
+  };
+
+  const togglePolicy = async (id: string, enabled: boolean) => {
+    setPolicyState({ status: "running", message: enabled ? "Enabling routing policy" : "Disabling routing policy" });
+    try {
+      const response = await fetch("/api/providers/policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: enabled ? "enable" : "disable", id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Routing policy status change failed"));
+      setPolicyState({ status: "success", message: `${enabled ? "Enabled" : "Disabled"} ${result.policy?.id ?? id}` });
+      await loadPolicies();
+      await loadUsage();
+    } catch (error) {
+      setPolicyState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Routing policy status change failed",
+      });
+    }
+  };
+
+  const simulatePolicy = async (payload: unknown) => {
+    const body = payload && typeof payload === "object"
+      ? (() => {
+          const { estimatedCostUsd, ...policy } = payload as { estimatedCostUsd?: number; [key: string]: unknown };
+          return { policy, estimatedCostUsd };
+        })()
+      : payload;
+    setPolicyState({ status: "running", message: "Simulating routing policy" });
+    try {
+      const response = await fetch("/api/providers/policies/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Routing policy simulation failed"));
+      const outcome = result.blocked ? "blocked" : `selected ${result.selected?.modelId ?? "candidate"}`;
+      setPolicyState({ status: "success", message: `Simulation ${outcome}` });
+    } catch (error) {
+      setPolicyState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Routing policy simulation failed",
+      });
+    }
+  };
+
   const statusLine = data?.configured
     ? `Configured: ${data.activeProviderRegistryId ?? data.activeProvider} / ${data.activeModel ?? "model pending"}`
     : "No active provider configuration";
@@ -528,6 +694,18 @@ export function ProviderCenter({
             refreshReady={canRefreshSelectedProvider}
             onRefresh={refreshModels}
             onTest={testProvider}
+          />
+          <PolicyControlPanel
+            provider={selectedProvider}
+            providerDraft={draft}
+            policies={policies.policies}
+            supportedModes={policies.supportedModes}
+            activeRoutingPolicyId={data?.routingPolicyId ?? selectedProvider?.configStatus.routingPolicyId ?? null}
+            actionState={policyState}
+            onSavePolicy={savePolicy}
+            onActivatePolicy={activatePolicy}
+            onTogglePolicy={togglePolicy}
+            onSimulatePolicy={simulatePolicy}
           />
           <UsageCostPanel
             usage={usage ?? emptyUsage}

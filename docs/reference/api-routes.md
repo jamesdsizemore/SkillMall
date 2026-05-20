@@ -148,6 +148,121 @@ Phase 3 surfaces `bifrost_local` as the only approved optional local gateway bac
 
 ---
 
+## GET /api/providers/policies
+
+Lists local routing policies from `llm_routing_policies`.
+
+**Response:**
+
+```typescript
+{
+  policies: Array<{
+    id: string
+    name: string
+    mode: 'manual' | 'fallback_chain' | 'local_first' | 'budget_guarded_manual'
+    rules: {
+      candidates?: Array<{
+        id: string
+        config: object
+        enabled?: boolean
+        estimatedCostUsd?: number
+      }>
+    }
+    budget: {
+      remainingUsd?: number
+      limitUsd?: number
+    }
+    enabled: boolean
+    createdAt: string
+    updatedAt: string
+  }>
+  supportedModes: string[]
+  unsupportedModes: string[]
+}
+```
+
+`supportedModes` is derived from the router's shared mode list. `cheapest_compatible`, `quality_first`, and semantic routers remain unsupported.
+
+---
+
+## POST /api/providers/policies
+
+Creates/updates, enables/disables, or activates a local routing policy.
+
+**Request body:**
+
+```typescript
+{
+  action?: 'upsert' | 'enable' | 'disable' | 'activate'
+  id: string
+  name?: string
+  mode?: string
+  rules?: object
+  budget?: object
+  enabled?: boolean
+}
+```
+
+Activation writes the selected policy id into the current provider config's `routingPolicyId`; it does not create a second active-policy store.
+
+The route rejects raw secret-like fields and prompt/response-like fields before policy operations. Rejected values are not echoed.
+
+---
+
+## POST /api/providers/policies/simulate
+
+Evaluates a routing policy locally without sending a provider request.
+
+**Request body:**
+
+```typescript
+{
+  id?: string
+  policy?: {
+    id: string
+    name: string
+    mode: string
+    rules?: object
+    budget?: object
+    enabled?: boolean
+  }
+  estimatedCostUsd?: number
+}
+```
+
+**Response:**
+
+```typescript
+{
+  simulation: true
+  providerRequestSent: false
+  promptStored: false
+  responseStored: false
+  policyId: string
+  mode: string
+  selected: {
+    candidateId: string
+    providerId: string
+    modelId: string
+    routeBackend: string
+  } | null
+  blocked: boolean
+  attempts: Array<{
+    candidateId: string
+    providerId: string
+    modelId: string
+    routeBackend: string
+    status: 'selected' | 'skipped' | 'blocked'
+    reason?: string
+  }>
+  estimatedCostUsd: number | null
+}
+```
+
+Inline policy drafts are normalized for simulation but are not written to `llm_routing_policies`. Simulation accepts numeric estimates only; prompt, response, message, output, raw key, token, session, and credential-file fields are rejected.
+
+---
+
 ## POST /api/providers/models/refresh
 
 Refreshes or reports model discovery status for a provider registry row. The route only performs network discovery for supported/configured strategies. It does not assume every provider or custom endpoint supports `/v1/models`. OpenAI-compatible default endpoints are used only for the active configured row or when the request supplies an explicit `baseURL`; unconfigured registry rows return `endpoint_required` without probing their public default endpoints.

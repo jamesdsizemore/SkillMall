@@ -20,6 +20,7 @@ import { regenPromptCommand } from "./commands/regen-prompt.js";
 import { optimizePromptCommand } from "./commands/optimize-prompt.js";
 import { mcpServerCommand } from "./commands/mcp-server.js";
 import { attachKnowledgeCommand } from "./commands/attach-knowledge.js";
+import { providerPoliciesCommand } from "./commands/provider-policies.js";
 
 const LOGO = `
 ${pc.bold(pc.cyan("  +-+-+-+-+-+-+-+-+-+-+"))}
@@ -47,6 +48,7 @@ ${pc.bold("Commands:")}
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
   ${pc.cyan("providers")} <command>               List, status, refresh, and test providers
+  ${pc.cyan("policies")} <command>                Manage provider routing policies and budgets
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
   ${pc.cyan("confirm-research")} <slug>          Build skill from research-result.json
 
@@ -101,6 +103,11 @@ async function main(): Promise<void> {
 
     case "providers":
       await providersCommand(rest);
+      break;
+
+    case "policies":
+    case "provider-policies":
+      await providerPoliciesCommand(rest);
       break;
 
     case "confirm-research":

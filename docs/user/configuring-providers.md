@@ -114,6 +114,38 @@ npx skill-mall providers refresh-models --provider openai --key-env OPENAI_API_K
 npx skill-mall providers test --provider claude-code
 ```
 
+## Routing Policies and Budgets
+
+Provider Center includes routing-policy and budget controls. Policies are stored locally in SkillMall's SQLite database and activated by writing the policy id into the current provider config. SkillMall does not require a hosted gateway dashboard for these controls.
+
+Supported policy modes:
+
+- `manual`
+- `fallback_chain`
+- `local_first`
+- `budget_guarded_manual`
+
+`budget_guarded_manual` can block a request from local numeric cost estimates before a provider client is created. Simulation is local-only: it evaluates the selected policy and budget metadata without sending a provider request and without storing prompts or responses.
+
+CLI examples:
+
+```bash
+npx skill-mall policies upsert \
+  --id budget-openai \
+  --name "Budget OpenAI" \
+  --mode budget_guarded_manual \
+  --candidate-current \
+  --remaining-usd 10 \
+  --limit-usd 20
+```
+
+```bash
+npx skill-mall policies activate --id budget-openai
+npx skill-mall policies simulate --id budget-openai --estimated-cost-usd 0.02
+```
+
+Future modes such as `cheapest_compatible`, `quality_first`, semantic routing, learned routing, and complexity routing are not active. They require additional pricing, capability, or evaluation evidence before implementation.
+
 ## Optional Local Gateway
 
 Bifrost local is an optional local gateway backend. It is not SkillMall's source of truth and is not required hosted infrastructure. Provider Center stores gateway references and local endpoint metadata while SkillMall keeps provider settings, model status, routing status, and usage/cost summaries in its own app surface.
