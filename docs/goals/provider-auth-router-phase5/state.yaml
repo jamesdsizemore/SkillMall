@@ -1,0 +1,227 @@
+version: 2
+active_task: T101
+goal:
+  slug: provider-auth-router-phase5
+  title: Provider/Auth Router Phase 5
+  status: active
+  created_at: '2026-05-20'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-auth-router-phase5-plan
+  source_plan: docs/recovery/2026-05-20-provider-auth-router-phase-5-implementation-plan.md
+  owner_outcome: User-manageable routing-policy and budget-control system across Provider Center, API, and CLI.
+  proof_type: test_review_artifact_source_grounded_policy_budget_control
+  intake:
+    completion_proof: Focused tests, full tests or documented blocker, TypeScript, lint classification, secret scan, code review/fixes, docs parity, diff containment, and GoalBuddy receipts prove policy/budget controls work across Provider Center, API, CLI, and router without auth or simulation drift.
+  oracle:
+    signal: GoalBuddy receipts plus final verification prove policy CRUD, activation, simulation, budget controls, API/CLI/UI parity, docs, review fixes, and auth/secret containment.
+    final_proof: Final receipt reports verification results, complete work, incomplete work, blockers, lint classification, secret scan, diff containment, and next safe action.
+  hard_constraints:
+    - Phase 5 implementation must start from updated main containing Phase 4 merge commit 8ad876a.
+    - No hosted gateway/router/proxy/observability product may be required.
+    - SkillMall remains the provider/settings/model/pricing/policy/budget/cost source of truth.
+    - No raw API keys, ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, copied credential-file contents, browser session cookies, or credential-file paths may be accepted.
+    - Do not add one ProviderID per broad ProviderRegistryID row.
+    - Do not implement quality_first, semantic routing, learned routing, or complexity routing.
+    - Do not implement cheapest_compatible unless Scout and Judge receipts prove the conditional scope gate.
+    - Do not store prompt or response bodies in simulation, budget checks, ledger metadata, or review artifacts.
+    - Update docs, blockers, incomplete work, code review findings, review fixes, and verification receipts.
+    - Do not stage, commit, push, or open a Phase 5 PR unless the user explicitly approves commit-prep or publish.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-auth-router-phase5/.goalbuddy-board/index.html
+tasks:
+  - id: T101
+    type: pm
+    assignee: PM
+    status: active
+    objective: Branch, mainline, dirty-state, and scope gate before implementation.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - git status -sb => implementation branch state recorded
+      - git branch --show-current => codex implementation branch recorded
+      - git fetch origin => exit 0
+      - git merge-base --is-ancestor 8ad876a origin/main => exit 0; main includes Phase 4 merge
+      - git diff --cached --name-only => empty before implementation
+      - git diff --name-only => dirty files classified before implementation
+    stop_if:
+      - Phase 4 merge commit 8ad876a is not present in updated origin/main.
+      - Implementation branch is not based on updated main.
+      - Dirty files are unrelated and unclassified.
+      - The agent starts implementation before the /goal command.
+    receipt: null
+  - id: T102
+    type: scout
+    assignee: Scout
+    status: queued
+    objective: Revalidate current source and stale-roadmap facts before code.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase5/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-5-implementation-plan.md
+    verify:
+      - rg -n "manual|fallback_chain|local_first|budget_guarded_manual|cheapest_compatible|quality_first" lib/llm/router app/api/providers components/skill-mall/providers docs/reference docs/recovery => evidence recorded
+      - rg -n "budget_json|UsageCostPanel|routing policy|llm_routing_policies|simulate" lib app components cli docs db => source map recorded
+    stop_if:
+      - The current source no longer matches the Phase 5 plan assumptions and the difference is not documented.
+      - Scout relies on stale prior docs instead of current source.
+      - Scout recommends unsupported auth/token/session handling.
+    receipt: null
+  - id: T103
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Lock the Phase 5 policy, budget, simulation, API, UI, CLI, docs, and Worker ownership contracts before Worker release.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase5/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-5-implementation-plan.md
+    verify:
+      - rg -n "Phase 5 Contracts|Routing Policy Contract|Budget Contract|Simulation Contract|UI Contract|API Contract|CLI Contract|Docs Contract" docs/recovery/2026-05-20-provider-auth-router-phase-5-implementation-plan.md => contract sections present
+    stop_if:
+      - The plan allows UI/API/CLI/router policy catalogs to drift.
+      - The plan allows real provider calls during simulation.
+      - The plan promotes quality_first without evaluation signal.
+      - The plan promotes cheapest_compatible without proven pricing and capability matching.
+      - The plan lacks allowed-file ownership for Worker tasks.
+    receipt: null
+  - id: T104
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement shared routing-policy and budget validation/service contracts.
+    allowed_files:
+      - lib/llm/router/routing-policy.ts
+      - lib/llm/router/types.ts
+      - lib/llm/router/config.ts
+      - lib/llm/router/usage-summary.ts
+      - lib/llm/router/__tests__/routing-policy.test.ts
+      - lib/llm/router/__tests__/config.test.ts
+      - lib/llm/router/__tests__/usage-summary.test.ts
+      - db/migrations/*.sql
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - npm test -- lib/llm/router/__tests__/routing-policy.test.ts lib/llm/router/__tests__/config.test.ts lib/llm/router/__tests__/usage-summary.test.ts => exit 0
+    stop_if:
+      - The Worker adds unsupported policy modes without Judge approval.
+      - The Worker stores raw prompt/response bodies.
+      - The Worker changes auth or provider identity scope unrelated to policy/budget controls.
+    receipt: null
+  - id: T105
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement API policy management, activation, budget status, and no-provider-request simulation.
+    allowed_files:
+      - app/api/providers/**/*.ts
+      - lib/llm/router/**/*.ts
+      - app/api/providers/__tests__/**/*.test.ts
+      - docs/reference/api-routes.md
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - npm test -- app/api/providers lib/llm/router => exit 0
+    stop_if:
+      - Simulation sends a provider request.
+      - API accepts raw key/token/session/credential fields.
+      - API duplicates policy-mode catalogs instead of using shared validation.
+      - API stores prompt or response bodies.
+    receipt: null
+  - id: T106
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement Provider Center policy and budget controls using the shared API contract.
+    allowed_files:
+      - components/skill-mall/providers/**/*.tsx
+      - components/skill-mall/providers/**/*.ts
+      - components/skill-mall/providers/__tests__/**/*.test.tsx
+      - app/providers/**/*.tsx
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - npm test -- components/skill-mall/providers => exit 0
+    stop_if:
+      - The UI invents policy modes the router cannot execute.
+      - The UI redesigns unrelated Provider Center surfaces.
+      - The UI hides blockers or estimated-vs-actual cost distinctions.
+    receipt: null
+  - id: T107
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement CLI parity for policy listing, show, create/update, enable/disable, activation, simulation, and budget status.
+    allowed_files:
+      - cli/**/*.ts
+      - bin/**/*.js
+      - lib/llm/router/**/*.ts
+      - docs/developer/cli-reference.md
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - npm test -- cli lib/llm/router => exit 0
+      - npx tsc --noEmit --pretty false => CLI-related TypeScript errors absent
+    stop_if:
+      - CLI writes raw secrets to JSON.
+      - CLI uses a different policy/provider catalog from the app.
+      - CLI simulates by sending provider requests.
+    receipt: null
+  - id: T108
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Update user, API, database, and developer docs for Phase 5 behavior and boundaries.
+    allowed_files:
+      - docs/reference/api-routes.md
+      - docs/reference/database-schema.md
+      - docs/developer/cli-reference.md
+      - docs/user/configuring-providers.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-5-implementation-plan.md
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - rg -n "quality_first|cheapest_compatible|semantic|prompt body|credential-file|routing policy|budget" docs/reference docs/developer docs/user docs/recovery/2026-05-20-provider-auth-router-phase-5-implementation-plan.md => docs reviewed for approved language
+    stop_if:
+      - Docs imply unsupported auth/token/session mechanisms.
+      - Docs claim quality_first or semantic routing exists.
+      - Docs present estimated costs as actual provider costs.
+      - Docs omit blocker or incomplete-work status.
+    receipt: null
+  - id: T109
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Perform code review, semantic-drift review, auth/secret review, and policy-mode review before commit-prep.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - git diff --name-only => reviewed file list recorded
+      - rg -n "quality_first|cheapest_compatible|semantic_router|apiKey|session|credential|token|prompt|response" changed files => findings recorded and classified
+      - npm test -- lib/llm/router app/api/providers components/skill-mall/providers => exit 0 or blocker recorded
+    stop_if:
+      - Any Phase 5-owned review finding remains unfixed and is not documented as blocked.
+      - Any raw secret/token/session/credential-file path acceptance is present.
+      - Any real provider call happens during simulation.
+      - Any Worker made a policy-mode decision outside the Judge-approved contract.
+    receipt: null
+  - id: T110
+    type: pm
+    assignee: PM
+    status: queued
+    objective: Final verification, blocker report, incomplete-work report, diff containment, and commit-prep readiness.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase5/state.yaml
+    verify:
+      - npm test -- lib/llm/router app/api/providers components/skill-mall/providers => exit 0
+      - npm test => exit 0 or blocker recorded
+      - npx tsc --noEmit --pretty false => exit 0
+      - npm run lint => exit 0 or pre-existing unrelated failures classified
+      - git diff --check => exit 0
+      - git diff --name-only => changed files match Phase 5 scope
+      - git diff --cached --name-only => empty unless user approved staging
+    stop_if:
+      - Focused tests fail from Phase 5-owned code.
+      - TypeScript fails from Phase 5-owned code.
+      - Lint fails from Phase 5-owned code.
+      - Secret scan finds raw credential material.
+      - Incomplete work is hidden or minimized.
+      - The agent stages, commits, pushes, or opens a PR without explicit approval.
+    receipt: null
