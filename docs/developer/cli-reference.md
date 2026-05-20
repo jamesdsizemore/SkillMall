@@ -11,6 +11,7 @@ Complete reference for all `npx skill-mall` commands. Every command documented w
 ## Table of Contents
 
 - [configure](#configure)
+- [providers](#providers)
 - [create](#create)
 - [confirm-research](#confirm-research)
 - [deploy](#deploy)
@@ -38,22 +39,34 @@ Complete reference for all `npx skill-mall` commands. Every command documented w
 Configure an LLM provider for skill generation.
 
 ```
-npx skill-mall configure [--provider <p>] [--key <api-key>] [--model <model>]
+npx skill-mall configure [--provider <p>] [--key-env <env>] [--model <model>]
 ```
 
 **Flags:**
 
 | Flag | Required | Description |
 |---|---|---|
-| `--provider <p>` | No | Provider ID: `openai`, `claude-code`, `gemini`, `groq`, `ollama` |
-| `--key <api-key>` | Depends | API key (required for openai, gemini, groq) |
-| `--model <model>` | No | Model name (defaults to provider default) |
+| `--provider <p>` | No | Executable provider ID or Provider Center registry row ID |
+| `--provider-registry-id <id>` | No | Provider Center row ID such as `openrouter` or `custom_openai_compatible` |
+| `--key-env <env>` | Depends | Environment variable name that holds the API key |
+| `--gateway-key-env <env>` | Depends | Environment variable name that holds a local gateway virtual key |
+| `--model <model>` | No | Model label |
+| `--manual-models <a,b>` | No | Manual model labels for custom/provider metadata rows |
+| `--config-mode <mode>` | No | `env_key`, `gateway_virtual_key_ref`, `local_cli_session`, or `none_local` |
+| `--gateway-backend <backend>` | No | `direct` or `bifrost_local` |
+| `--base-url <url>` | No | Local, gateway, or custom OpenAI-compatible endpoint |
+| `--routing-policy <id>` | No | Routing policy identifier |
 
 **Behavior:**
 
-Without flags, runs an interactive wizard to select your provider. With flags, configures immediately without prompts.
+Without flags, runs an interactive wizard to select an executable provider. With flags, configures immediately without prompts.
 
 Writes non-secret configuration to `~/.skill-mall/config.json`. API providers store an env-var reference such as `OPENAI_API_KEY`; raw API keys are not written.
+Raw `--key` values are rejected. Use `--key-env` or `--gateway-key-env` secret references instead. Secret-reference names must be environment-variable-style names, not filesystem paths or credential-file references.
+
+The selected auth/config mode must match the selected Provider Center row. For example, `openai` cannot be configured as `local_cli_session`, and `anthropic` cannot be configured with `gateway_virtual_key_ref` unless a later approved phase changes that row's access modes.
+
+Executable Provider Center rows persist through the shared router config store. Registry-only rows such as `openrouter`, cloud/project rows, planned-source-review rows, and `custom_openai_compatible` return metadata/status output without widening executable `ProviderID` support or writing a runnable provider config.
 
 **Examples:**
 
@@ -76,6 +89,19 @@ npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.
 # Ollama (local, no API key)
 ollama pull llama3.1
 npx skill-mall configure --provider ollama --model llama3.1
+
+# Local Bifrost gateway virtual-key reference
+npx skill-mall configure --provider openai \
+  --config-mode gateway_virtual_key_ref \
+  --gateway-backend bifrost_local \
+  --gateway-key-env BIFROST_VIRTUAL_KEY \
+  --base-url http://localhost:8080/v1
+
+# Custom OpenAI-compatible metadata row (does not persist executable ProviderID)
+npx skill-mall configure \
+  --provider-registry-id custom_openai_compatible \
+  --base-url http://localhost:1234/v1 \
+  --manual-models local-model-a,local-model-b
 ```
 
 **Expected output:**
@@ -87,6 +113,55 @@ npx skill-mall configure --provider ollama --model llama3.1
 ```
 
 **Exit codes:** 0 on success, 1 on invalid provider or missing required flags.
+
+---
+
+## providers
+
+Provider Center parity commands for catalog, status, model refresh, and safe readiness checks.
+
+```
+npx skill-mall providers <list|status|refresh-models|test> [options]
+```
+
+These commands use the shared Provider Center registry. The catalog includes OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The executable direct/router set remains `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`.
+
+Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. This currently includes Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
+
+**Flags:**
+
+| Flag | Required | Description |
+|---|---|---|
+| `--provider <id>` | No | Executable provider ID or Provider Center row ID |
+| `--provider-registry-id <id>` | No | Provider Center registry row ID |
+| `--key-env <env>` | No | Environment variable reference for model refresh auth |
+| `--base-url <url>` | No | Endpoint for OpenAI-compatible model refresh |
+| `--manual-models <a,b>` | No | Manual model labels for custom rows |
+| `--json` | No | Print machine-readable JSON |
+
+`providers list` prints all shared registry rows with Provider Center status, access label, and the active configured row marker.
+
+`providers status` shows the active provider status, or a selected row when `--provider` / `--provider-registry-id` is supplied.
+
+`providers refresh-models` uses the shared model-discovery contract. OpenAI-compatible rows can probe the active configured endpoint or an explicitly supplied `--base-url`; unconfigured registry rows return `endpoint_required` without probing public default endpoints. Provider-specific, cloud/project, local-runtime, static, manual, and planned-source-review rows return the correct status labels without assuming generic `/v1/models` support.
+
+`providers test` performs the same safe status/readiness check as Provider Center. It does not echo prompts, responses, raw secrets, browser tokens, session tokens, or credential files.
+
+**Examples:**
+
+```bash
+npx skill-mall providers list
+npx skill-mall providers status
+npx skill-mall providers status --provider openrouter
+npx skill-mall providers refresh-models --provider openai --key-env OPENAI_API_KEY
+npx skill-mall providers refresh-models \
+  --provider-registry-id custom_openai_compatible \
+  --base-url http://localhost:1234/v1 \
+  --manual-models local-model-a,local-model-b
+npx skill-mall providers test --provider claude-code
+```
+
+**Exit codes:** 0 on success, 1 on invalid provider, raw secret flag usage, or failed live model refresh.
 
 ---
 

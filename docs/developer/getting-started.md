@@ -87,32 +87,42 @@ Run the interactive configurator:
 npx skill-mall configure
 ```
 
-This writes non-secret configuration to `~/.skill-mall/config.json`. API providers store an env-var reference; raw API keys are not written. You can configure a specific provider directly:
+This writes non-secret configuration to `~/.skill-mall/config.json`. API providers store an env-var reference; raw API keys are not written. You can also use the Provider Center at `/settings/providers`, which is the app settings surface for catalog status, model refresh, provider tests, and usage/cost summaries.
+
+You can configure a current executable provider directly:
 
 ```bash
-# Option 1: Claude Code CLI (no API key needed — uses your existing auth)
+# Claude Code CLI (local tool session, no API key)
 npx skill-mall configure --provider claude-code --model claude-sonnet-4-6
 
-# Option 2: OpenAI
+# OpenAI API access
 npx skill-mall configure --provider openai --key-env OPENAI_API_KEY --model gpt-4o
 
-# Option 3: Gemini
+# Anthropic API access
+npx skill-mall configure --provider anthropic --key-env ANTHROPIC_API_KEY --model claude-sonnet-4-20250514
+
+# Gemini API access
 npx skill-mall configure --provider gemini --key-env GEMINI_API_KEY --model gemini-2.0-flash-exp
 
-# Option 4: Groq (fast, inexpensive)
+# Groq API access
 npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.3-70b-versatile
 
-# Option 5: Ollama (local, no API key)
+# Ollama local runtime
 ollama pull llama3.1
 npx skill-mall configure --provider ollama --model llama3.1
 ```
 
+Provider Center also lists registry-only rows such as OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. Those broad `ProviderRegistryID` rows are separate from the narrower executable `ProviderID` set (`openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`).
+
+Planned-source-review rows are visible but not live-callable until official evidence and adapter support are added. This currently includes Alibaba/DashScope/Qwen, Z.AI, Perplexity, DeepInfra until primary-source evidence is recorded, and ambiguous managed NVIDIA NIM variants.
+
 **Provider notes:**
 
-- **Claude Code** is the simplest option for existing Claude Code users — it spawns `claude -p` subprocesses using your already-authenticated session. No API key to manage. Note that it does not support embeddings for RAG features.
+- **Claude Code** is the simplest option for existing Claude Code users. It spawns `claude -p` subprocesses using your already-authenticated local tool session. It is not Anthropic API-key access and does not support embeddings for RAG features.
 - **OpenAI** (gpt-4o or gpt-4o-mini) produces the most reliable JSON extraction for the research pipeline. Most of the codebase was tested against OpenAI.
 - **Groq** is 10–20x faster than OpenAI for the same Llama models and substantially cheaper. Best for development.
 - **Ollama** requires running `ollama serve` before starting the app. Quality varies by model — `llama3.1` (8B) works but a larger model produces better skill structure.
+- **Bifrost local** is an optional local gateway backend. It is not a required hosted gateway and is not the source of truth for Provider Center settings.
 
 **For RAG/embeddings**, set a separate embedding provider. The main provider and the embedding provider can differ:
 
@@ -489,7 +499,7 @@ Create `.env.local` in the project root (it's gitignored). Copy from `.env.local
 
 | Variable | Required | Source | Breaks if missing |
 |---|---|---|---|
-| `SKILL_MALL_PROVIDER` | Yes (for skill creation) | `npx skill-mall configure` | Skill creation pipeline fails: "No LLM provider configured" |
+| `SKILL_MALL_PROVIDER` | Yes (for skill creation) | Provider Center or `npx skill-mall configure` | Skill creation pipeline fails: "No LLM provider configured" |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `GROQ_API_KEY` | Depends on provider | Provider API dashboard | API provider calls fail |
 | `SKILL_MALL_MODEL` | No | Auto-set during configure | Uses provider default model |
 | `SKILL_MALL_EMBEDDING_PROVIDER` | No (for RAG only) | Same as SKILL_MALL_PROVIDER but separate | RAG attach-knowledge fails |
@@ -512,6 +522,8 @@ SKILL_MALL_PROVIDER=openai
 OPENAI_API_KEY=your-openai-api-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+`SKILL_MALL_PROVIDER` names an executable provider only: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, or `ollama`. It does not accept broad Provider Center registry-only rows such as `openrouter` unless a later phase adds and tests an executable adapter.
 
 **Quick setup with GitHub auth:**
 

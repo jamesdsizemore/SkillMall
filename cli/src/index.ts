@@ -7,6 +7,7 @@ import { newCommand } from "./commands/new.js";
 import { validateCommand } from "./commands/validate.js";
 import { createCommand } from "./commands/create.js";
 import { configureCommand } from "./commands/configure.js";
+import { providersCommand } from "./commands/providers.js";
 import { confirmResearchCommand } from "./commands/confirm-research.js";
 import { deployPackCommand } from "./commands/deploy-pack.js";
 import { forkCommand } from "./commands/fork.js";
@@ -45,12 +46,15 @@ ${pc.bold("Commands:")}
   ${pc.cyan("attach-knowledge")} <cat/slug> <dir> Attach a document directory as a RAG knowledge base
   ${pc.cyan("validate")} [path]                  Check frontmatter character limits
   ${pc.cyan("configure")} [--provider <p>]       Configure LLM provider for skill generation
+  ${pc.cyan("providers")} <command>               List, status, refresh, and test providers
   ${pc.cyan("create")} "<topic>" [--urls ...]    Research-first skill creation (pipeline)
   ${pc.cyan("confirm-research")} <slug>          Build skill from research-result.json
 
 ${pc.bold("Examples:")}
   npx skill-mall list
   npx skill-mall configure --provider claude-code
+  npx skill-mall providers list
+  npx skill-mall providers status
   npx skill-mall create "blue ocean strategy" --urls https://blueoceanstrategy.com/tools/
   npx skill-mall confirm-research blue-ocean-strategy
   npx skill-mall validate
@@ -93,6 +97,10 @@ async function main(): Promise<void> {
 
     case "configure":
       await configureCommand(rest);
+      break;
+
+    case "providers":
+      await providersCommand(rest);
       break;
 
     case "confirm-research":

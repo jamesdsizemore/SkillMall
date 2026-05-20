@@ -15,6 +15,7 @@ const gatewayBackends = new Set<string>(PHASE1_GATEWAY_BACKENDS)
 const routerAuthModes = new Set<string>(PHASE2_AUTH_MODES)
 const routerGatewayBackends = new Set<string>(PHASE2_GATEWAY_BACKENDS)
 const routerRoutingPolicyModes = new Set<string>(PHASE2_ROUTING_POLICY_MODES)
+const secretRefNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 export function assertPhase1AuthMode(value: unknown): LLMAuthMode {
   if (typeof value === 'string' && authModes.has(value)) return value as LLMAuthMode
@@ -57,20 +58,32 @@ export function sanitizeSecretRef(ref: unknown): SecretRef {
   }
 
   if (candidate.type === 'env') {
-    if (typeof candidate.name !== 'string' || candidate.name.trim().length === 0) {
-      throw new Error('Env secret ref requires a non-empty env var name')
-    }
-    return { type: 'env', name: candidate.name.trim() }
+    return { type: 'env', name: sanitizeSecretRefName(candidate.name, 'Env secret ref') }
   }
 
   if (candidate.type === 'gateway_virtual_key_ref') {
-    if (typeof candidate.name !== 'string' || candidate.name.trim().length === 0) {
-      throw new Error('Gateway virtual key ref requires a non-empty env var name')
+    return {
+      type: 'gateway_virtual_key_ref',
+      name: sanitizeSecretRefName(candidate.name, 'Gateway virtual key ref'),
     }
-    return { type: 'gateway_virtual_key_ref', name: candidate.name.trim() }
   }
 
   throw new Error(`Unsupported Phase 1 secret ref type: ${String(candidate.type)}`)
+}
+
+export function sanitizeSecretRefName(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${label} requires a non-empty reference name`)
+  }
+
+  const name = value.trim()
+  if (!secretRefNamePattern.test(name)) {
+    throw new Error(
+      `${label} must be an environment-variable-style reference name, not a raw key, path, or credential file reference`
+    )
+  }
+
+  return name
 }
 
 export function resolveEnvSecret(name: string): string | undefined {

@@ -4,6 +4,11 @@ import path from 'path'
 import { DEFAULT_MODELS } from '../../providers/defaults'
 import { ConfigError, type ProviderID } from '../../providers/types'
 import {
+  assertAuthModeAllowedForProvider,
+  getProviderRegistryEntry,
+  providerRegistryIdForExecutableProvider,
+} from '../../providers/registry'
+import {
   assertRouterAuthMode,
   assertRouterGatewayBackend,
   sanitizeSecretRef,
@@ -81,6 +86,8 @@ function resolveAuthAndSecret(
   }
 
   const authMode = assertRouterAuthMode(stored?.authMode ?? defaultAuthModeForProvider(provider))
+  const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(provider))
+  if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
   const rawSecretRef =
     stored?.secretRef ??
     (authMode === 'env_key'
@@ -106,6 +113,8 @@ export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
     }
 
     const authMode = defaultAuthModeForProvider(envProvider)
+    const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(envProvider))
+    if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
     const secretRef = validateSecretRefForAuthMode(
       authMode,
       authMode === 'env_key' ? defaultSecretRefForProvider(envProvider) : { type: 'none' }
