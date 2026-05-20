@@ -4,9 +4,7 @@ import * as p from "@clack/prompts";
 import { pc } from "../utils.js";
 import { resolveProviderConfig, createLLMClient } from "@/lib/providers/index.js";
 import { ResearchResultSchema } from "@/lib/validators.js";
-import { buildSkillDirectory } from "@/lib/skill-builder.js";
-import { generatePrompts } from "@/lib/prompt-engine.js";
-import { validateSkillDirectory, atomicWrite } from "@/lib/pipeline.js";
+import { buildSkillFromResearch, estimateSkillResourceScore } from "@/lib/pipeline.js";
 
 export async function confirmResearchCommand(args: string[]): Promise<void> {
   const slug = args[0];
@@ -66,21 +64,27 @@ export async function confirmResearchCommand(args: string[]): Promise<void> {
   );
   console.log();
 
-  const s = p.spinner();
-  s.start("Building skill directory...");
+  const outputPath = path.join(
+    "skills",
+    researchResult.suggestedCategory,
+    slug
+  );
 
-  let skillDirectory;
-  let promptFiles;
+  const s = p.spinner();
+  s.start(`Building and writing to ${outputPath}...`);
+
+  let result;
   try {
-    [skillDirectory, promptFiles] = await Promise.all([
-      buildSkillDirectory(researchResult, {
+    result = await buildSkillFromResearch({
+      researchResult,
+      metadata: {
         slug,
         category: researchResult.suggestedCategory,
         tags: researchResult.suggestedTags,
         targetAgents: ["claude-code"],
-      }, client),
-      generatePrompts(researchResult, { slug }, client),
-    ]);
+      },
+      writeToDisk: true,
+    }, client);
   } catch (err) {
     s.stop("Failed");
     process.stderr.write(
@@ -89,58 +93,35 @@ export async function confirmResearchCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const completeDirectory = {
-    ...skillDirectory,
-    files: [...skillDirectory.files, ...promptFiles],
-  };
-
-  s.stop("Skill directory built.");
-
-  // Validate
-  const validation = validateSkillDirectory(completeDirectory);
-  if (!validation.valid) {
+  if (!result.validation.valid) {
+    s.stop("Validation failed");
     process.stderr.write(pc.red("Validation failed:\n"));
-    for (const err of validation.errors) {
+    for (const err of result.validation.errors) {
       process.stderr.write(pc.red(`  - ${err.field}: ${err.message}\n`));
     }
     process.exit(1);
   }
 
-  // Write to disk
-  const outputPath = path.join(
-    "skills",
-    researchResult.suggestedCategory,
-    slug
-  );
-
-  s.start(`Writing to ${outputPath}...`);
-  let writeResult;
-  try {
-    writeResult = await atomicWrite(completeDirectory, outputPath);
-  } catch (err) {
+  if (!result.writeResult) {
     s.stop("Write failed");
-    process.stderr.write(
-      pc.red(`Write error: ${err instanceof Error ? err.message : String(err)}\n`)
-    );
+    process.stderr.write(pc.red("Write error: pipeline completed without a write result\n"));
     process.exit(1);
   }
 
   s.stop(`Written to ${outputPath}`);
 
-  // Quality score estimate
-  const resourceScore =
-    (completeDirectory.files.some((f) => f.path.startsWith("scripts/")) ? 20 : 0) +
-    (completeDirectory.files.some((f) => f.path.startsWith("resources/templates/")) ? 30 : 0) +
-    (completeDirectory.files.some((f) => f.path.startsWith("resources/samples/")) ? 30 : 0) +
-    Math.min(researchResult.suggestedTags.length * 4, 20);
+  const resourceScore = estimateSkillResourceScore(
+    result.skillDirectory,
+    researchResult.suggestedTags
+  );
 
   p.outro(pc.bold(pc.green("  Skill created successfully.")));
   console.log();
   console.log(
     `  ${pc.green("Created:")} skills/${researchResult.suggestedCategory}/${slug}/`
   );
-  console.log(`  ${pc.dim("Files written:")} ${writeResult.fileCount}`);
-  console.log(`  ${pc.dim("Prompts:")} ${promptFiles.length}`);
+  console.log(`  ${pc.dim("Files written:")} ${result.writeResult.fileCount}`);
+  console.log(`  ${pc.dim("Prompts:")} ${result.promptCount}`);
   console.log(`  ${pc.dim("Quality score:")} ${resourceScore}/100`);
   console.log();
 }
