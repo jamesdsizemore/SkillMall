@@ -1,0 +1,297 @@
+version: 2
+active_task: T1001
+goal:
+  slug: provider-auth-router-phase4
+  title: Provider/Auth Router Phase 4
+  status: prepared
+  created_at: '2026-05-20'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-auth-router-phase4-plan
+  source_plan: docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+  owner_outcome: Source-backed model/pricing refresh and executable OpenAI-compatible
+    registry providers on top of the Phase 3 Provider Center.
+  proof_type: test_review_artifact_source_backed_decision
+  oracle:
+    signal: GoalBuddy receipts plus final verification prove source-backed model refresh,
+      pricing refresh, executable registry-provider configuration, UI/CLI/API parity,
+      docs, review fixes, and auth/secret containment.
+    final_proof: Final receipt reports verification results, complete work, incomplete
+      work, blockers, lint classification, secret scan, diff containment, and next
+      safe action.
+  hard_constraints:
+  - Phase 4 implementation must start from updated main after the completed PR queue
+    cleanup through bb03dc6.
+  - No hosted gateway/router/proxy/observability product may be required.
+  - SkillMall remains the provider/settings/model/pricing/cost source of truth.
+  - No raw API keys, ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex
+    credential files, Claude Code credential files, copied credential-file contents,
+    or credential-file paths may be accepted.
+  - Do not add one ProviderID per broad ProviderRegistryID row.
+  - Do not assume generic /v1/models for provider-specific, account-scoped, cloud-project,
+    local-runtime, or source-backed static providers.
+  - Update docs, blockers, incomplete work, code review findings, review fixes, and
+    verification receipts.
+  - Do not stage, commit, push, or open a Phase 4 PR unless the user explicitly approves
+    commit-prep or publish.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-auth-router-phase4/.goalbuddy-board/index.html
+tasks:
+  - id: T1001
+    type: pm
+    assignee: PM
+    status: active
+    objective: Branch, mainline, and scope gate.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - git status -sb => clean implementation branch or exact dirty state classified
+    - git branch --show-current => implementation branch is correct
+    - git fetch origin => remote refs refreshed
+    - git merge-base --is-ancestor bb03dc6 origin/main => exit 0; main includes the
+      completed PR queue cleanup
+    - git diff --cached --name-only => empty before implementation
+    stop_if:
+    - Phase 3 files are not present.
+    - Implementation branch is not based on updated origin/main through bb03dc6.
+    - Implementation would start from unknown provider/router state.
+    receipt:
+  - id: T1002
+    type: scout
+    assignee: Scout
+    status: queued
+    objective: Scout current source, current official provider docs, maintainer repos,
+      pricing-source licenses/schemas, and planned-row promotion evidence.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    - docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+    verify:
+    - rg -n "ProviderRegistryID|ProviderID|discoveryStrategy|llm_models|llm_pricing_snapshots|models/refresh|ProviderCenter"
+      lib app cli docs db => source map evidence recorded
+    stop_if:
+    - Any provider activation, model source, or pricing source would rely on stale or
+      unofficial evidence only.
+    - License/schema status for the selected pricing source is unknown.
+    receipt:
+  - id: T1003
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Judge and lock the Phase 4 model-source, executable registry-provider,
+      pricing-source, and provider-promotion contract before code.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    - docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+    verify:
+    - rg -n "Model Source Adapter Contract|Executable Registry Provider Contract|Pricing
+      Source Contract|Provider Activation Contract" docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+      => contract sections present and reviewed
+    stop_if:
+    - Design creates duplicate dashboard or hosted dependency.
+    - Design adds one ProviderID per broad provider row.
+    - Design accepts raw keys/tokens/credential files.
+    - Design cannot make registry-only OpenAI-compatible rows executable while preserving
+      the registry/executable split.
+    receipt:
+  - id: T1004
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement the shared model-source adapter layer with source labels, planned-row
+      non-network behavior, provider-specific adapters, and tests.
+    allowed_files:
+    - lib/providers/model-sources.ts
+    - lib/providers/model-sources/__tests__/model-sources.test.ts
+    - lib/providers/model-discovery.ts
+    - lib/providers/registry.ts
+    - lib/providers/types.ts
+    - docs/reference/provider-catalog.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/providers/model-sources lib/providers/__tests__/model-discovery.test.ts
+      lib/providers/__tests__/registry.test.ts => exit 0
+    stop_if:
+    - Adapter makes live calls for planned-source-review rows.
+    - Adapter leaks raw key/token/secret-like metadata.
+    - Adapter treats generic /v1/models as universal.
+    receipt:
+  - id: T1005
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Persist source-backed registry model refresh into llm_models and expose
+      model source/count/timestamp/stale/blocker status through provider APIs.
+    allowed_files:
+    - lib/llm/router/model-refresh.ts
+    - app/api/providers/models/refresh/route.ts
+    - app/api/providers/route.ts
+    - app/api/providers/__tests__/providers-route.test.ts
+    - docs/reference/api-routes.md
+    - docs/reference/database-schema.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/llm/router/__tests__/model-refresh.test.ts app/api/providers/__tests__/providers-route.test.ts
+      => exit 0
+    stop_if:
+    - Registry-only rows cannot persist source-backed snapshots and no blocker is documented.
+    - Planned rows write snapshots without source evidence.
+    - Raw model metadata stores secret-like fields.
+    receipt:
+  - id: T1006
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Make OpenAI-compatible registry rows executable through a generic SkillMall-owned
+      execution path without adding one ProviderID per row.
+    allowed_files:
+    - lib/llm/router/openai-compatible-client.ts
+    - lib/llm/router/__tests__/openai-compatible-client.test.ts
+    - lib/llm/router/types.ts
+    - lib/llm/router/config.ts
+    - lib/llm/router/create-client.ts
+    - lib/providers/config-store.ts
+    - lib/providers/index.ts
+    - app/api/providers/configure/route.ts
+    - app/api/providers/test/route.ts
+    - app/api/providers/__tests__/providers-route.test.ts
+    - docs/reference/provider-catalog.md
+    - docs/user/configuring-providers.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/llm/router/__tests__/openai-compatible-client.test.ts lib/llm/router
+      app/api/providers/__tests__/providers-route.test.ts => exit 0
+    stop_if:
+    - Broad provider rows are added directly to ProviderID one by one.
+    - Raw secret fields are accepted.
+    - Ledger stores prompt/response bodies.
+    - Existing direct providers regress.
+    receipt:
+  - id: T1007
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement pricing-source refresh into llm_pricing_snapshots without requiring
+      hosted gateway credentials.
+    allowed_files:
+    - lib/providers/pricing-sources.ts
+    - lib/providers/__tests__/pricing-sources.test.ts
+    - lib/llm/router/pricing-refresh.ts
+    - app/api/providers/pricing/refresh/route.ts
+    - app/api/providers/usage/route.ts
+    - app/api/providers/__tests__/providers-route.test.ts
+    - docs/reference/api-routes.md
+    - docs/reference/database-schema.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/providers/__tests__/pricing-sources.test.ts lib/llm/router/__tests__/pricing-refresh.test.ts
+      app/api/providers/__tests__/providers-route.test.ts => exit 0
+    stop_if:
+    - Pricing refresh requires Portkey Gateway, LiteLLM proxy, hosted credentials, or
+      another paid app.
+    - Estimated cost is represented as actual cost.
+    - Pricing source license/schema evidence is missing.
+    receipt:
+  - id: T1008
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Upgrade Provider Center and CLI parity for model-source, pricing-source,
+      executable registry-provider, stale, and blocker status.
+    allowed_files:
+    - components/skill-mall/providers/ProviderCenter.tsx
+    - components/skill-mall/providers/ModelRefreshPanel.tsx
+    - components/skill-mall/providers/ProviderConfigPanel.tsx
+    - components/skill-mall/providers/UsageCostPanel.tsx
+    - components/skill-mall/providers/__tests__/provider-center.test.tsx
+    - cli/src/commands/providers.ts
+    - cli/src/commands/configure.ts
+    - docs/user/using-the-cli.md
+    - docs/developer/cli-reference.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- components/skill-mall/providers/__tests__/provider-center.test.tsx
+      app/api/providers/__tests__/providers-route.test.ts => exit 0
+    - cd cli && npm run type-check => exit 0
+    stop_if:
+    - Provider Center hides planned-row blockers.
+    - CLI duplicates provider/model/pricing contracts instead of using shared modules.
+    - UI asks for raw secrets instead of references.
+    receipt:
+  - id: T1009
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Update docs and migration notes to match executable registry providers,
+      model/pricing refresh, source labels, blockers, and auth boundaries.
+    allowed_files:
+    - docs/reference/provider-catalog.md
+    - docs/reference/api-routes.md
+    - docs/reference/database-schema.md
+    - docs/user/configuring-providers.md
+    - docs/user/using-the-cli.md
+    - docs/developer/cli-reference.md
+    - docs/developer/deployment.md
+    - docs/developer/faq.md
+    - docs/developer/architecture.md
+    - docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - rg -n "raw ChatGPT|paste.*token|apiKey.*sk-|future-only|TODO|TBD|metadata_only.*executable"
+      docs/reference docs/user docs/developer docs/goals/provider-auth-router-phase4
+      docs/recovery/2026-05-20-provider-auth-router-phase-4-implementation-plan.md =>
+      only intentional safety-language or verification-command matches, with false positives
+      classified
+    stop_if:
+    - Docs omit known blockers or incomplete provider mechanisms.
+    - Docs contradict implementation.
+    - Docs imply hosted gateway or raw-token support.
+    receipt:
+  - id: T1010
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Code review, semantic-drift review, source-evidence review, provider/auth
+      safety review, UI/API/CLI parity review, and review-fix gate.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - git diff --name-only => diff containment reviewed
+    - npm test -- lib/providers lib/llm/router app/api/providers components/skill-mall/providers
+      => exit 0 or PR-owned findings listed
+    stop_if:
+    - Implementation changes excluded wizard/preview files.
+    - Implementation leaks secrets or raw tokens.
+    - Implementation drifts from the approved registry/executable contract.
+    - Review findings are not fixed or explicitly blocked.
+    receipt:
+  - id: T1011
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Final verification, blocker documentation, incomplete-work documentation,
+      and commit-prep readiness audit.
+    allowed_files:
+    - docs/goals/provider-auth-router-phase4/state.yaml
+    verify:
+    - npm test -- lib/providers lib/llm/router app/api/providers components/skill-mall/providers
+      => exit 0 or blocker classified
+    - npm test => exit 0 or blocker classified
+    - npx tsc --noEmit --pretty false => exit 0 or blocker classified
+    - cd cli && npm run type-check => exit 0 or blocker classified
+    - npm run lint => exit 0 or failures classified as PR-owned/pre-existing
+    - git diff --name-only => no excluded files changed
+    - git diff --cached --name-only => empty unless user explicitly approved staging
+    - (git diff --name-only; git ls-files --others --exclude-standard) | xargs rg --pcre2
+      -n "sk-(proj|live|ant-api)[A-Za-z0-9_-]+|OPENAI_API_KEY=(?!your-|sk-test)[A-Za-z0-9_-]+|ANTHROPIC_API_KEY=(?!your-)[A-Za-z0-9_-]+|CLAUDE_CODE_OAUTH_TOKEN=[A-Za-z0-9_-]+|CODEX_ACCESS_TOKEN=[A-Za-z0-9_-]+"
+      => no real secrets in changed files; false positives classified
+    - (git diff --name-only; git ls-files --others --exclude-standard) | rg -n "(wizard|preview|\.DS_Store)"
+      => no excluded changed paths
+    stop_if:
+    - Any PR-owned verification failure remains.
+    - Any incomplete work lacks blocker evidence and next safe action.
+    - Any stage/commit/push action is attempted without explicit user approval.
+    receipt:
