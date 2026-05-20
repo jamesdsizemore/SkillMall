@@ -13,6 +13,10 @@ import type { ResearchResult } from "./WizardContext";
 
 const STEP_LABELS = ["TOPIC", "RESEARCH", "METADATA", "PREVIEW", "PROMPTS", "CONFIRM"] as const;
 
+function slugFromTopic(topic: string): string {
+  return topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export function WizardShell() {
   const wizard = useWizard();
   const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
@@ -48,13 +52,47 @@ export function WizardShell() {
     }
   };
 
-  // Step 5 → 6: call /api/confirm-research (preview, no disk write)
+  // Step 3 → 4: build the actual SKILL.md preview before the editable screen.
+  const handleStep3Next = async () => {
+    if (!wizard.researchResult) return;
+    wizard.setLoading(true);
+    wizard.setError(null);
+    try {
+      const slug = slugFromTopic(wizard.topic);
+      const res = await fetch("/api/preview-skill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          researchResult: wizard.researchResult,
+          metadata: { slug, category: wizard.category, tags: wizard.tags, targetAgents: wizard.targetAgents },
+          selectedToolNames: wizard.selectedToolNames,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { message?: string }).message ?? `Preview failed (${res.status})`);
+      }
+      const { skillDirectory } = await res.json();
+      const skillMd = skillDirectory.files.find((f: { path: string }) => f.path === "SKILL.md")?.content ?? "";
+      if (!skillMd.trim()) {
+        throw new Error("Preview did not include a generated SKILL.md file");
+      }
+      wizard.setPreview(skillDirectory, skillMd);
+      wizard.nextStep();
+    } catch (err) {
+      wizard.setError(err instanceof Error ? err.message : "Preview failed");
+    } finally {
+      wizard.setLoading(false);
+    }
+  };
+
+  // Step 5 → 6: call /api/confirm-research (prompt preview, no disk write)
   const handleStep5Next = async () => {
     if (!wizard.researchResult) return;
     wizard.setLoading(true);
     wizard.setError(null);
     try {
-      const slug = wizard.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const slug = slugFromTopic(wizard.topic);
       const res = await fetch("/api/confirm-research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,6 +101,7 @@ export function WizardShell() {
           metadata: { slug, category: wizard.category, tags: wizard.tags, targetAgents: wizard.targetAgents },
           selectedToolNames: wizard.selectedToolNames,
           selectedMetaTypes: wizard.selectedMetaTypes,
+          ...(wizard.skillMdPreview !== null ? { skillMdContent: wizard.skillMdPreview } : {}),
         }),
       });
       if (!res.ok) {
@@ -86,7 +125,7 @@ export function WizardShell() {
     wizard.setLoading(true);
     wizard.setError(null);
     try {
-      const slug = wizard.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const slug = slugFromTopic(wizard.topic);
       const res = await fetch("/api/create-skill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,6 +134,7 @@ export function WizardShell() {
           metadata: { slug, category: wizard.category, tags: wizard.tags, targetAgents: wizard.targetAgents },
           selectedToolNames: wizard.selectedToolNames,
           selectedMetaTypes: wizard.selectedMetaTypes,
+          ...(wizard.skillMdPreview !== null ? { skillMdContent: wizard.skillMdPreview } : {}),
         }),
       });
       if (!res.ok) {
@@ -219,14 +259,17 @@ export function WizardShell() {
             targetAgents={wizard.targetAgents}
             onCategoryChange={(cat) => wizard.setMetadata(cat, wizard.tags, wizard.targetAgents)}
             onTagsChange={(tags) => wizard.setMetadata(wizard.category, tags, wizard.targetAgents)}
-            onNext={() => wizard.nextStep()}
+            onNext={handleStep3Next}
             onBack={wizard.prevStep}
+            isLoading={wizard.isLoading}
+            error={wizard.error}
           />
         )}
 
         {wizard.step === 4 && (
           <Step4Preview
             skillMdPreview={wizard.skillMdPreview ?? ""}
+            onContentChange={wizard.setSkillMdPreview}
             onNext={() => wizard.nextStep()}
             onBack={wizard.prevStep}
           />

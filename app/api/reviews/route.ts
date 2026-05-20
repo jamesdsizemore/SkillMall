@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getSession } from "@/lib/auth/github";
+import { authenticationRequiredResponse, getSessionFromRequest } from "@/lib/auth/policy";
 import { createReview, hasInstallSignal } from "@/lib/reviews";
-import { logInstallEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 
@@ -13,12 +12,10 @@ const ReviewBodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // Auth required
-  const token = req.cookies.get("sm_session")?.value;
-  const session = token ? getSession(token) : null;
+  const session = getSessionFromRequest(req);
 
   if (!session) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return authenticationRequiredResponse("unauthorized");
   }
 
   const body = await req.json().catch(() => null);

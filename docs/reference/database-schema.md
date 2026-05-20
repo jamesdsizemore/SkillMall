@@ -2,6 +2,10 @@
 
 SkillMall Phase 2 uses SQLite via `better-sqlite3`. No cloud database. No Supabase. The database file lives at `data/skillmall.db` (gitignored) and is created automatically on first run.
 
+Provider/Auth Router Phase 1 adds local LLM provider metadata and request-ledger tables. Phase 2 expands those tables for local Bifrost gateway execution, model refresh, pricing snapshots, and routing-policy evaluation. Phase 3 exposes those records through the Provider Center, model refresh/status actions, safe provider tests, and grouped usage/cost summaries. These tables are local-only and do not introduce a hosted gateway, hosted observability service, or cloud database.
+
+The database stores provider IDs, auth modes, secret references, model snapshots, pricing snapshots, request metadata, and routing/budget state. It must not store raw ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, raw API key values, or credential-file paths.
+
 ## Setup
 
 ```bash
@@ -109,6 +113,191 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   applied_at TEXT NOT NULL DEFAULT (datetime('now'))
 )
 ```
+
+---
+
+### llm_provider_configs
+
+Stores non-secret provider configuration for the router. Secret values are not stored here. `env_key` rows store only the environment variable name in `secret_ref`; `gateway_virtual_key` rows store only the gateway virtual-key environment variable name.
+
+Allowed auth modes are:
+
+- `env_key`
+- `local_cli_session`
+- `none_local`
+- `gateway_virtual_key`
+
+Allowed gateway backends:
+
+- `direct`
+- `bifrost_local`
+
+Reserved future auth/gateway modes such as `codex_session`, `oauth_device_flow`, `keychain_ref`, GoModel, LiteLLM, Portkey, TensorZero, and external hosted gateways are not implemented in Phase 2.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_provider_configs (
+  id TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key')),
+  secret_ref_type TEXT CHECK (secret_ref_type IS NULL OR secret_ref_type IN ('env', 'none', 'gateway_virtual_key_ref')),
+  secret_ref TEXT,
+  base_url TEXT,
+  gateway_backend TEXT CHECK (gateway_backend IS NULL OR gateway_backend IN ('direct', 'bifrost_local')),
+  enabled INTEGER NOT NULL DEFAULT 1,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+The migration also enforces auth/secret pairing: `env_key` requires an env secret reference, while `local_cli_session` and `none_local` cannot store secret references.
+
+---
+
+### llm_models
+
+Caches model metadata by provider. Phase 3 model refresh follows each Provider Center row's declared `discoveryStrategy`. OpenAI-compatible rows may probe configured endpoints, provider-specific rows require dedicated adapters, cloud-project rows require project/resource context, local runtime rows require local runtime status, manual rows use manual labels, and planned-source-review rows are visible but not live-callable. Static provider defaults remain fallbacks only.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_models (
+  id TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  display_name TEXT,
+  capabilities_json TEXT NOT NULL DEFAULT '{}',
+  context_window INTEGER,
+  max_output_tokens INTEGER,
+  source TEXT NOT NULL DEFAULT 'manual',
+  last_checked_at TEXT,
+  raw_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(provider_id, model_id)
+);
+```
+
+---
+
+### llm_pricing_snapshots
+
+Stores local pricing snapshots for cost estimation. Phase 1 does not implement provider-wide automatic price refresh.
+
+Phase 2 uses these rows for local estimated-cost calculation when a provider or selected gateway does not report an exact request cost. Provider/gateway-reported costs are recorded as `actual_cost_usd`; locally calculated costs are recorded as `estimated_cost_usd` and must never be presented as exact spend.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_pricing_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  pricing_json TEXT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  source TEXT NOT NULL,
+  source_url TEXT,
+  snapshot_at TEXT NOT NULL DEFAULT (datetime('now')),
+  hash TEXT
+);
+```
+
+---
+
+### llm_routing_policies
+
+Stores routing-policy metadata. Phase 2 supports bounded runtime evaluation for approved modes.
+
+Allowed modes:
+
+- `manual`
+- `fallback_chain`
+- `local_first`
+- `budget_guarded_manual`
+
+Future/not implemented modes include `cheapest_compatible`, `quality_first`, and semantic/eval-based routing.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_routing_policies (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('manual', 'fallback_chain', 'local_first', 'budget_guarded_manual')),
+  rules_json TEXT NOT NULL DEFAULT '{}',
+  budget_json TEXT NOT NULL DEFAULT '{}',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+---
+
+### llm_requests
+
+Records local LLM request lifecycle rows. Prompt and response bodies are not stored by default.
+Provider/auth usage visibility reads this ledger through `lib/llm/router/usage-summary.ts`.
+The helper and `/api/providers/usage` summarize request counts, success/failure counts, per-provider
+usage, per-model usage, per-operation usage, auth modes, route backends, routing-policy usage, token
+counts, latency, and cost. `actual_cost_usd` and `estimated_cost_usd` remain separate fields with
+separate API labels: `provider_or_gateway_reported_actual_cost` and `locally_estimated_cost`.
+Estimated cost is a local estimate and must not be presented as exact spend.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_requests (
+  id TEXT PRIMARY KEY,
+  operation TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  model_id TEXT,
+  route_backend TEXT NOT NULL DEFAULT 'direct' CHECK (route_backend IN ('direct', 'bifrost_local')),
+  auth_mode TEXT NOT NULL CHECK (auth_mode IN ('env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key')),
+  routing_policy_id TEXT,
+  status TEXT NOT NULL CHECK (status IN ('started', 'succeeded', 'failed')),
+  started_at TEXT NOT NULL,
+  completed_at TEXT,
+  latency_ms INTEGER,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  cached_input_tokens INTEGER,
+  reasoning_tokens INTEGER,
+  estimated_cost_usd REAL,
+  actual_cost_usd REAL,
+  cost_source TEXT,
+  error_code TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+```
+
+---
+
+### llm_request_events
+
+Records local request lifecycle events such as provider errors. Event metadata is JSON and should not include prompt or response bodies.
+
+```sql
+CREATE TABLE IF NOT EXISTS llm_request_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id TEXT NOT NULL REFERENCES llm_requests(id),
+  event_type TEXT NOT NULL,
+  provider_id TEXT,
+  model_id TEXT,
+  message TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+---
+
+### Provider usage summary API
+
+`GET /api/providers/usage` is backed by `lib/llm/router/usage-summary.ts` and returns:
+
+- `summary`: total request, success, failure, started, token, latency, actual-cost, and estimated-cost metrics.
+- `byProvider`: the same metrics grouped by `provider_id`.
+- `byModel`: the same metrics grouped by `provider_id` and `model_id` when the ledger has model IDs.
+- `byOperation`: the same metrics grouped by operation.
+- `byAuthMode` and `byRouteBackend`: the same metrics grouped by `auth_mode` and `route_backend`.
+- `byRoutingPolicy`: the same metrics grouped by `routing_policy_id`.
+- `budgetPolicies`: routing-policy budget status derived from `llm_routing_policies.budget_json` when numeric budget fields are present.
+- `costLabels`: labels that preserve the distinction between exact provider/gateway-reported actual cost and local estimated cost.
+
+Budget visibility currently recognizes numeric `remainingUsd` or `remaining_usd` as a remaining-budget signal, and numeric `limitUsd`, `limit_usd`, `monthlyLimitUsd`, `monthly_limit_usd`, `monthlyBudgetUsd`, or `monthly_budget_usd` as budget-limit signals. If a budget object exists but those numeric fields are unavailable, the API reports the policy budget status as `unknown` instead of inventing a spend interpretation.
 
 ---
 

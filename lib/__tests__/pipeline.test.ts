@@ -3,6 +3,7 @@ import {
   atomicWrite,
   buildSkillFromResearch,
   estimateSkillResourceScore,
+  replaceSkillMdContent,
   runPipeline,
   validateSkillDirectory,
 } from "../pipeline";
@@ -195,6 +196,76 @@ describe("buildSkillFromResearch", () => {
     }, ["one", "two", "three", "four", "five", "six"]);
 
     expect(score).toBe(100);
+  });
+
+  it("applies reviewed SKILL.md content before validation and optional write", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      text: async () => SAMPLE_HTML,
+    }));
+    const client = buildConfirmedResearchClient();
+
+    const result = await buildSkillFromResearch({
+      researchResult: blueOcean,
+      metadata: META,
+      skillMdContent: "",
+    }, client);
+
+    expect(result.skillDirectory.files.find((file) => file.path === "SKILL.md")?.content).toBe("");
+    expect(result.validation.valid).toBe(false);
+    expect(result.validation.errors.some((error) => error.field === "name")).toBe(true);
+  });
+});
+
+describe("replaceSkillMdContent", () => {
+  it("replaces only SKILL.md content without mutating other files", () => {
+    const original = {
+      slug: "my-skill",
+      category: "business",
+      files: [
+        { path: "SKILL.md", content: "original" },
+        { path: "README.md", content: "readme" },
+      ],
+    };
+
+    const updated = replaceSkillMdContent(original, "edited");
+
+    expect(updated).not.toBe(original);
+    expect(updated.files.find((file) => file.path === "SKILL.md")?.content).toBe("edited");
+    expect(updated.files.find((file) => file.path === "README.md")?.content).toBe("readme");
+    expect(original.files.find((file) => file.path === "SKILL.md")?.content).toBe("original");
+  });
+
+  it("leaves directories without SKILL.md unchanged", () => {
+    const original = {
+      slug: "my-skill",
+      category: "business",
+      files: [{ path: "README.md", content: "readme" }],
+    };
+
+    const updated = replaceSkillMdContent(original, "edited");
+
+    expect(updated.files).toEqual(original.files);
+  });
+
+  it("allows blank reviewed SKILL.md content to fail normal validation", () => {
+    const original = {
+      slug: "my-skill",
+      category: "business",
+      files: [
+        {
+          path: "SKILL.md",
+          content: `---\nname: my-skill\ndescription: "Apply the skill."\n---\n`,
+        },
+        { path: "README.md", content: "readme" },
+      ],
+    };
+
+    const updated = replaceSkillMdContent(original, "");
+    const validation = validateSkillDirectory(updated);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.some((error) => error.field === "name")).toBe(true);
   });
 });
 

@@ -97,8 +97,8 @@ See the [GitHub OAuth in Production](#github-oauth-in-production) section below 
 
 ```
 SKILL_MALL_PROVIDER  = openai
-SKILL_MALL_API_KEY   = sk-...
 SKILL_MALL_MODEL     = gpt-4o
+OPENAI_API_KEY       = your-openai-api-key
 ```
 
 **Do not set Stripe keys on Vercel** unless you have implemented a separate API server for checkout. The Stripe webhook handler requires a writable SQLite database — the webhook will fail on Vercel's read-only filesystem.
@@ -212,14 +212,13 @@ In the Railway dashboard, go to your service → Variables. Add all of the follo
 NODE_ENV                       = production
 NEXT_PUBLIC_APP_URL            = https://your-app.up.railway.app
 SKILL_MALL_PROVIDER            = openai
-SKILL_MALL_API_KEY             = sk-...
 SKILL_MALL_MODEL               = gpt-4o
 SKILL_MALL_EMBEDDING_PROVIDER  = openai
-OPENAI_API_KEY                 = sk-...
+OPENAI_API_KEY                 = your-openai-api-key
 GITHUB_CLIENT_ID               = (from GitHub OAuth App)
 GITHUB_CLIENT_SECRET           = (from GitHub OAuth App)
 NEXTAUTH_SECRET                = (openssl rand -hex 32)
-STRIPE_SECRET_KEY              = sk_live_...
+STRIPE_SECRET_KEY              = your-stripe-secret-key
 STRIPE_PUBLISHABLE_KEY         = pk_live_...
 STRIPE_WEBHOOK_SECRET          = whsec_...
 PORT                           = 3000
@@ -267,7 +266,7 @@ cp /dev/stdin .env.local << 'EOF'
 NODE_ENV=production
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
 SKILL_MALL_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 # ... all other vars
 EOF
 
@@ -314,7 +313,7 @@ Every environment variable SkillMall reads, what it does, whether it is required
 | Variable | Required | Where to get it | What breaks if missing |
 |---|---|---|---|
 | `SKILL_MALL_PROVIDER` | Yes — for skill creation | `npx skill-mall configure`, or set manually | Skill creation pipeline fails: "No LLM provider configured" |
-| `SKILL_MALL_API_KEY` | Yes — unless using `ollama` or `claude-code` | Your LLM provider's API dashboard | Authentication fails for OpenAI, Gemini, Groq — all LLM calls return 401 |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `GROQ_API_KEY` | Yes for matching API providers | Provider API dashboard | API provider calls fail |
 | `SKILL_MALL_MODEL` | No | Auto-set by `npx skill-mall configure` | Provider falls back to its default model |
 | `SKILL_MALL_EMBEDDING_PROVIDER` | No — for RAG only | Same options as `SKILL_MALL_PROVIDER` | RAG knowledge attachment (`/api/retrieve`) fails: "No embedding provider configured" |
 | `OPENAI_API_KEY` | Yes — if using OpenAI embeddings | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | OpenAI embedding calls fail; RAG attach-knowledge returns 500 |
@@ -332,7 +331,11 @@ Every environment variable SkillMall reads, what it does, whether it is required
 
 ### Variable notes
 
-**`SKILL_MALL_PROVIDER` valid values:** `openai`, `claude-code`, `gemini`, `groq`, `ollama`. The `claude-code` provider spawns `claude -p` subprocesses using the authenticated Claude Code CLI session — it does not require an API key but does require Claude Code to be installed and authenticated on the server.
+**`SKILL_MALL_PROVIDER` executable values:** `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, `ollama`. This environment variable is intentionally narrower than the broad Provider Center registry. Registry-only rows such as OpenRouter, cloud-project providers, and custom OpenAI-compatible metadata rows are visible in Provider Center but do not become runnable direct providers until an executable adapter is implemented and tested.
+
+The `claude-code` provider spawns `claude -p` subprocesses using the authenticated Claude Code CLI local tool session. It does not require Anthropic API-key access, but it does require Claude Code to be installed and authenticated on the server. Claude account/Max auth is separate from Anthropic API access; ChatGPT Pro/Codex subscription auth is separate from OpenAI API access.
+
+Bifrost local is optional local gateway infrastructure for `bifrost_local` routing. It is not a required hosted gateway and is not the source of truth for Provider Center settings, model status, or usage/cost summaries.
 
 **`SKILL_MALL_EMBEDDING_PROVIDER`:** Can differ from `SKILL_MALL_PROVIDER`. A common pattern is `SKILL_MALL_PROVIDER=groq` (fast, cheap text generation) with `SKILL_MALL_EMBEDDING_PROVIDER=openai` (best embedding quality). The `claude-code` provider does not support embeddings — setting `SKILL_MALL_EMBEDDING_PROVIDER=claude-code` will cause RAG commands to fail with a descriptive error.
 
@@ -365,10 +368,9 @@ NEXTAUTH_SECRET=...
 NODE_ENV=production
 NEXT_PUBLIC_APP_URL=https://your-app.up.railway.app
 SKILL_MALL_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
 SKILL_MALL_MODEL=gpt-4o
 SKILL_MALL_EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 GITHUB_CLIENT_ID=Ov23li...
 GITHUB_CLIENT_SECRET=...
 NEXTAUTH_SECRET=...
@@ -635,7 +637,7 @@ npx skill-mall create "Kubernetes pod scheduling" --urls https://kubernetes.io/d
 npx skill-mall validate
 ```
 
-The CLI resolves `SKILL_MALL_PROVIDER`, `SKILL_MALL_API_KEY`, and all other variables from the process environment. On Railway, variables set in the dashboard are available automatically. On VPS, they come from `.env.local` or the shell environment.
+The CLI resolves `SKILL_MALL_PROVIDER`, provider-specific API variables such as `OPENAI_API_KEY`, and all other variables from the process environment. It stores only secret references in `~/.skill-mall/config.json`; API key values remain in the environment. On Railway, variables set in the dashboard are available automatically. On VPS, they come from `.env.local` or the shell environment.
 
 **Important:** The CLI writes files to the `skills/` directory on the server. For these changes to survive a Railway deploy, either:
 1. Commit the new skills to git and push — the next deploy picks them up from the repository
@@ -676,7 +678,7 @@ jobs:
       - name: Create skill
         env:
           SKILL_MALL_PROVIDER: openai
-          SKILL_MALL_API_KEY: ${{ secrets.SKILL_MALL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           npx skill-mall create "${{ inputs.topic }}" --urls "${{ inputs.url }}"
           # Confirm the research result (runs second stage of pipeline)

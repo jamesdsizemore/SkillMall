@@ -48,6 +48,7 @@ export interface BuildSkillFromResearchInput {
   metadata: SkillMetadata;
   selectedToolNames?: string[];
   selectedMetaTypes?: string[];
+  skillMdContent?: string;
   writeToDisk?: boolean;
   outputBasePath?: string;
 }
@@ -132,6 +133,18 @@ export function validateSkillDirectory(dir: InMemorySkillDirectory): ValidationR
   return { valid: errors.length === 0, errors, warnings };
 }
 
+export function replaceSkillMdContent(
+  dir: InMemorySkillDirectory,
+  content: string
+): InMemorySkillDirectory {
+  return {
+    ...dir,
+    files: dir.files.map((file) =>
+      file.path === "SKILL.md" ? { ...file, content } : file
+    ),
+  };
+}
+
 // ─── Atomic write ─────────────────────────────────────────────────────────
 
 export async function atomicWrite(
@@ -180,10 +193,14 @@ export async function buildSkillFromResearch(
     generatePrompts(filteredResearchResult, input.metadata, client, input.selectedMetaTypes),
   ]);
 
-  const completeDirectory: InMemorySkillDirectory = {
+  let completeDirectory: InMemorySkillDirectory = {
     ...skillDirectory,
     files: [...skillDirectory.files, ...promptFiles],
   };
+
+  if (input.skillMdContent !== undefined) {
+    completeDirectory = replaceSkillMdContent(completeDirectory, input.skillMdContent);
+  }
 
   const validation = validateSkillDirectory(completeDirectory);
 

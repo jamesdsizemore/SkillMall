@@ -103,7 +103,8 @@ That is it. No key entry, no additional setup.
 ### Option B: OpenAI
 
 ```bash
-npx skill-mall configure --provider openai --key sk-your-key-here
+export OPENAI_API_KEY="your-openai-api-key"
+npx skill-mall configure --provider openai --key-env OPENAI_API_KEY
 ```
 
 The default model is `gpt-4o`. To use a different model, add `--model gpt-4o-mini`.

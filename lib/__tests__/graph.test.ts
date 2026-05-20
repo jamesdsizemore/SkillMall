@@ -16,6 +16,7 @@ function makeSkill(slug: string, linked: string[] = []): Skill {
     author: 'test',
     license: '',
     compatibility: '',
+    hasReadme: false,
     hasScripts: false,
     hasTemplates: false,
     hasSamples: false,

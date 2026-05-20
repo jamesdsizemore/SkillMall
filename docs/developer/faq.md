@@ -185,18 +185,18 @@ The `WizardContext.tsx` implementation uses a `useEffect` on the wizard state to
 
 ### 11. Does Docker container support work?
 
-The default `claude-code` provider requires the `claude` binary on `PATH`, which is not available in a standard Docker container. To run SkillMall in a containerized environment, configure an SDK-backed provider instead:
+The default `claude-code` provider requires the `claude` binary on `PATH`, which is not available in a standard Docker container. To run SkillMall in a containerized environment, configure an API-access or local-runtime executable provider instead:
 
 ```bash
 SKILL_MALL_PROVIDER=openai
-SKILL_MALL_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 ```
 
 Or for Groq (fast, free tier available):
 
 ```bash
 SKILL_MALL_PROVIDER=groq
-SKILL_MALL_API_KEY=gsk_...
+GROQ_API_KEY=your-groq-api-key
 ```
 
 Or for Ollama running as a sidecar container:
@@ -206,7 +206,9 @@ SKILL_MALL_PROVIDER=ollama
 SKILL_MALL_MODEL=llama3.2
 ```
 
-The `resolveProviderConfig()` function in `lib/providers/index.ts` reads `SKILL_MALL_PROVIDER`, `SKILL_MALL_API_KEY`, and `SKILL_MALL_MODEL` from environment variables. Set these in your `docker-compose.yml` or container runtime and all LLM calls will route to the configured provider without any code changes.
+The executable `SKILL_MALL_PROVIDER` values are `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. The broader Provider Center catalog is visible in the app/CLI, but registry-only rows do not become container-runnable providers until an executable adapter is added.
+
+The `resolveProviderConfig()` and router config functions read `SKILL_MALL_PROVIDER`, `SKILL_MALL_MODEL`, and provider-specific API environment variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `GROQ_API_KEY`. Set these in your `docker-compose.yml` or container runtime and all LLM calls will route to the configured provider without any code changes.
 
 The SQLite database at `data/skillmall.db` needs a persistent volume mount if you want sessions and analytics to survive container restarts: `-v ./data:/app/data`.
 

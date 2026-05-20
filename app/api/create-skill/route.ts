@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   const client = createLLMClient(config);
-  const { researchResult, metadata, selectedToolNames, selectedMetaTypes } = parsed.data;
+  const { researchResult, metadata, selectedToolNames, selectedMetaTypes, skillMdContent } = parsed.data;
 
   try {
     const result = await buildSkillFromResearch({
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
       metadata,
       selectedToolNames,
       selectedMetaTypes,
+      skillMdContent,
       writeToDisk: true,
     }, client);
 
