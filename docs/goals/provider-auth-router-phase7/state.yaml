@@ -1,0 +1,228 @@
+version: 2
+active_task: T701
+goal:
+  slug: provider-auth-router-phase7
+  title: Provider/Auth Router Phase 7
+  status: active
+  created_at: '2026-05-20'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-auth-router-phase7-plan
+  source_plan: docs/recovery/2026-05-20-provider-auth-router-phase-7-final-e2e-audit-hardening-plan.md
+  owner_outcome: SkillMall's provider/auth router is proven end to end and Phase 7-owned defects are hardened without new unauthorized features.
+  proof_type: e2e_audit_test_review_hardening_receipts
+  intake:
+    completion_proof: E2E audit matrix, focused tests, full tests, TypeScript, lint classification, secret scan, code review/fixes, docs parity, diff containment, and GoalBuddy receipts prove Provider Center/API/CLI/router/database/docs behavior after Phases 1-6.
+  oracle:
+    signal: GoalBuddy receipts plus current-source audit matrix prove each provider/auth router flow has matching implementation, test, docs, and blocker evidence.
+    final_proof: Final receipt reports complete work, incomplete work, blockers, verification commands, lint classification, secret scan, diff containment, code review fixes, and next safe action.
+  hard_constraints:
+    - Phase 7 implementation must start from updated main after Phase 6 PR #12 merges unless the user explicitly approves a stacked Phase 7 implementation branch.
+    - No hosted gateway/router/proxy/observability product may be required.
+    - SkillMall remains the provider/settings/model/pricing/policy/budget/cost source of truth.
+    - No raw API keys, ChatGPT browser/session tokens, Claude.ai OAuth tokens, Codex credential files, Claude Code credential files, copied credential contents, browser session cookies, or credential-file paths may be accepted.
+    - Do not store prompt or response bodies in tests, simulations, capability checks, ledger metadata, Provider Center state, CLI output, docs, or receipts.
+    - Do not add one ProviderID per broad ProviderRegistryID row.
+    - Do not implement cheapest_compatible, quality_first, semantic routing, learned routing, complexity routing, eval routing, keychain auth, OAuth device flow, Codex session auth, Claude Code token auth, or browser session-token handling.
+    - Do not fix unrelated lint errors unless the user explicitly approves a separate cleanup slice.
+    - Every hardening change must be tied to an audit finding.
+    - Update plan docs, blockers, incomplete work, code review findings, review fixes, and verification receipts.
+    - Do complete Phase 7 work; do not hand off partial work as complete.
+    - Do not stage, commit, push, or open a Phase 7 PR unless the user explicitly approves commit-prep or publish.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-auth-router-phase7/.goalbuddy-board/index.html
+tasks:
+  - id: T701
+    type: pm
+    assignee: PM
+    status: active
+    objective: Verify branch, PR #12/mainline, dirty state, and implementation authority before any Phase 7 implementation.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase7/state.yaml
+    verify:
+      - git status -sb => branch and dirty state recorded
+      - git branch --show-current => implementation/planning branch recorded
+      - gh pr view 12 --json state,mergeStateStatus,headRefName,baseRefName,url => Phase 6 PR state recorded
+      - git fetch origin => exit 0
+      - git diff --cached --name-only => empty before implementation unless user approved staging
+      - git diff --name-only => dirty files classified before implementation
+    stop_if:
+      - Phase 7 implementation starts from main before Phase 6 PR #12 is merged.
+      - Phase 7 implementation starts as a stacked branch without explicit user approval.
+      - Dirty files are unrelated and unclassified.
+      - The agent starts implementation before the /goal command.
+    receipt: null
+  - id: T702
+    type: scout
+    assignee: Scout
+    status: queued
+    objective: Build the current-source E2E audit matrix for Provider Center, API, CLI, router, database, ledger, docs, and unsupported-mode boundaries.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+      - docs/recovery/2026-05-20-provider-auth-router-phase-7-final-e2e-audit-hardening-plan.md
+    verify:
+      - rg -n "Provider Center|providers|routing policy|capability|eligibility|pricing|secretRef|llm_requests|promptStored|responseStored|cheapest_compatible|quality_first" app cli components lib db docs => matrix evidence recorded
+      - gh pr view 12 --json state,mergeStateStatus,headRefName,baseRefName,url => current Phase 6 dependency recorded
+    stop_if:
+      - Scout relies on prior chat memory instead of current source.
+      - Scout omits API, CLI, UI, docs, database, ledger, or unsupported-mode boundaries.
+      - Scout recommends new feature work before recording current proof gaps.
+    receipt: null
+  - id: T703
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Lock the Phase 7 hardening contract, allowed-file slices, and stop conditions from the Scout audit matrix.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/recovery/2026-05-20-provider-auth-router-phase-7-final-e2e-audit-hardening-plan.md
+    verify:
+      - T702 receipt reviewed => hardening scope accepted or rejected
+      - rg -n "Out Of Scope|Hardening Rules|Development Workflow Contract|Sub-Agent Orchestration" docs/recovery/2026-05-20-provider-auth-router-phase-7-final-e2e-audit-hardening-plan.md => contract present
+    stop_if:
+      - Any proposed Worker slice is not tied to an audit finding.
+      - The plan allows unsupported mode/auth/provider expansion.
+      - The plan allows prompt/response or raw credential storage.
+      - The plan lacks verification or allowed-file ownership for Workers.
+    receipt: null
+  - id: T704
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Add or harden automated E2E/integration proof for provider API, router, model/pricing/capability refresh, route eligibility, policy simulation, and ledger safety findings approved by T703.
+    allowed_files:
+      - app/api/providers/**/*.ts
+      - app/api/providers/__tests__/**/*.test.ts
+      - lib/llm/router/**/*.ts
+      - lib/llm/router/__tests__/**/*.test.ts
+      - lib/providers/**/*.ts
+      - lib/providers/**/__tests__/**/*.test.ts
+      - db/migrations/*.sql
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+    verify:
+      - npm test -- app/api/providers lib/llm/router lib/providers => exit 0
+      - rg changed files for raw secret/prompt/response/session/credential patterns => hits classified
+    stop_if:
+      - Fix requires unsupported routing/auth/provider expansion.
+      - Test stores prompt or response bodies.
+      - Test uses real secrets instead of redacted/synthetic fixtures.
+      - Worker needs files outside allowed_files without Judge approval.
+    receipt: null
+  - id: T705
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Add or harden Provider Center and CLI E2E parity proof for audit findings approved by T703.
+    allowed_files:
+      - components/skill-mall/providers/**/*.tsx
+      - components/skill-mall/providers/**/*.ts
+      - components/skill-mall/providers/__tests__/**/*.test.tsx
+      - cli/src/**/*.ts
+      - app/api/providers/**/*.ts
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+    verify:
+      - npm test -- components/skill-mall/providers cli app/api/providers lib/llm/router => exit 0
+      - Optional browser walkthrough if local dev server starts cleanly => receipt records URL, steps, and blockers
+      - rg changed files for raw secret/prompt/response/session/credential patterns => hits classified
+    stop_if:
+      - UI implies reference metadata is live account availability.
+      - CLI accepts raw keys, prompts, responses, session tokens, or credential paths.
+      - Worker changes unrelated visual design beyond audited behavior proof.
+    receipt: null
+  - id: T706
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Fix bounded Phase 7 audit defects found by T704/T705 and approved by Judge, without expanding feature scope.
+    allowed_files:
+      - app/api/providers/**/*.ts
+      - components/skill-mall/providers/**/*.tsx
+      - components/skill-mall/providers/**/*.ts
+      - cli/src/**/*.ts
+      - lib/llm/router/**/*.ts
+      - lib/providers/**/*.ts
+      - db/migrations/*.sql
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+    verify:
+      - Focused test command for each fixed finding => exit 0
+      - git diff --check => exit 0
+    stop_if:
+      - Finding is not Phase 7-owned.
+      - Fix requires new routing mode, auth mode, hosted service, provider enum sprawl, prompt/response storage, or unrelated lint cleanup.
+      - Worker cannot tie fix to a recorded audit finding.
+    receipt: null
+  - id: T707
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Update docs and final runbook language for Provider/Auth Router E2E behavior, unsupported modes, blockers, and any Phase 7 hardening changes.
+    allowed_files:
+      - docs/reference/api-routes.md
+      - docs/reference/database-schema.md
+      - docs/reference/provider-catalog.md
+      - docs/developer/cli-reference.md
+      - docs/developer/architecture.md
+      - docs/user/configuring-providers.md
+      - docs/recovery/2026-05-20-provider-auth-router-phase-7-final-e2e-audit-hardening-plan.md
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+    verify:
+      - rg -n "cheapest_compatible|quality_first|semantic|credential-file|prompt body|response body|reference metadata|live account availability|Phase 7" docs/reference docs/developer docs/user docs/recovery/2026-05-20-provider-auth-router-phase-7-final-e2e-audit-hardening-plan.md => docs reviewed
+    stop_if:
+      - Docs claim unsupported modes or auth mechanisms are implemented.
+      - Docs hide blockers or incomplete work.
+      - Docs drift from implemented API/CLI/UI behavior.
+    receipt: null
+  - id: T708
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Perform code review, semantic-drift review, auth/secret review, E2E proof review, and unsupported-mode review before final verification.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+    verify:
+      - git diff --name-only => reviewed file list recorded
+      - rg changed files for unsupported mode and secret/prompt/response patterns => findings classified
+      - npm test -- app/api/providers components/skill-mall/providers cli lib/llm/router lib/providers => exit 0 or blocker recorded
+    stop_if:
+      - Any Phase 7-owned review finding remains unfixed and undocumented.
+      - Any raw secret/token/session/credential-file path acceptance is present.
+      - Any prompt/response storage is present.
+      - Any unsupported mode/auth mechanism is promoted.
+      - E2E matrix has unreviewed gaps.
+    receipt: null
+  - id: T709
+    type: pm
+    assignee: PM
+    status: queued
+    objective: Final verification, blocker report, incomplete-work report, diff containment, and commit-prep readiness.
+    allowed_files:
+      - docs/goals/provider-auth-router-phase7/state.yaml
+      - docs/goals/provider-auth-router-phase7/notes/**
+    verify:
+      - npm test -- app/api/providers components/skill-mall/providers cli lib/llm/router lib/providers => exit 0
+      - npm test => exit 0 or blocker recorded
+      - npx tsc --noEmit --pretty false => exit 0
+      - npm run lint => exit 0 or pre-existing unrelated failures classified
+      - git diff --check => exit 0
+      - git diff --cached --name-only => empty unless user approved staging
+      - git ls-files -m -o --exclude-standard => changed files match Phase 7 scope
+      - secret scan over changed/untracked files => no raw credential material
+      - GoalBuddy checker => exit 0
+    stop_if:
+      - Focused tests fail from Phase 7-owned code.
+      - TypeScript fails from Phase 7-owned code.
+      - Lint fails from Phase 7-owned code.
+      - Secret scan finds raw credential material.
+      - Incomplete work is hidden or minimized.
+      - The agent stages, commits, pushes, or opens a PR without explicit approval.
+    receipt: null
