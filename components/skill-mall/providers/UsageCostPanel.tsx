@@ -81,9 +81,13 @@ export function UsageCostPanel({
     <section className="border border-sm-border bg-sm-surface p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ USAGE + COST ]</p>
+          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ STAGE 4 / USAGE + COST ]</p>
           <p className="text-sm text-sm-primary">
             {usage.available ? "Ledger-backed provider usage" : "Usage ledger unavailable"}
+          </p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-sm-secondary">
+            Review local ledger summaries. Actual cost is provider/gateway reported; estimated cost is a local estimate,
+            not invoice reconciliation.
           </p>
         </div>
         <p className="border border-sm-border px-2 py-1 text-[9px] tracking-widest text-sm-secondary font-label">
@@ -113,7 +117,7 @@ export function UsageCostPanel({
         </p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ REQUESTS ]</p>
           <p className="text-xl font-black leading-none text-sm-display font-display">
@@ -148,7 +152,7 @@ export function UsageCostPanel({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ ACTUAL COST LABEL ]</p>
           <p className="text-xs leading-relaxed text-sm-secondary">{usage.costLabels.actual_cost_usd}</p>
@@ -174,7 +178,7 @@ export function UsageCostPanel({
       {topOperations.length > 0 && (
         <div className="mt-3 border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ TOP OPERATIONS ]</p>
-          <div className="grid gap-1">
+          <div className="grid grid-cols-1 gap-1">
             {topOperations.map((operation) => (
               <p key={operation.operation} className="text-xs leading-relaxed text-sm-secondary">
                 {operation.operation}: {formatCount(operation.request_count)} requests,{" "}
@@ -188,7 +192,7 @@ export function UsageCostPanel({
       {budgetPolicies.length > 0 && (
         <div className="mt-3 border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ BUDGET POLICY STATUS ]</p>
-          <div className="grid gap-1">
+          <div className="grid grid-cols-1 gap-1">
             {budgetPolicies.map((policy) => (
               <p key={policy.routing_policy_id} className="text-xs leading-relaxed text-sm-secondary">
                 {policy.policy_name}: {policy.budget_status}

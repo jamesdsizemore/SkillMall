@@ -179,8 +179,12 @@ export function PolicyControlPanel({
     <section className="border border-sm-border bg-sm-surface p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ ROUTING POLICY + BUDGET ]</p>
+          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ STAGE 3 / LOCAL ROUTING POLICY ]</p>
           <h3 className="text-lg font-bold text-sm-display">Policy controls</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-sm-secondary">
+            Edit only supported local policy modes. Cheapest, quality, semantic, learned, and eval routing stay blocked
+            until a later approved phase.
+          </p>
         </div>
         <p className="border border-sm-border px-2 py-1 text-[9px] tracking-widest text-sm-secondary font-label">
           [ ACTIVE: {(activeRoutingPolicyId ?? "MANUAL DEFAULT").toUpperCase()} ]
@@ -188,7 +192,7 @@ export function PolicyControlPanel({
       </div>
 
       {policies.length > 0 && (
-        <div className="mb-4 grid gap-2">
+        <div className="mb-4 grid grid-cols-1 gap-2">
           {policies.map((policy) => (
             <button
               type="button"
@@ -207,7 +211,7 @@ export function PolicyControlPanel({
         </div>
       )}
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field
           label="POLICY ID"
           value={draft.id}
@@ -325,7 +329,7 @@ export function PolicyControlPanel({
       {simulationResult?.eligibility?.length ? (
         <div className="mt-4 border border-sm-border-subtle px-3 py-2">
           <p className="mb-2 text-[9px] tracking-widest text-sm-disabled font-label">[ ROUTE ELIGIBILITY ]</p>
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {simulationResult.eligibility.map((item) => (
               <p key={item.candidateId} className="text-xs leading-relaxed text-sm-secondary">
                 {item.candidateId}: capability {item.capabilityStatus}, pricing {item.pricingStatus}

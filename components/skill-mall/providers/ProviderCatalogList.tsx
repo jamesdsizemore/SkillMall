@@ -69,6 +69,8 @@ function StatusPill({ provider }: { provider: ProviderRow }) {
       ? "source review"
       : provider.executableProviderId
         ? "configurable"
+        : provider.gatewayProfile?.kind === "openai_compatible"
+          ? "compatible"
         : "registry";
   const tone = provider.configStatus.configured
     ? "border-sm-blue text-sm-blue"
@@ -91,15 +93,20 @@ export function ProviderCatalogList({
   const groups = groupsForProviders(providers);
 
   return (
-    <div className="border border-sm-border bg-sm-surface">
+    <div className="min-w-0 border border-sm-border bg-sm-surface">
       <div className="border-b border-sm-border px-3 py-2">
         <p className="text-[9px] tracking-widest text-sm-secondary font-label">[ PROVIDER CATALOG ]</p>
+        <p className="mt-1 text-[11px] leading-snug text-sm-disabled">
+          Select a catalog row to review its access type, execution boundary, setup state, and safe next action.
+        </p>
       </div>
       <div className="max-h-[760px] overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label} className="border-b border-sm-border last:border-b-0">
             <div className="px-3 py-2">
-              <p className="text-[9px] tracking-widest text-sm-display font-label">{group.label}</p>
+              <p className="text-[9px] tracking-widest text-sm-display font-label">
+                {group.label} / {group.providers.length}
+              </p>
               <p className="mt-1 text-[11px] leading-snug text-sm-disabled">{group.description}</p>
             </div>
             <div className="space-y-1 px-2 pb-2">

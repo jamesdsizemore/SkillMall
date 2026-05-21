@@ -58,15 +58,19 @@ export function ModelRefreshPanel({
     <section className="border border-sm-border bg-sm-surface p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ MODEL REFRESH + TEST ]</p>
+          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ STAGE 2 / MODEL + STATUS ]</p>
           <p className="text-sm text-sm-primary">{provider.name}</p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-sm-secondary">
+            Inspect model source, cache freshness, capability confidence, blockers, and safe status tests before treating
+            labels as usable routes.
+          </p>
         </div>
         <p className="border border-sm-border px-2 py-1 text-[9px] tracking-widest text-sm-secondary font-label">
           [ {provider.modelStatus.source.toUpperCase()} / {provider.modelStatus.authoritative ? "AUTHORITATIVE" : "FALLBACK"} ]
         </p>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ STRATEGY ]</p>
           <p className="truncate text-sm text-sm-primary">{provider.modelStatus.strategy.replace(/_/g, " ")}</p>
@@ -91,7 +95,7 @@ export function ModelRefreshPanel({
         </div>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ LAST CHECKED ]</p>
           <p className="truncate text-sm text-sm-primary">{formatCheckedAt(provider.modelStatus.lastCheckedAt)}</p>
@@ -108,7 +112,7 @@ export function ModelRefreshPanel({
         </div>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ CAPABLE MODELS ]</p>
           <p className="truncate text-sm text-sm-primary">

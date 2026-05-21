@@ -10,6 +10,13 @@ clients.
 - Registry inclusion does not imply direct router execution.
 - Planned-source-review rows are visible in the catalog but are not live-callable.
 
+Provider Center shows each selected row with its access type, execution boundary,
+setup state, model source, safe next action, registry row ID, and executable
+`ProviderID` only when one exists. These labels are product explanation, not a
+runtime expansion. A row marked OpenAI-compatible or registry/configurable still
+uses the existing generic execution contract or remains metadata/status-only
+according to its registry fields.
+
 The registry lives in `lib/providers/registry.ts`. Shared model-source adapters
 live in `lib/providers/model-sources.ts`; `lib/providers/model-discovery.ts`
 keeps the older discovery facade aligned with those adapters.

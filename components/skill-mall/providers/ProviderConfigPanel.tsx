@@ -112,8 +112,12 @@ export function ProviderConfigPanel({
     <section className="border border-sm-border bg-sm-surface p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ CONFIGURATION ]</p>
+          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ STAGE 1 / SAFE SETUP ]</p>
           <h3 className="text-lg font-bold text-sm-display">{provider.name}</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-sm-secondary">
+            Configure reference names, local runtime/session choices, endpoint labels, and model labels. SkillMall stores
+            references and metadata here, not raw provider secrets.
+          </p>
         </div>
         <a
           href={provider.setupUrl}
@@ -125,7 +129,7 @@ export function ProviderConfigPanel({
         </a>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-2">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="border border-sm-border-subtle px-3 py-2">
           <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ ACCESS LABELS ]</p>
           <p className="text-sm text-sm-primary">{provider.accessModes.map(accessModeLabel).join(" / ")}</p>
@@ -209,7 +213,7 @@ export function ProviderConfigPanel({
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {draft.configMode === "env_key" && (
           <Field
             label="ENV VAR NAME"
