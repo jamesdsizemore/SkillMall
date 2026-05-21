@@ -206,6 +206,16 @@ describe("Provider Center UI", () => {
     const html = renderToStaticMarkup(<ProviderCenter initialData={providersResponse} initialUsage={usageResponse} />);
 
     expect(html).toContain("Provider Center");
+    expect(html).toContain("SELECTED PROVIDER");
+    expect(html).toContain("ACCESS TYPE");
+    expect(html).toContain("EXECUTION BOUNDARY");
+    expect(html).toContain("SETUP STATE");
+    expect(html).toContain("SAFE NEXT ACTION");
+    expect(html).toContain("Direct executable provider: openai");
+    expect(html).toContain("STAGE 1 / SAFE SETUP");
+    expect(html).toContain("STAGE 2 / MODEL + STATUS");
+    expect(html).toContain("STAGE 3 / LOCAL ROUTING POLICY");
+    expect(html).toContain("STAGE 4 / USAGE + COST");
     expect(html).toContain("API providers");
     expect(html).toContain("Local tools / sessions");
     expect(html).toContain("Local runtimes");
@@ -289,7 +299,7 @@ describe("Provider Center UI", () => {
       />
     );
 
-    expect(html).toContain("ROUTING POLICY + BUDGET");
+    expect(html).toContain("STAGE 3 / LOCAL ROUTING POLICY");
     expect(html).toContain("Budget OpenAI");
     expect(html).toContain("budget_guarded_manual");
     expect(html).toContain("SAVE POLICY");

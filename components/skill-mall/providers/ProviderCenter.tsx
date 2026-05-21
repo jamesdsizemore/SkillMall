@@ -303,6 +303,119 @@ function canRefreshProviderWithDraft(provider: ProviderRow | null, draft: Provid
   return !requiresEndpoint || hasConfiguredEndpoint || hasDraftEndpoint;
 }
 
+function accessModeLabel(mode: string): string {
+  const labels: Record<string, string> = {
+    api_access: "API access",
+    local_tool_session: "Local tool/session access",
+    local_runtime: "Local runtime",
+    gateway_virtual_key: "Gateway reference access",
+    cloud_project: "Cloud/project scoped",
+    custom_openai_compatible: "Custom OpenAI-compatible endpoint",
+  };
+  return labels[mode] ?? mode.replace(/_/g, " ");
+}
+
+function executionBoundary(provider: ProviderRow): string {
+  if (provider.accessModes.includes("local_tool_session")) return "Local tool/session status; no credential files copied";
+  if (provider.accessModes.includes("local_runtime")) return "Local runtime endpoint; no provider secret required";
+  if (provider.executableProviderId) return `Direct executable provider: ${provider.executableProviderId}`;
+  if (provider.gatewayProfile?.kind === "openai_compatible") return "Registry row via shared OpenAI-compatible adapter";
+  if (provider.accessModes.includes("cloud_project")) return "Cloud/project metadata row; project setup stays gated";
+  if (provider.status === "planned_source_review") return "Source-review row; live calls blocked";
+  return "Registry metadata row; not a direct executable ProviderID";
+}
+
+function setupState(provider: ProviderRow): string {
+  if (provider.status === "planned_source_review") return "Source review required before setup";
+  if (provider.configStatus.configured) return "Configured with safe references";
+  if (provider.accessModes.includes("local_tool_session")) return "Uses local tool/session auth";
+  if (provider.accessModes.includes("local_runtime")) return "Requires local runtime availability";
+  if (provider.accessModes.includes("cloud_project")) return "Requires project/resource context";
+  return "Ready for reference-only configuration";
+}
+
+function modelState(provider: ProviderRow): string {
+  if (provider.modelStatus.stale) return "Stale, fallback, or reference metadata";
+  if (provider.modelStatus.authoritative) return "Authoritative model source";
+  return "Source-backed or cached model labels";
+}
+
+function safeNextAction(provider: ProviderRow, refreshReady: boolean): string {
+  if (provider.status === "planned_source_review") return "Review provider evidence before live calls";
+  if (!provider.configStatus.configured) return "Configure a safe reference or local endpoint";
+  if (refreshReady) return "Refresh models or run a safe status test";
+  if (provider.configStatus.routingPolicyId) return "Review local routing and usage state";
+  return "Add or activate a local routing policy if needed";
+}
+
+function SelectedProviderContext({
+  provider,
+  refreshReady,
+}: {
+  provider: ProviderRow | null;
+  refreshReady: boolean;
+}) {
+  if (!provider) {
+    return (
+      <section className="border border-sm-border bg-sm-surface p-4">
+        <p className="text-[9px] tracking-widest text-sm-secondary font-label">[ SELECTED PROVIDER ]</p>
+        <p className="mt-2 text-sm text-sm-disabled">Provider catalog status is loading.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-sm-border bg-sm-surface p-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ SELECTED PROVIDER ]</p>
+          <h3 className="text-lg font-bold text-sm-display">{provider.name}</h3>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-sm-secondary">{provider.evidenceNote}</p>
+        </div>
+        <p className="border border-sm-border px-2 py-1 text-[9px] tracking-widest text-sm-secondary font-label">
+          [ {provider.status.replace(/_/g, " ").toUpperCase()} ]
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ ACCESS TYPE ]</p>
+          <p className="text-sm leading-snug text-sm-primary">
+            {provider.accessModes.map(accessModeLabel).join(" / ")}
+          </p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ EXECUTION BOUNDARY ]</p>
+          <p className="text-sm leading-snug text-sm-primary">{executionBoundary(provider)}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ SETUP STATE ]</p>
+          <p className="text-sm leading-snug text-sm-primary">{setupState(provider)}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ SAFE NEXT ACTION ]</p>
+          <p className="text-sm leading-snug text-sm-primary">{safeNextAction(provider, refreshReady)}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ MODEL SOURCE ]</p>
+          <p className="text-sm leading-snug text-sm-primary">{modelState(provider)}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ REGISTRY ROW ]</p>
+          <p className="text-sm leading-snug text-sm-primary">{provider.id}</p>
+        </div>
+        <div className="border border-sm-border-subtle px-3 py-2">
+          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ EXECUTABLE PROVIDER ID ]</p>
+          <p className="text-sm leading-snug text-sm-primary">{provider.executableProviderId ?? "not direct"}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ProviderCenter({
   initialData = null,
   initialUsage = null,
@@ -680,7 +793,7 @@ export function ProviderCenter({
     : "No active provider configuration";
 
   return (
-    <section className="space-y-5">
+    <section className="min-w-0 space-y-5">
       <div>
         <p className="mb-2 text-[9px] tracking-widest text-sm-secondary font-label">[ PROVIDER CENTER ]</p>
         <h2 className="mb-2 text-xl font-bold text-sm-display">Provider Center</h2>
@@ -704,14 +817,16 @@ export function ProviderCenter({
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(240px,320px)_1fr]">
+      <SelectedProviderContext provider={selectedProvider} refreshReady={canRefreshSelectedProvider} />
+
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
         <ProviderCatalogList
           providers={data?.providers ?? []}
           selectedProviderId={selectedProviderId}
           onSelectProvider={handleSelectProvider}
         />
 
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <ProviderConfigPanel
             provider={selectedProvider}
             draft={draft}

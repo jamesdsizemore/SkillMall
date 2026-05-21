@@ -32,10 +32,10 @@ export default async function SettingsLayout({
         </p>
         <h1 className="mb-8 text-2xl font-bold text-sm-display">Settings</h1>
 
-        <div className="flex gap-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
           {/* Sidebar nav */}
-          <nav className="w-40 shrink-0">
-            <ul className="space-y-1">
+          <nav className="w-full shrink-0 sm:w-40">
+            <ul className="flex flex-wrap gap-1 sm:block sm:space-y-1">
               {NAV_ITEMS.map((item) => (
                 <li key={item.href}>
                   <Link
@@ -50,7 +50,7 @@ export default async function SettingsLayout({
           </nav>
 
           {/* Page content */}
-          <div className="min-w-0 flex-1">{children}</div>
+          <div className="w-full min-w-0 flex-1">{children}</div>
         </div>
       </div>
     </div>

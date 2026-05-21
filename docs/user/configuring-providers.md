@@ -6,6 +6,19 @@ SkillMall stores secret references, not raw secrets. API providers use environme
 
 Secret-reference names must be environment-variable-style names, not paths. `OPENAI_API_KEY` and `BIFROST_VIRTUAL_KEY` are valid references; `~/.codex/auth.json`, Claude credential-file paths, and copied session-token locations are rejected.
 
+## Provider Center Workflow
+
+The Provider Center is organized around the way a user evaluates a provider row:
+
+- **Provider catalog:** Select a broad catalog row and see whether it is API access, local tool/session access, local runtime, gateway/OpenAI-compatible access, cloud/project scoped, custom endpoint, or source-review only.
+- **Selected provider:** Review the selected row's access type, execution boundary, setup state, model source, registry row ID, executable `ProviderID` mapping when one exists, and safe next action.
+- **Safe setup:** Configure environment-variable references, gateway virtual-key references, local session/runtime choices, endpoints, model labels, manual model labels, and routing-policy IDs without storing raw provider secrets.
+- **Model and status:** Inspect model source, cache freshness, blockers, capability confidence, safe status tests, and refresh availability.
+- **Local routing policy:** Edit only currently supported local policy modes. Future cheapest, quality, semantic, learned, complexity, and eval routing modes remain blocked until separately approved.
+- **Usage and cost:** Review local ledger summaries. Actual cost is provider/gateway reported; estimated cost is a local SkillMall estimate, not invoice reconciliation.
+
+These sections are workflow labels over the current Provider Center capabilities. They do not widen executable provider support or change provider/router behavior.
+
 ## Provider Catalog vs Executable Providers
 
 The Provider Center has a broad `ProviderRegistryID` catalog. It includes OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.

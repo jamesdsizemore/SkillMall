@@ -1,0 +1,380 @@
+SM
+SkillMall
+[ BETA ]
+Contribute
+Settings
+GitHub
+phase1-browser-proof
+[ SIGN OUT ]
+
+[ SETTINGS ]
+
+Settings
+Providers
+Appearance
+
+[ PROVIDER CENTER ]
+
+Provider Center
+
+Configure provider access with references, inspect local and gateway status, refresh model labels, and track usage costs without storing raw provider secrets in the browser.
+
+[ CONFIGURED: GROQ / LLAMA-3.3-70B-VERSATILE ]
+
+[ ACTIVE MODEL: LLAMA-3.3-70B-VERSATILE ]
+
+[ PROVIDER CENTER STATUS LOADED ]
+
+[ SELECTED PROVIDER ]
+
+Groq
+
+Groq API reference exposes OpenAI-compatible model listing.
+
+[ ACTIVE CONFIGURABLE ]
+
+[ ACCESS TYPE ]
+
+API access / Gateway reference access
+
+[ EXECUTION BOUNDARY ]
+
+Direct executable provider: groq
+
+[ SETUP STATE ]
+
+Configured with safe references
+
+[ SAFE NEXT ACTION ]
+
+Refresh models or run a safe status test
+
+[ MODEL SOURCE ]
+
+Stale, fallback, or reference metadata
+
+[ REGISTRY ROW ]
+
+groq
+
+[ EXECUTABLE PROVIDER ID ]
+
+groq
+
+[ PROVIDER CATALOG ]
+
+Select a catalog row to review its access type, execution boundary, setup state, and safe next action.
+
+API providers / 7
+
+Env-var references for provider APIs.
+
+Anthropic Claude API
+API access
+configurable
+Google Gemini API
+API access
+configurable
+Hugging Face Inference Providers
+API access
+registry
+Cohere
+API access
+registry
+Fireworks AI
+API access
+Gateway access
+compatible
+Replicate
+API access
+registry
+Perplexity
+API access
+registry
+
+Local tools / sessions / 1
+
+Official local session status only.
+
+Claude Code CLI
+Local CLI/session access
+configurable
+
+Local runtimes / 2
+
+Local endpoint availability and model labels.
+
+Ollama
+Local runtime
+configurable
+NVIDIA NIM
+Local runtime
+Custom OpenAI-compatible
+compatible
+
+Gateway / OpenAI-compatible / custom / 14
+
+Virtual-key refs, routing policy, and compatible endpoints.
+
+OpenAI API
+API access
+Gateway access
+configurable
+Groq
+API access
+Gateway access
+configured
+OpenRouter
+API access
+Gateway access
+compatible
+Alibaba Cloud Model Studio / DashScope / Qwen
+API access
+Gateway access
+compatible
+Z.AI
+API access
+Gateway access
+compatible
+MiniMax
+API access
+Gateway access
+compatible
+Kimi / Moonshot AI
+API access
+Gateway access
+compatible
+DeepSeek
+API access
+Gateway access
+compatible
+Mistral AI
+API access
+Gateway access
+compatible
+xAI
+API access
+Gateway access
+compatible
+Together AI
+API access
+Gateway access
+compatible
+DeepInfra
+API access
+Gateway access
+compatible
+Cerebras
+API access
+Gateway access
+compatible
+Custom OpenAI-Compatible Endpoint
+Custom OpenAI-compatible
+Gateway access
+compatible
+
+Cloud / project providers / 3
+
+Project, resource, region, or deployment scoped rows.
+
+AWS Bedrock
+Cloud project
+registry
+Azure OpenAI
+Cloud project
+registry
+Google Vertex AI
+Cloud project
+registry
+
+Planned / source-review rows / 0
+
+Visible but blocked from live calls until evidence is recorded.
+
+[ NONE ]
+
+[ STAGE 1 / SAFE SETUP ]
+
+Groq
+
+Configure reference names, local runtime/session choices, endpoint labels, and model labels. SkillMall stores references and metadata here, not raw provider secrets.
+
+[ SETUP SOURCE ]
+
+[ ACCESS LABELS ]
+
+API access / Gateway access
+
+[ AUTH CONTRACT ]
+
+Environment variable API key reference
+
+[ ACTIVE MODEL ]
+
+llama-3.3-70b-versatile
+
+[ EXECUTION PROFILE ]
+
+groq
+
+[ GATEWAY BACKEND ]
+
+direct
+
+[ ROUTING POLICY ]
+
+manual default
+
+[ ENV VAR REF ]
+[ GATEWAY REF ]
+[ ENV VAR NAME ]
+[ OPENAI-COMPATIBLE BASE URL ]
+[ MODEL LABEL ]
+[ MANUAL MODEL LABELS ]
+[ ROUTING POLICY ]
+
+Model discovery: openai compatible models. Refresh by probing the configured OpenAI-compatible models endpoint.
+
+Gateway profile: Existing direct client uses an OpenAI-compatible Groq base URL.
+
+[ SAVE REFERENCE CONFIG ]
+
+[ STAGE 2 / MODEL + STATUS ]
+
+Groq
+
+Inspect model source, cache freshness, capability confidence, blockers, and safe status tests before treating labels as usable routes.
+
+[ FALLBACK / FALLBACK ]
+
+[ STRATEGY ]
+
+openai compatible models
+
+[ ACTIVE MODEL ]
+
+llama-3.3-70b-versatile
+
+[ MODEL COUNT ]
+
+2
+
+[ SECRET STATUS ]
+
+reference missing
+
+[ LAST CHECKED ]
+
+never
+
+[ CACHE STATE ]
+
+stale or fallback
+
+[ BLOCKER ]
+
+Refresh by probing the configured OpenAI-compatible models endpoint.
+
+[ CAPABLE MODELS ]
+
+0 / 2
+
+[ CAPABILITY CONFIDENCE ]
+
+fallback
+
+[ CAPABILITY BLOCKERS ]
+
+fallback_only, missing_metadata
+
+[ MODEL LABELS ]
+
+llama-3.3-70b-versatile
+llama-3.1-8b-instant
+[ REFRESH MODELS ]
+[ TEST STATUS ]
+
+[ refresh: IDLE ]
+
+[ test: IDLE ]
+
+[ STAGE 3 / LOCAL ROUTING POLICY ]
+
+Policy controls
+
+Edit only supported local policy modes. Cheapest, quality, semantic, learned, and eval routing stay blocked until a later approved phase.
+
+[ ACTIVE: MANUAL DEFAULT ]
+
+[ POLICY ID ]
+[ POLICY NAME ]
+[ POLICY MODE ]
+manual
+fallback_chain
+local_first
+budget_guarded_manual
+[ SIMULATED ESTIMATED COST USD ]
+[ OPERATION ]
+chat.text
+skill.generate
+skill.preview
+skill.optimize_prompt
+provider.test
+embedding
+[ REQUIRE PRICING ]
+[ REMAINING BUDGET USD ]
+[ BUDGET LIMIT USD ]
+[ SAVE POLICY ]
+[ ACTIVATE ]
+[ DISABLE ]
+[ SIMULATE ]
+
+[ STAGE 4 / USAGE + COST ]
+
+Ledger-backed provider usage
+
+Review local ledger summaries. Actual cost is provider/gateway reported; estimated cost is a local estimate, not invoice reconciliation.
+
+[ GROQ ]
+
+[ REFRESH PRICING ]
+
+[ PRICING SOURCE: SOURCE-BACKED SNAPSHOTS; LOCAL ESTIMATES REMAIN SEPARATE FROM ACTUAL SPEND ]
+
+[ REQUESTS ]
+
+0
+
+0 failed / 0 succeeded
+
+[ TOKENS ]
+
+0
+
+In 0 / Out 0
+
+[ ACTUAL COST USD ]
+
+$0.0000
+
+Reported by provider or gateway
+
+[ ESTIMATED COST USD ]
+
+$0.0000
+
+Local estimate, not exact spend
+
+[ ACTUAL COST LABEL ]
+
+provider_or_gateway_reported_actual_cost
+
+[ ESTIMATED COST LABEL ]
+
+locally_estimated_cost
+
+SkillMall
+—
+Open-source agent skill catalog
+Contribute
+GitHub
