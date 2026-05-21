@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { requireRepoRoot, pc } from '../utils.js'
+import { pc } from '../utils.js'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers/index.js'
 import { optimizePrompt } from '@/lib/prompt-optimizer.js'
 

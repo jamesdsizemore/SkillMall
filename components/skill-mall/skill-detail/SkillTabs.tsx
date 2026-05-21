@@ -325,7 +325,12 @@ function BudgetPanel({ category, slug }: { category: string; slug: string }) {
     }
   }, [category, slug]);
 
-  React.useEffect(() => { fetchAnalysis('claude-code'); }, [fetchAnalysis]);
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      fetchAnalysis('claude-code');
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [fetchAnalysis]);
 
   const handleAgentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const v = e.target.value;

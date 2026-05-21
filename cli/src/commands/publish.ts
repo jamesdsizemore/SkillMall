@@ -9,12 +9,11 @@ export async function publishCommand(args: string[]): Promise<void> {
   const slug = args[0];
   let registry = "skills.sh";
   let dryRun = true; // DEFAULT: always dry-run unless --publish is explicit
-  let actualPublish = false;
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === "--registry" && args[i + 1]) registry = args[++i];
     else if (args[i] === "--dry-run") dryRun = true;
-    else if (args[i] === "--publish") { actualPublish = true; dryRun = false; }
+    else if (args[i] === "--publish") dryRun = false;
   }
 
   if (!slug) {

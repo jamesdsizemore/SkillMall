@@ -130,7 +130,7 @@ ${result.principles.map((p) => `- ${p}`).join("\n")}
   return { path: "README.md", content };
 }
 
-function generateScripts(result: ResearchResult, meta: SkillMetadata): InMemoryFile[] {
+function generateScripts(result: ResearchResult): InMemoryFile[] {
   const files: InMemoryFile[] = [];
 
   // Main analysis script
@@ -206,7 +206,7 @@ export async function buildSkillDirectory(
     files.push(generateTemplate(tool));
   }
 
-  files.push(...generateScripts(result, meta));
+  files.push(...generateScripts(result));
 
   // LLM-based sample files (parallel)
   const samples = await Promise.all(

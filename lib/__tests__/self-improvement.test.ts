@@ -1,7 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { bumpVersion, applySuggestion } from '../self-improvement/applier'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 
 describe('bumpVersion', () => {
   it("returns '1.2.4' for bumpVersion('1.2.3', 'patch')", () => {

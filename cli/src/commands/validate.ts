@@ -79,7 +79,6 @@ export function validateCommand(args: string[]): void {
   let warnCount = 0;
 
   for (const result of results) {
-    const skillDir = path.dirname(result.skillPath);
     const relPath = path.relative(repoRoot, result.skillPath);
     const hasErrors = result.errors.length > 0;
     const hasWarns = result.warnings.length > 0;

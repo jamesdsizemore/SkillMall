@@ -171,8 +171,6 @@ async function main(): Promise<void> {
       // Dynamically resolve version from package.json at runtime
       // This works whether running via tsx (dev) or from dist/
       try {
-        const { createRequire } = await import("node:module");
-        const require = createRequire(import.meta.url);
         // Walk up to find our own package.json
         const pkgPath = new URL("../../package.json", import.meta.url);
         const pkg = JSON.parse(

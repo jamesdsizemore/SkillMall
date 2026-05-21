@@ -4,7 +4,6 @@ import type { InMemoryFile } from "./skill-builder";
 import {
   getFrameworkCandidates,
   FRAMEWORK_DESCRIPTIONS,
-  type ArtifactType,
 } from "./pe-frameworks";
 import { FrameworkSelectionSchema } from "./validators";
 

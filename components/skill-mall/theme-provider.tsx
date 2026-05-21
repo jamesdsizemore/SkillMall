@@ -38,8 +38,11 @@ export function useTheme(): [Theme, (t: Theme) => void] {
   const [theme, setThemeState] = useState<Theme>("system");
 
   useEffect(() => {
-    const saved = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
-    setThemeState(saved);
+    const timeout = window.setTimeout(() => {
+      const saved = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
+      setThemeState(saved);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const setTheme = (t: Theme) => {
