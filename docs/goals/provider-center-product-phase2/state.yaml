@@ -1,0 +1,259 @@
+version: 2
+active_task: T001
+goal:
+  slug: provider-center-product-phase2
+  title: Provider Center Product Phase 2
+  status: active
+  created_at: '2026-05-21'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-center-product-phase2-plan
+  implementation_branch: codex/provider-center-product-phase2
+  source_plan: docs/recovery/2026-05-21-provider-center-product-phase-2-implementation-plan.md
+  owner_outcome: Provider Center turns safe provider configuration into a guided, understandable workflow for existing provider/auth/router capabilities, without adding new auth modes, new providers, new routing modes, credential storage, or executable adapters.
+  proof_type: implementation_tests_browser_review_goalbuddy_receipts
+  intake:
+    original_request: "merge #16 into main, update local main, then start Provider Center Product Phase 2 planning/goalboard."
+    interpreted_outcome: "Merge the completed Phase 1 PR, update main, and prepare an implementation-ready Phase 2 plan and GoalBuddy board."
+    input_shape: existing_plan
+    audience: "SkillMall coding agents and James as product owner"
+    authority: planning_only_until_goal_started
+    completion_proof: "Phase 2 implementation produces guided safe setup UX, resolves or blocks provider-test prompt ambiguity, passes tests/browser proof/review, and preserves provider/auth/router safety boundaries."
+    likely_misfire: "A coding agent uses Phase 2 setup guidance as permission to add OAuth/device flows, raw token fields, credential-file handling, new providers, new auth modes, or deep model/policy/dashboard features."
+  oracle:
+    signal: "Provider Center visibly guides safe provider setup across access modes, explains required references/endpoints/local/session context, and gives safe save/test/refresh next actions without raw secret or prompt-response handling."
+    final_proof: "Final receipt confirms changed files, test/browser/code-review evidence, no safety drift, no hidden incomplete work, and decision: complete."
+  hard_constraints:
+    - Phase 2 is configuration UX and setup guidance only.
+    - Do not start implementation until the user explicitly runs this goal or otherwise approves Phase 2 implementation.
+    - "Start implementation from updated main after PR #16 is merged unless the user explicitly approves stacked Phase 2 implementation."
+    - Do not add providers, auth modes, routing modes, gateway dependencies, OAuth/device flows, keychain storage, credential storage, credential-file ingestion, or executable provider adapters.
+    - Do not widen ProviderID.
+    - Do not ask users to paste raw API keys, copied tokens, browser/session tokens, cookies, credential-file contents, or credential-file paths.
+    - API-key access remains optional and must be labeled as API access.
+    - Subscription/account/tool-session auth remains separate from API-key access.
+    - Claude Code remains local tool/session access; SkillMall must not copy credential files.
+    - Do not store prompt or response bodies in UI state, fixtures, docs, tests, API payloads, logs, receipts, screenshots, or browser proof.
+    - Do not introduce hosted dashboards, paid hosted control planes, or required extra-cost infrastructure.
+    - Do not promote cheapest_compatible, quality_first, semantic routing, learned routing, complexity routing, eval routing, or automatic optimization.
+    - Do not hand off partial work as complete.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-center-product-phase2/.goalbuddy-board/index.html
+tasks:
+  - id: T001
+    type: pm
+    assignee: PM
+    status: active
+    objective: Verify implementation authority, PR #16 merge state, branch hygiene, dirty state, and Phase 2 allowed-file boundaries before any source work.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/**
+    verify:
+      - git status --short --branch => branch and dirty state recorded
+      - gh pr view 16 --json state,mergedAt,mergeCommit,url,title => Phase 1 PR merge state recorded
+      - git log --oneline -5 => local main ancestry/Phase 1 merge recorded
+      - git diff --name-only && git ls-files -o --exclude-standard => dirty files classified
+      - test -f docs/recovery/2026-05-21-provider-center-product-phase-2-implementation-plan.md => plan exists
+    stop_if:
+      - User has not approved Phase 2 implementation.
+      - PR #16 is unmerged and the user has not explicitly approved stacked implementation.
+      - Dirty product-code files are present and unclassified.
+      - The agent stages, commits, pushes, or opens a PR without explicit user approval.
+    receipt: null
+  - id: T002
+    type: scout
+    assignee: Scout
+    status: queued
+    objective: Revalidate current setup/configuration source, tests, docs, AGENTS.md, relevant Next.js docs, and the provider-test prompt ambiguity before design or implementation.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/T002-source-revalidation.md
+    verify:
+      - sed -n '1,260p' AGENTS.md => project rules recorded
+      - sed -n '1,260p' docs/recovery/2026-05-21-provider-center-product-phase-2-implementation-plan.md => phase plan recorded
+      - rg -n "ProviderConfigPanel|configureProvider|testProvider|configMode|secretRef|baseURL|manualModels|prompt|response" components/skill-mall/providers app/api/providers lib/llm/router lib/providers docs/user docs/reference => setup evidence recorded
+      - sed -n '1,160p' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md => relevant Next.js docs recorded
+    stop_if:
+      - Scout relies on Phase 0/1 notes without checking current source.
+      - Scout recommends adding providers, auth modes, routing modes, OAuth, keychain, credential-file ingestion, or backend architecture changes.
+      - Scout skips the provider-test prompt-field evidence.
+      - Scout skips Next.js docs required by AGENTS.md.
+    receipt: null
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Approve a concrete Phase 2 setup contract, prompt-field disposition, allowed files, and stop conditions before Worker code edits.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/T003-setup-contract.md
+    verify:
+      - test -f docs/goals/provider-center-product-phase2/notes/T002-source-revalidation.md => source revalidation exists
+      - rg -n "setup mode|required field|save|test|refresh|prompt|allowed files|stop conditions|raw secret|credential" docs/goals/provider-center-product-phase2/notes/T003-setup-contract.md => setup contract is explicit
+    stop_if:
+      - Setup contract changes provider/router execution behavior.
+      - Setup contract adds OAuth/device flows, raw token fields, keychain, credential-file ingestion, new auth modes, new routing modes, or new providers.
+      - Setup contract leaves provider-test prompt disposition ambiguous.
+      - Allowed files are too broad for the approved slice.
+    receipt: null
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement the Judge-approved guided setup UX in Provider Center setup surfaces.
+    allowed_files:
+      - components/skill-mall/providers/ProviderConfigPanel.tsx
+      - components/skill-mall/providers/ProviderCenter.tsx
+      - components/skill-mall/providers/ModelRefreshPanel.tsx
+      - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/**
+    verify:
+      - npm test -- components/skill-mall/providers => Provider Center tests pass
+      - rg -n "raw API key|browser token|session token|cookie|credential file|credential path|prompt body|response body" components/skill-mall/providers || true => hits are safe constraints or negative tests only
+    stop_if:
+      - Worker edits API, router, provider registry, CLI, database, gateway, model refresh, usage/cost, or routing-policy files in this task.
+      - Worker adds new auth, provider, routing, OAuth, keychain, credential-file, or executable adapter behavior.
+      - Worker introduces raw secret/token/cookie/credential-file prompts or prompt/response storage.
+      - Worker deepens Phase 3 model, Phase 4 usage/cost, Phase 5 policy, or Phase 6 catalog-governance scope.
+    receipt: null
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Resolve the provider status-test prompt ambiguity and update focused API tests, only as approved by the Judge setup contract.
+    allowed_files:
+      - app/api/providers/test/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/**
+    verify:
+      - npm test -- app/api/providers => provider API route tests pass
+      - rg -n "prompt|response|raw_secret_field_rejected|invalid_input" app/api/providers/test/route.ts app/api/providers/__tests__/providers-route.test.ts => prompt/status-test contract classified
+    stop_if:
+      - T003 did not explicitly approve the prompt-field disposition.
+      - Any prompt body or response body is accepted, stored, echoed, logged, or snapshotted.
+      - Raw-secret rejection is weakened.
+      - Configure route behavior is changed without Judge approval.
+    receipt: null
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Update user/reference docs to match Phase 2 setup guidance and provider status-test behavior.
+    allowed_files:
+      - docs/user/configuring-providers.md
+      - docs/reference/api-routes.md
+      - docs/reference/provider-catalog.md
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/**
+    verify:
+      - rg -n "safe setup|environment variable|gateway virtual-key|local session|local runtime|status test|prompt|response|credential" docs/user/configuring-providers.md docs/reference/api-routes.md docs/reference/provider-catalog.md => docs reflect safe setup contract
+      - rg -n "raw API key|browser token|session token|cookie|credential file|credential path|prompt body|response body" docs/user/configuring-providers.md docs/reference/api-routes.md docs/reference/provider-catalog.md || true => hits are safety constraints only
+    stop_if:
+      - Docs imply users should paste raw secrets, tokens, cookies, credential-file contents, or credential-file paths.
+      - Docs imply provider tests send real prompts or store prompt/response bodies.
+      - Docs add unimplemented Phase 3-6 features as if they already exist.
+    receipt: null
+  - id: T007
+    type: pm
+    assignee: PM
+    status: queued
+    objective: Run required verification, including focused/broad tests, TypeScript, lint, diff check, secret scan, and desktop/mobile browser proof or exact runtime blocker.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/T007-verification.md
+    verify:
+      - npm test -- components/skill-mall/providers => pass or exact blocker
+      - npm test -- app/api/providers => pass or exact blocker
+      - npm test -- app/api/providers lib/providers lib/llm/router => pass or exact blocker
+      - npm test => pass or exact blocker
+      - npx tsc --noEmit --pretty false => pass or exact blocker
+      - npm run lint => pass or pre-existing unrelated failures classified
+      - git diff --check => pass
+      - desktop and mobile browser proof => recorded or exact runtime blocker
+      - secret/proof artifact scan => pass
+    stop_if:
+      - Phase 2-owned tests fail.
+      - Phase 2 creates lint, typecheck, or diff-check regressions.
+      - Browser proof shows overlap, text clipping, unreadable setup guidance, unsafe prompt/secret language, or broken Provider Center workflow.
+      - Protected-route HTML proof artifacts containing session data are retained.
+    receipt: null
+  - id: T008
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Perform code review for bugs, semantic drift, safety regressions, incomplete work, weak verification, and plan deviations.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/T008-code-review.md
+    verify:
+      - git diff -- components/skill-mall/providers app/api/providers docs/user docs/reference => reviewed diff recorded
+      - rg -n "finding|severity|fix required|approved|blocked" docs/goals/provider-center-product-phase2/notes/T008-code-review.md => review decision recorded
+    stop_if:
+      - Any high or medium severity finding remains unfixed.
+      - Review finds implementation drift into Phase 3-6.
+      - Review finds hidden incomplete work or missing verification.
+    receipt: null
+  - id: T009
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Fix all actionable code-review findings and rerun affected verification.
+    allowed_files:
+      - components/skill-mall/providers/ProviderConfigPanel.tsx
+      - components/skill-mall/providers/ProviderCenter.tsx
+      - components/skill-mall/providers/ModelRefreshPanel.tsx
+      - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      - app/api/providers/test/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - docs/user/configuring-providers.md
+      - docs/reference/api-routes.md
+      - docs/reference/provider-catalog.md
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/**
+    verify:
+      - npm test -- components/skill-mall/providers => pass
+      - npm test -- app/api/providers => pass
+      - rerun any previously failed affected verification => pass or exact unrelated blocker
+    stop_if:
+      - Fixes introduce new scope drift.
+      - Fixes ignore a Judge finding without documented approval.
+    receipt: null
+  - id: T010
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Run final semantic drift and completion review before PM can mark the goal complete.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/T010-final-review.md
+    verify:
+      - rg -n "new provider|new auth|new routing|ProviderID|OAuth|device flow|keychain|raw API key|browser token|session token|cookie|credential file|credential path|prompt body|response body|hosted dashboard|cheapest_compatible|quality_first|semantic routing" components/skill-mall/providers app/api/providers docs/user docs/reference docs/goals/provider-center-product-phase2 => hits classified
+      - git diff --name-only => changed files are Phase 2-owned
+    stop_if:
+      - Final review cannot prove the owner outcome.
+      - Any blocker or incomplete item is hidden.
+      - Changed files exceed allowed Phase 2 ownership without user approval.
+    receipt: null
+  - id: T011
+    type: pm
+    assignee: PM
+    status: queued
+    objective: Record final receipt with changed files, verification, blockers, incomplete work, docs updates, and next safe action.
+    allowed_files:
+      - docs/goals/provider-center-product-phase2/state.yaml
+      - docs/goals/provider-center-product-phase2/notes/**
+    verify:
+      - node /Users/jamesdsizemore/.codex/plugins/cache/goalbuddy/goalbuddy/0.3.7/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/provider-center-product-phase2/state.yaml => pass
+      - npx goalbuddy board /Users/jamesdsizemore/Developer/skill-mall/docs/goals/provider-center-product-phase2 --once --json => pass
+      - git status --short --branch => final dirty state recorded
+    stop_if:
+      - Final receipt lacks decision complete.
+      - Any incomplete work lacks why/evidence/next safe action.
+      - Agent attempts commit/push/PR without explicit user approval.
+    receipt: null
