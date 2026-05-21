@@ -1,0 +1,328 @@
+version: 2
+active_task: null
+goal:
+  slug: provider-center-product-phase0
+  title: Provider Center Product Phase 0
+  status: done
+  created_at: '2026-05-21'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: main
+  implementation_branch: null
+  source_plan: docs/recovery/2026-05-21-provider-center-product-phase-0-implementation-plan.md
+  owner_outcome: SkillMall has a current-source Provider Center product workflow contract that maps existing provider/auth/router capabilities to user workflows and future implementation phases.
+  proof_type: source_backed_audit_workflow_contract_goalbuddy_receipts
+  intake:
+    original_request: "Approved"
+    interpreted_outcome: "The approved Provider Center product roadmap should advance to the first individual phase plan and GoalBuddy board without implementation."
+    input_shape: existing_plan
+    audience: "SkillMall coding agents and James as product owner"
+    completion_proof: "Phase 0 audit report, validated workflow/gap matrix, phase ownership map, unchanged product code, and final GoalBuddy receipt."
+    likely_misfire: "A coding agent treats Phase 0 as permission to implement Provider Center UI or reopen router/gateway research."
+  oracle:
+    signal: "The audit report maps every required Provider Center workflow to current source, tests, docs, gaps, blockers, and future phase ownership."
+    final_proof: "Final receipt confirms no product code changed, required workflows were audited or blocked with evidence, and the next safe phase recommendation is explicit."
+  hard_constraints:
+    - Phase 0 is read-only against product code.
+    - Do not implement UI, API, router, CLI, database, provider, or test changes.
+    - Do not create new providers, auth modes, routing modes, or gateway integrations.
+    - Do not recommend hosted apps, paid hosted dashboards, paid external control planes, or required extra-cost infrastructure.
+    - Do not recommend raw API key fields, raw token fields, browser/session token handling, credential-file handling, browser cookies, or credential-file paths.
+    - Do not store prompt or response bodies in notes, reports, receipts, fixtures, or command output.
+    - Do not stage, commit, push, or open a PR unless the user explicitly approves commit-prep or publish after the final receipt.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-center-product-phase0/.goalbuddy-board/index.html
+tasks:
+  - id: T001
+    type: pm
+    assignee: PM
+    status: done
+    objective: Verify branch, dirty state, roadmap approval, and Phase 0 read-only authority before any audit work.
+    allowed_files:
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/**
+    verify:
+      - git status -sb => branch and dirty state recorded
+      - git branch --show-current => branch recorded
+      - test -f docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md => roadmap exists
+      - test -f docs/recovery/2026-05-21-provider-center-product-phase-0-implementation-plan.md => phase plan exists
+      - git diff --name-only => dirty files classified before audit
+    stop_if:
+      - Product code implementation starts.
+      - Dirty files are unrelated and unclassified.
+      - The agent stages, commits, pushes, or opens a PR without explicit user approval.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T17:24:00-07:00'
+      decision: proceed
+      summary: Phase 0 authority gate passed. The run is on main, the approved roadmap and Phase 0 plan exist, there are no tracked product-code diffs, and the only untracked files are the approved roadmap, Phase 0 plan, and Phase 0 GoalBuddy board artifacts.
+      commands:
+        - cmd: git status -sb
+          status: pass
+          output: "On main tracking origin/main. Untracked files are docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md, docs/recovery/2026-05-21-provider-center-product-phase-0-implementation-plan.md, and docs/goals/provider-center-product-phase0/**."
+        - cmd: git branch --show-current
+          status: pass
+          output: "main"
+        - cmd: test -f docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md
+          status: pass
+          output: "roadmap_exists"
+        - cmd: test -f docs/recovery/2026-05-21-provider-center-product-phase-0-implementation-plan.md
+          status: pass
+          output: "phase0_plan_exists"
+        - cmd: git diff --name-only
+          status: pass
+          output: "No tracked file diffs."
+        - cmd: git ls-files -o --exclude-standard
+          status: pass
+          output: "Only approved roadmap, Phase 0 plan, and Phase 0 GoalBuddy board files are untracked."
+      blockers: []
+      incomplete: []
+  - id: T002
+    type: scout
+    assignee: Scout
+    status: done
+    objective: Build a current-source evidence map for every required Provider Center workflow.
+    allowed_files:
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md
+    verify:
+      - rg --files components/skill-mall/providers app/api/providers lib/providers lib/llm/router cli docs | rg "providers|provider|router|usage|cost|policy|model|configuring-providers|provider-catalog" => evidence source inventory recorded
+      - rg -n "secretRef|credential|token|prompt|response|routingPolicy|modelStatus|usage|cost|ProviderRegistryID|ProviderID" components/skill-mall/providers app/api/providers lib/providers lib/llm/router cli docs => workflow evidence recorded
+    stop_if:
+      - Scout relies on prior chat memory instead of current source.
+      - Scout skips API, CLI, router, ledger, docs, tests, or security/privacy evidence.
+      - Scout recommends implementation before evidence is recorded.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T17:38:00-07:00'
+      summary: Current-source evidence map completed for all required Provider Center workflows. Evidence covers UI, API routes, CLI, provider registry, model discovery, router policy/simulation, ledger/usage/cost, docs, tests, and security/privacy boundaries.
+      note: docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md
+      commands:
+        - cmd: rg --files components/skill-mall/providers app/api/providers lib/providers lib/llm/router cli docs | rg "providers|provider|router|usage|cost|policy|model|configuring-providers|provider-catalog"
+          status: pass
+          output: "Source inventory recorded across Provider Center UI, provider APIs, provider registry/discovery, router modules, CLI commands/tests, docs, and prior provider/auth receipts."
+        - cmd: rg -n "secretRef|credential|token|prompt|response|routingPolicy|modelStatus|usage|cost|ProviderRegistryID|ProviderID" components/skill-mall/providers app/api/providers lib/providers lib/llm/router cli docs
+          status: pass
+          output: "Workflow evidence recorded. Broad scan has expected safe-boundary, docs, and test-fixture hits; no product implementation changes were made."
+        - cmd: rg --files cli/src | rg 'provider|policy|test'
+          status: pass
+          output: "Provider and policy CLI source/test files exist."
+        - cmd: rg --files app/api/providers components/skill-mall/providers lib/llm/router lib/providers | rg '__tests__|test'
+          status: pass
+          output: "Provider Center, provider API, router, provider registry/model-source tests inventoried."
+      evidence:
+        - "Provider catalog, safe configuration, provider status/test, model refresh, capability/blocker interpretation, routing policy, routing simulation, usage/cost/budget, provider expansion governance, CLI parity, and security/privacy all have source-backed evidence."
+        - "Main gaps are product clarity and workflow guidance, not missing provider/auth/router substrate."
+        - "CLI parity requires detailed test-body confirmation before the final audit gives it high confidence."
+      blockers: []
+      incomplete:
+        - "T003 must convert this evidence into a user workflow gap matrix with future phase ownership."
+  - id: T003
+    type: scout
+    assignee: Scout
+    status: done
+    objective: Produce a user workflow map and gap matrix from the source evidence.
+    allowed_files:
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md
+    verify:
+      - test -f docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md => source map exists
+      - rg -n "provider selection|safe configuration|model refresh|routing policy|simulation|usage|cost|budget|provider expansion|security" docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md => required workflows covered
+    stop_if:
+      - Gap matrix lacks future phase ownership.
+      - Gap matrix blurs implemented-but-confusing with missing-backend work.
+      - Gap matrix promotes unsupported routing/auth/provider work.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T17:46:00-07:00'
+      summary: User workflow map and gap matrix completed from the T002 evidence map. Gaps are assigned to future phases, with Phase 1 kept as information architecture, Phase 2 as configuration/status guidance, Phase 3 as model/capability clarity, Phase 4 as usage/cost dashboard, Phase 5 as policy/simulation UX, Phase 6 as provider expansion governance, and Phase 7 as final audit.
+      note: docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md
+      commands:
+        - cmd: sed -n '1,260p' cli/src/commands/providers.test.ts
+          status: pass
+          output: "CLI provider unsafe input tests opened; they reject raw key/token/session/cookie/credential/prompt/response/output flags without echoing values."
+        - cmd: sed -n '1,280p' cli/src/commands/provider-policies.test.ts
+          status: pass
+          output: "CLI policy unsafe input tests opened; they reject unsafe policy flags without echoing values."
+        - cmd: sed -n '1,220p' app/api/providers/test/route.ts
+          status: pass
+          output: "Provider test route accepts optional prompt but returns safe status and says prompt/response bodies are not stored or echoed."
+        - cmd: sed -n '1,260p' docs/user/using-the-cli.md
+          status: pass
+          output: "CLI docs include configure, providers, model refresh, pricing refresh, and safe provider test behavior."
+        - cmd: test -f docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md
+          status: pass
+          output: "T002 source map exists."
+      blockers: []
+      incomplete:
+        - "T004 Judge must validate whether the matrix is complete enough and whether safe-but-confusing items are assigned to the right future phases."
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: done
+    objective: Validate the evidence map, gap matrix, phase ownership, and semantic drift guardrails before the final audit report is written.
+    allowed_files:
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/T004-judge-review.md
+    verify:
+      - test -f docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md => evidence map exists
+      - test -f docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md => gap matrix exists
+      - rg -n "blocked|approved|revise|phase ownership|semantic drift" docs/goals/provider-center-product-phase0/notes/T004-judge-review.md => decision recorded
+    stop_if:
+      - Evidence is incomplete but the goal attempts final completion.
+      - Future phase ownership is vague.
+      - Any recommendation violates the master roadmap non-negotiables.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T17:57:00-07:00'
+      decision: approved
+      summary: Judge gate approved the T002 evidence map and T003 workflow gap matrix for final audit report writing. A Judge subagent was attempted but did not return in a useful window, so PM recorded an inline Judge review with drift scans and required report caveats.
+      note: docs/goals/provider-center-product-phase0/notes/T004-judge-review.md
+      commands:
+        - cmd: rg -n "hosted dashboard|paid|raw API key|browser token|session token|credential file|credential path|cheapest_compatible|quality_first|semantic routing|new provider|new auth|ProviderID|implement UI|redesign" docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md
+          status: pass
+          output: "Hits were expected constraint/future-blocker mentions, not implementation recommendations."
+        - cmd: rg -n "provider selection|safe configuration|model refresh|routing policy|simulation|usage|cost|budget|provider expansion|security|Phase 1|Phase 2|Phase 3|Phase 4|Phase 5|Phase 6|Phase 7" docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md
+          status: pass
+          output: "Required workflows and phase ownership references are present."
+        - cmd: git diff --name-only
+          status: pass
+          output: "No tracked product-code diffs."
+      blockers: []
+      incomplete:
+        - "T005 must write the audit report and preserve the required caveats."
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: done
+    objective: Write the Phase 0 audit report and amend the master roadmap only if Judge approved a source-backed correction.
+    allowed_files:
+      - docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+      - docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/**
+    verify:
+      - test -f docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md => audit report exists
+      - rg -n "Source Files Inspected|Workflow Map|Gap Matrix|Phase Ownership|Blockers|Next Phase Recommendation" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md => required sections exist
+      - git diff --name-only => only allowed documentation/board files changed
+    stop_if:
+      - Worker edits product code, tests, API routes, CLI, router, database, or provider files.
+      - Audit report contains unsourced recommendations.
+      - Audit report records raw secrets, prompt bodies, or response bodies.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T18:05:00-07:00'
+      summary: Phase 0 audit report written. The report confirms the current provider/auth/router substrate is strong, the master roadmap remains valid, and the next safe planning step is Provider Center Product Phase 1 information architecture.
+      changed_files:
+        - docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+      commands:
+        - cmd: test -f docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+          status: pass
+          output: "Audit report exists."
+        - cmd: rg -n "Source Files Inspected|Workflow Map|Gap Matrix|Phase Ownership|Blockers|Next Phase Recommendation" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+          status: pass
+          output: "Required sections are present."
+        - cmd: git diff --name-only
+          status: pass
+          output: "Only documentation and Phase 0 board files are changed/untracked."
+      blockers: []
+      incomplete:
+        - "T006 must review the report for completeness, semantic drift, unsupported recommendations, and vague phase ownership."
+  - id: T006
+    type: judge
+    assignee: Judge
+    status: done
+    objective: Review the audit report for completeness, semantic drift, unsupported recommendations, vague phase ownership, and partial-completion risk.
+    allowed_files:
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/T006-final-review.md
+    verify:
+      - rg -n "T""BD|TO""DO|implement later|fill in" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md docs/goals/provider-center-product-phase0 => no placeholder drift or findings recorded
+      - rg -n "hosted dashboard|raw API key|browser token|session token|credential file|credential path|cheapest_compatible|quality_first|semantic routing" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md => hits classified as constraints/future blockers only
+    stop_if:
+      - Audit report misses a required workflow.
+      - Audit report recommends out-of-scope implementation.
+      - Audit report does not identify the next safe phase.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T18:12:00-07:00'
+      decision: approved
+      summary: Final review approved the Phase 0 audit report. Placeholder scan hits were limited to board verification command strings, unsupported/secret/routing-mode hits were constraint or future-blocker language, and phase ownership is explicit.
+      note: docs/goals/provider-center-product-phase0/notes/T006-final-review.md
+      commands:
+        - cmd: rg -n "T""BD|TO""DO|implement later|fill in" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md docs/goals/provider-center-product-phase0
+          status: pass
+          output: "Only board verification command strings matched; no audit-report placeholder found."
+        - cmd: rg -n "hosted dashboard|raw API key|browser token|session token|credential file|credential path|cheapest_compatible|quality_first|semantic routing" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+          status: pass
+          output: "Hits are constraints/future blockers only, not implementation recommendations."
+        - cmd: rg -n "Phase 1|Phase 2|Phase 3|Phase 4|Phase 5|Phase 6|Phase 7|does not own|Owns" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+          status: pass
+          output: "Phase ownership and next-phase recommendation are explicit."
+        - cmd: git diff --name-only && git ls-files -o --exclude-standard
+          status: pass
+          output: "Only documentation and Phase 0 board artifacts are changed/untracked."
+      blockers: []
+      incomplete: []
+  - id: T007
+    type: pm
+    assignee: PM
+    status: done
+    objective: Run final documentation-only verification and record the Phase 0 final receipt.
+    allowed_files:
+      - docs/goals/provider-center-product-phase0/state.yaml
+      - docs/goals/provider-center-product-phase0/notes/**
+    verify:
+      - git status --short => changed files classified
+      - rg -n "T""BD|TO""DO|implement later|fill in" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md docs/goals/provider-center-product-phase0 => no placeholders or hits classified
+      - rg -n "raw API key|browser token|session token|credential file|credential path|prompt body|response body" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md docs/goals/provider-center-product-phase0 => hits classified as constraints only
+      - node /Users/jamesdsizemore/.codex/plugins/cache/goalbuddy/goalbuddy/0.3.7/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/provider-center-product-phase0/state.yaml => pass
+    stop_if:
+      - Product code changed.
+      - The audit report is missing or incomplete.
+      - Blockers or incomplete work are undocumented.
+      - The final receipt lacks next safe action.
+    receipt:
+      result: done
+      completed_at: '2026-05-20T18:18:00-07:00'
+      decision: complete
+      full_outcome_complete: true
+      summary: Phase 0 is complete. The source-backed audit report exists, required workflows were mapped, gaps were assigned to future phases, no product code changed, the master roadmap remains unchanged, and the next safe step is Provider Center Product Phase 1 planning and GoalBuddy board creation.
+      changed_files:
+        - docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md
+        - docs/recovery/2026-05-21-provider-center-product-phase-0-implementation-plan.md
+        - docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md
+        - docs/goals/provider-center-product-phase0/goal.md
+        - docs/goals/provider-center-product-phase0/state.yaml
+        - docs/goals/provider-center-product-phase0/notes/.gitkeep
+        - docs/goals/provider-center-product-phase0/notes/T002-source-evidence-map.md
+        - docs/goals/provider-center-product-phase0/notes/T003-workflow-gap-matrix.md
+        - docs/goals/provider-center-product-phase0/notes/T004-judge-review.md
+        - docs/goals/provider-center-product-phase0/notes/T006-final-review.md
+        - docs/goals/provider-center-product-phase0/.goalbuddy-board/app.js
+        - docs/goals/provider-center-product-phase0/.goalbuddy-board/goalbuddy-mark.png
+        - docs/goals/provider-center-product-phase0/.goalbuddy-board/index.html
+        - docs/goals/provider-center-product-phase0/.goalbuddy-board/styles.css
+      commands:
+        - cmd: git status --short
+          status: pass
+          output: "Only Phase 0 docs/board files and the approved master roadmap are untracked; no product code changed."
+        - cmd: rg -n "T""BD|TO""DO|implement later|fill in" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md docs/recovery/2026-05-21-provider-center-product-roadmap-master-plan.md docs/goals/provider-center-product-phase0
+          status: pass
+          output: "Hits are limited to board verification command strings; no audit-report or roadmap placeholder content found."
+        - cmd: rg -n "raw API key|browser token|session token|credential file|credential path|prompt body|response body" docs/recovery/2026-05-21-provider-center-product-phase-0-audit-report.md docs/goals/provider-center-product-phase0
+          status: pass
+          output: "Hits are safety constraints, evidence notes, and board command/receipt text only."
+        - cmd: node /Users/jamesdsizemore/.codex/plugins/cache/goalbuddy/goalbuddy/0.3.7/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/provider-center-product-phase0/state.yaml
+          status: pass
+          output: "GoalBuddy checker passed while T007 was active; final done-state check runs after this receipt."
+        - cmd: git diff --name-only && git ls-files -o --exclude-standard
+          status: pass
+          output: "Changed/untracked set is documentation and Phase 0 board artifacts only."
+      blockers: []
+      incomplete: []
+      next_safe_action: "Create Provider Center Product Phase 1 implementation plan and GoalBuddy board for Provider Center Information Architecture."
