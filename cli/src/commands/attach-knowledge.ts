@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import * as p from '@clack/prompts'
-import { requireRepoRoot, pc } from '../utils.js'
+import { pc } from '../utils.js'
 import { resolveProviderConfig, createLLMClient } from '@/lib/providers/index.js'
 
 // Dynamic import to prevent better-sqlite3 (CJS) from loading at CLI startup,

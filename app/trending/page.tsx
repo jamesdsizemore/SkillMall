@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTrending7d, getRising, getTopByForkCount, getHighQualitySkills } from "@/lib/analytics";
-import { getSkill, getAllSkills } from "@/lib/skills";
+import { getAllSkills } from "@/lib/skills";
 
 function SkillRow({
   slug,

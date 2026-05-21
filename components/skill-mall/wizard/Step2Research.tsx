@@ -28,8 +28,6 @@ type Props = {
 
 export function Step2Research({
   researchResult,
-  selectedToolNames,
-  onToggleTool,
   onNext,
   isLoading,
 }: Props) {

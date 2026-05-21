@@ -11,7 +11,6 @@ let testDb: Database.Database;
 // Mock getDb to use test database
 import { vi } from "vitest";
 vi.mock("../db/client", () => {
-  const Database = vi.fn().mockImplementation(() => testDb);
   return {
     getDb: () => testDb,
   };

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { sanitizeInput, runTestCase, runTestSuite, loadTestCases, type TestCase } from '../skill-tester'
-import * as fs from 'node:fs'
 
 const mockClient = {
   complete: vi.fn(),

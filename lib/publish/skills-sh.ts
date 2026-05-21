@@ -98,5 +98,7 @@ export async function publishToSkillsSh(
   accessToken: string
 ): Promise<{ id: string; url: string }> {
   // TODO: Implement POST to skills.sh publish API when endpoints are documented.
+  void skill;
+  void accessToken;
   throw new Error("skills.sh publish API not yet implemented.");
 }

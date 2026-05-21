@@ -52,6 +52,7 @@ export default async function RootLayout({
         {/* Doto variable font — dot-matrix display style for stats and counters */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Doto:ROND,wght@0,100..900;1,100..900&display=swap"
           rel="stylesheet"

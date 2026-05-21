@@ -121,7 +121,6 @@ export default function PromptLibraryPage() {
       </div>
 
       {/* Copy button handler — event delegation, no React state needed */}
-      {/* eslint-disable-next-line @next/next/no-sync-scripts */}
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('click', function(e) {
           var btn = e.target && e.target.closest('[data-copy]');

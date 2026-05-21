@@ -1,7 +1,6 @@
 "use client";
 
 import { MDXRemote, type MDXRemoteSerializeResult } from "next-mdx-remote";
-import type { TocEntry } from "@/lib/docs";
 
 type Props = {
   source: MDXRemoteSerializeResult;
