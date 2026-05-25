@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db/client'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
+import { getProviderSecretStatus } from '@/lib/providers/secret-store'
 import type { SecretRef } from '@/lib/llm/router/types'
 import type { ProviderRegistryEntry, ProviderRegistryID } from '@/lib/providers/types'
 
@@ -15,6 +16,7 @@ function accessLabel(authMode: string | null, gatewayBackend: string | null): st
   if (authMode === 'local_cli_session') return 'local_tool_session'
   if (authMode === 'none_local') return 'local_runtime'
   if (authMode === 'gateway_virtual_key') return 'gateway_access'
+  if (authMode === 'codex_app_server' || authMode === 'claude_setup_token') return 'provider_account_auth'
   return null
 }
 
@@ -26,6 +28,10 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
       valuePresent: true,
       source: 'no_secret_required',
     }
+  }
+
+  if (secretRef.type === 'stored_provider_secret') {
+    return getProviderSecretStatus(secretRef.id)
   }
 
   return {

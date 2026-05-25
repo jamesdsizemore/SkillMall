@@ -1,6 +1,11 @@
 export const PHASE1_AUTH_MODES = ['env_key', 'local_cli_session', 'none_local'] as const
 
-export const PHASE2_AUTH_MODES = [...PHASE1_AUTH_MODES, 'gateway_virtual_key'] as const
+export const PHASE2_AUTH_MODES = [
+  ...PHASE1_AUTH_MODES,
+  'gateway_virtual_key',
+  'codex_app_server',
+  'claude_setup_token',
+] as const
 
 export type LLMAuthMode = (typeof PHASE2_AUTH_MODES)[number]
 
@@ -28,11 +33,19 @@ export const PHASE2_ROUTING_POLICY_MODES = [
 
 export type RoutingPolicyMode = (typeof PHASE2_ROUTING_POLICY_MODES)[number]
 
-export type SecretRefType = 'env' | 'none' | 'gateway_virtual_key_ref'
+export type StoredProviderSecretType = 'api_key' | 'setup_token'
+
+export type SecretRefType = 'env' | 'none' | 'gateway_virtual_key_ref' | 'stored_provider_secret'
 
 export type SecretRef =
   | { type: 'env'; name: string }
   | { type: 'gateway_virtual_key_ref'; name: string }
+  | {
+      type: 'stored_provider_secret'
+      id: string
+      providerRegistryId: string
+      secretType: StoredProviderSecretType
+    }
   | { type: 'none' }
 
 export interface RouterProviderConfig {

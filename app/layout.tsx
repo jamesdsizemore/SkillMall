@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Space_Mono } from "next/font/google";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { getSession } from "@/lib/auth/github";
+import { getSessionFromCookies } from "@/lib/auth/policy";
 import { AuthButton } from "@/components/skill-mall/auth-button";
 import { ThemeProvider } from "@/components/skill-mall/theme-provider";
 import "./globals.css";
@@ -36,9 +35,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sm_session")?.value;
-  const session = token ? getSession(token) : null;
+  const session = await getSessionFromCookies();
 
   return (
     <html

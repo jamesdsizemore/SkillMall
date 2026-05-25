@@ -1,9 +1,10 @@
 import type { GatewayBackend, LLMAuthMode, RouterExecutionKind, SecretRef } from '../llm/router/types'
 
-export type ProviderID = 'openai' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
+export type ProviderID = 'openai' | 'codex' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
 
 export type ProviderRegistryID =
   | 'openai'
+  | 'openai_codex'
   | 'anthropic'
   | 'claude_code'
   | 'gemini'
@@ -33,6 +34,7 @@ export type ProviderRegistryID =
 
 export type ProviderAccessMode =
   | 'api_access'
+  | 'provider_account_auth'
   | 'local_tool_session'
   | 'local_runtime'
   | 'gateway_virtual_key'
@@ -57,6 +59,7 @@ export type ProviderRegistryStatus =
 
 export type ProviderRegistryClassification =
   | 'active_configurable'
+  | 'provider_account_auth'
   | 'gateway_configurable_openai_compatible'
   | 'local_tool_session'
   | 'local_runtime'

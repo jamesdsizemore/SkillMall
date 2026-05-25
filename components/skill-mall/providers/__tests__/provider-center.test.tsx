@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   ProviderCenter,
   buildPolicySimulationBody,
+  draftForProvider,
   type ProviderDraft,
   type ProviderRow,
   type ProvidersResponse,
@@ -98,6 +99,21 @@ const providersResponse: ProvidersResponse = {
   warnings: [],
   providers: [
     provider({ id: "openai", name: "OpenAI API" }),
+    provider({
+      id: "openai_codex",
+      name: "OpenAI Codex",
+      accessModes: ["provider_account_auth"],
+      accessLabel: "ChatGPT/Codex account auth",
+      authLabel: "Codex app-server ChatGPT login",
+      classification: "local_tool_session",
+      discoveryStrategy: "static_fallback_only",
+      executableProviderId: "codex",
+      gatewayProfile: null,
+      modelStatus: {
+        ...provider({}).modelStatus,
+        models: ["gpt-5.4"],
+      },
+    }),
     provider({
       id: "anthropic",
       name: "Anthropic Claude API",
@@ -217,12 +233,14 @@ describe("Provider Center UI", () => {
     expect(html).toContain("STAGE 3 / LOCAL ROUTING POLICY");
     expect(html).toContain("STAGE 4 / USAGE + COST");
     expect(html).toContain("API providers");
+    expect(html).toContain("Account auth providers");
     expect(html).toContain("Local tools / sessions");
     expect(html).toContain("Local runtimes");
     expect(html).toContain("Gateway / OpenAI-compatible / custom");
     expect(html).toContain("Cloud / project providers");
     expect(html).toContain("Planned / source-review rows");
     expect(html).toContain("API access");
+    expect(html).toContain("Provider account auth");
     expect(html).toContain("Local CLI/session access");
     expect(html).toContain("Local runtime");
     expect(html).toContain("Gateway access");
@@ -373,6 +391,37 @@ describe("Provider Center UI", () => {
     expect(modelField).not.toContain('value="policy-not-a-model"');
   });
 
+  it("rehydrates configured OpenAI Codex rows as codex app-server auth", () => {
+    const configuredCodex = provider({
+      id: "openai_codex",
+      name: "OpenAI Codex",
+      accessModes: ["provider_account_auth"],
+      accessLabel: "ChatGPT/Codex account auth",
+      authLabel: "Codex app-server ChatGPT login",
+      classification: "provider_account_auth",
+      discoveryStrategy: "static_fallback_only",
+      executableProviderId: "codex",
+      gatewayProfile: null,
+      configStatus: {
+        configured: true,
+        authMode: "codex_app_server",
+        gatewayBackend: "direct",
+        accessLabel: "provider_account_auth",
+        secretRef: { type: "none" },
+        secretStatus: { type: "none", valuePresent: true, source: "no_secret_required" },
+        baseURL: null,
+        routingPolicyId: null,
+        activeModel: "gpt-5.4",
+      },
+      modelStatus: {
+        ...provider({}).modelStatus,
+        models: ["gpt-5.4"],
+      },
+    });
+
+    expect(draftForProvider(configuredCodex).configMode).toBe("codex_app_server");
+  });
+
   it("disables model refresh for unconfigured endpoint-required rows", () => {
     const html = renderToStaticMarkup(
       <ProviderCenter
@@ -419,6 +468,7 @@ describe("Provider Center UI", () => {
       model: "custom-chat",
       manualModels: "custom-chat, custom-fast",
       routingPolicyId: "manual",
+      setupToken: "",
     };
 
     const html = renderToStaticMarkup(
@@ -439,5 +489,80 @@ describe("Provider Center UI", () => {
     expect(html).not.toMatch(/apiKey/i);
     expect(html).not.toMatch(/type="password"/);
     expect(html).not.toMatch(/credential path/i);
+  });
+
+  it("renders Codex app-server auth session objects instead of a fake token button", () => {
+    const codex = providersResponse.providers.find((row) => row.id === "openai_codex");
+    const draft: ProviderDraft = {
+      configMode: "codex_app_server",
+      envVarName: "OPENAI_CODEX_API_REF",
+      gatewayRefName: "BIFROST_VIRTUAL_KEY",
+      baseURL: "",
+      model: "gpt-5.4",
+      manualModels: "gpt-5.4",
+      routingPolicyId: "",
+      setupToken: "",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProviderConfigPanel
+        provider={codex ?? null}
+        draft={draft}
+        actionState={{ status: "idle", message: null }}
+        authActionState={{ status: "idle", message: null }}
+        authSession={{
+          providerRegistryId: "openai_codex",
+          method: "chatgpt_device_code",
+          status: "authorization_required",
+          flowId: "flow-1",
+          loginId: "login-1",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          userCode: "ABCD-1234",
+          message: "Open the verification URL and enter the displayed user code.",
+        }}
+        onDraftChange={() => undefined}
+        onSave={() => undefined}
+      />
+    );
+
+    expect(html).toContain("OPENAI CODEX AUTH SESSION");
+    expect(html).toContain("START BROWSER LOGIN");
+    expect(html).toContain("START DEVICE CODE");
+    expect(html).toContain("https://auth.openai.com/codex/device");
+    expect(html).toContain("ABCD-1234");
+    expect(html).not.toContain("AUTH TOKEN");
+    expect(html).not.toMatch(/accessToken|refreshToken|sk-/);
+  });
+
+  it("renders Claude local login separately from Claude setup-token", () => {
+    const claude = providersResponse.providers.find((row) => row.id === "claude_code");
+    const draft: ProviderDraft = {
+      configMode: "claude_setup_token",
+      envVarName: "ANTHROPIC_API_KEY",
+      gatewayRefName: "BIFROST_VIRTUAL_KEY",
+      baseURL: "",
+      model: "claude-sonnet-4-6",
+      manualModels: "claude-sonnet-4-6",
+      routingPolicyId: "",
+      setupToken: ["sk-ant-oat01", "example-token"].join("-"),
+    };
+
+    const html = renderToStaticMarkup(
+      <ProviderConfigPanel
+        provider={claude ?? null}
+        draft={draft}
+        actionState={{ status: "idle", message: null }}
+        onDraftChange={() => undefined}
+        onSave={() => undefined}
+      />
+    );
+
+    expect(html).toContain("CLAUDE CODE AUTH PATHS");
+    expect(html).toContain("LOCAL CLI LOGIN");
+    expect(html).toContain("CLAUDE SETUP-TOKEN");
+    expect(html).toContain("not a Provider Center web auth page");
+    expect(html).toContain("Stored separately from Anthropic API-key access");
+    expect(html).toContain("SAVE SETUP-TOKEN");
+    expect(html).toMatch(/type="password"/);
   });
 });

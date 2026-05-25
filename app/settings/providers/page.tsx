@@ -1,5 +1,5 @@
-import { ProviderCenter } from "@/components/skill-mall/providers/ProviderCenter";
+import { SimpleProviderConfiguration } from "@/components/skill-mall/providers/SimpleProviderConfiguration";
 
 export default function ProvidersPage() {
-  return <ProviderCenter />;
+  return <SimpleProviderConfiguration />;
 }

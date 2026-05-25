@@ -1,4 +1,5 @@
 import { resolveEnvSecret } from '../llm/router/secret-refs'
+import { readProviderSecret } from './secret-store'
 import type { SecretRef } from '../llm/router/types'
 import { getProviderRegistryEntry } from './registry'
 import type {
@@ -135,6 +136,9 @@ export function sanitizeProviderModelRaw(raw: Record<string, unknown>): Record<s
 function envSecretValue(input: ProviderModelSourceInput): string | undefined {
   if (input.apiKey) return input.apiKey
   if (!input.secretRef || input.secretRef.type === 'none') return undefined
+  if (input.secretRef.type === 'stored_provider_secret') {
+    return input.secretRef.secretType === 'api_key' ? readProviderSecret(input.secretRef.id) : undefined
+  }
   return resolveEnvSecret(input.secretRef.name)
 }
 

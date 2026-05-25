@@ -17,6 +17,7 @@ import {
   portkeyPricingUrl,
   type PricingSource,
 } from "../../../lib/providers/pricing-sources";
+import { getProviderSecretStatus } from "../../../lib/providers/secret-store";
 import type { SecretRef } from "../../../lib/llm/router/types";
 import type {
   ProviderID,
@@ -275,6 +276,16 @@ function secretStatus(secretRef: SecretRef | undefined | null) {
       source: "no_secret_required",
     };
   }
+  if (secretRef.type === "stored_provider_secret") {
+    const status = getProviderSecretStatus(secretRef.id);
+    return {
+      type: secretRef.type,
+      id: secretRef.id,
+      secretType: secretRef.secretType,
+      valuePresent: status.valuePresent,
+      source: status.source,
+    };
+  }
 
   return {
     type: secretRef.type,
@@ -290,6 +301,7 @@ function accessLabel(authMode: string | null, gatewayBackend: string | null): st
   if (authMode === "local_cli_session") return "local_tool_session";
   if (authMode === "none_local") return "local_runtime";
   if (authMode === "gateway_virtual_key") return "gateway_access";
+  if (authMode === "codex_app_server" || authMode === "claude_setup_token") return "provider_account_auth";
   return null;
 }
 
@@ -567,11 +579,19 @@ async function refreshModelsCommand(flags: ProviderFlags): Promise<void> {
   try {
     const activeMatches = active.activeProviderRegistryId === entry.id;
     let keyEnv: string | undefined;
+    let statusSecretRef: SecretRef | undefined;
     if (flags.keyEnv) {
       const ref = sanitizeSecretRef({ type: "env", name: flags.keyEnv });
       keyEnv = ref.type === "env" ? ref.name : undefined;
-    } else if (activeMatches && active.secretRef?.type !== "none") {
+      statusSecretRef = ref;
+    } else if (
+      activeMatches &&
+      (active.secretRef?.type === "env" || active.secretRef?.type === "gateway_virtual_key_ref")
+    ) {
       keyEnv = active.secretRef?.name;
+      statusSecretRef = active.secretRef ?? undefined;
+    } else if (activeMatches) {
+      statusSecretRef = active.secretRef ?? undefined;
     }
     const apiKey = keyEnv ? resolveEnvSecret(keyEnv) : undefined;
     const baseUrl =
@@ -588,14 +608,7 @@ async function refreshModelsCommand(flags: ProviderFlags): Promise<void> {
       executableProviderId: entry.executableProviderId ?? null,
       configured: activeMatches,
       discovery,
-      secretStatus: keyEnv
-        ? {
-            type: active.secretRef?.type ?? "env",
-            name: keyEnv,
-            valuePresent: Boolean(apiKey),
-            source: "reference_only",
-          }
-        : null,
+      secretStatus: statusSecretRef ? secretStatus(statusSecretRef) : null,
     };
 
     if (flags.json) {

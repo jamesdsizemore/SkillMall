@@ -9,6 +9,7 @@ import { PolicyControlPanel } from "./PolicyControlPanel";
 
 export type ProviderAccessMode =
   | "api_access"
+  | "provider_account_auth"
   | "local_tool_session"
   | "local_runtime"
   | "gateway_virtual_key"
@@ -16,7 +17,8 @@ export type ProviderAccessMode =
   | "custom_openai_compatible";
 
 export type ProviderSecretStatus = {
-  type: "env" | "gateway_virtual_key_ref" | "none";
+  type: "env" | "gateway_virtual_key_ref" | "stored_provider_secret" | "none";
+  id?: string;
   name?: string;
   valuePresent: boolean;
   source: string;
@@ -176,13 +178,34 @@ export type UsageSummary = {
 };
 
 export type ProviderDraft = {
-  configMode: "env_key" | "gateway_virtual_key_ref" | "local_cli_session" | "none_local";
+  configMode:
+    | "env_key"
+    | "gateway_virtual_key_ref"
+    | "local_cli_session"
+    | "none_local"
+    | "codex_app_server"
+    | "claude_setup_token";
   envVarName: string;
   gatewayRefName: string;
   baseURL: string;
   model: string;
   manualModels: string;
   routingPolicyId: string;
+  setupToken: string;
+};
+
+export type ProviderAuthSession = {
+  providerRegistryId: "openai_codex";
+  method: "chatgpt" | "chatgpt_device_code";
+  status: "authorization_required" | "pending" | "ready" | "cancelled" | "expired" | "failed";
+  flowId: string;
+  loginId: string;
+  authUrl?: string;
+  verificationUrl?: string;
+  userCode?: string;
+  expiresAt?: string;
+  message: string;
+  error?: string;
 };
 
 export type ProviderActionState = {
@@ -219,7 +242,7 @@ function fallbackEnvName(provider: ProviderRow | null): string {
   return `${provider.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_REF`;
 }
 
-function draftForProvider(provider: ProviderRow | null): ProviderDraft {
+export function draftForProvider(provider: ProviderRow | null): ProviderDraft {
   if (!provider) {
     return {
       configMode: "env_key",
@@ -229,6 +252,7 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
       model: "",
       manualModels: "",
       routingPolicyId: "",
+      setupToken: "",
     };
   }
 
@@ -236,7 +260,11 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
   const model = provider.configStatus.configured
     ? provider.configStatus.activeModel ?? provider.modelStatus.models[0] ?? ""
     : provider.modelStatus.models[0] ?? "";
-  const defaultMode = provider.accessModes.includes("local_tool_session")
+  const defaultMode = provider.id === "openai_codex"
+    ? "codex_app_server"
+    : provider.id === "claude_code" && provider.configStatus.authMode === "claude_setup_token"
+      ? "claude_setup_token"
+      : provider.accessModes.includes("local_tool_session")
     ? "local_cli_session"
     : provider.accessModes.includes("local_runtime")
       ? "none_local"
@@ -250,6 +278,10 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
     configMode:
       configuredSecret?.type === "gateway_virtual_key_ref"
         ? "gateway_virtual_key_ref"
+        : provider.configStatus.authMode === "codex_app_server"
+          ? "codex_app_server"
+        : provider.configStatus.authMode === "claude_setup_token"
+          ? "claude_setup_token"
         : configuredSecret?.type === "none"
           ? provider.accessModes.includes("local_tool_session")
             ? "local_cli_session"
@@ -264,6 +296,7 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
     model,
     manualModels: provider.modelStatus.models.join(", "),
     routingPolicyId: provider.configStatus.routingPolicyId ?? "",
+    setupToken: "",
   };
 }
 
@@ -306,6 +339,7 @@ function canRefreshProviderWithDraft(provider: ProviderRow | null, draft: Provid
 function accessModeLabel(mode: string): string {
   const labels: Record<string, string> = {
     api_access: "API access",
+    provider_account_auth: "Provider account auth",
     local_tool_session: "Local tool/session access",
     local_runtime: "Local runtime",
     gateway_virtual_key: "Gateway reference access",
@@ -317,6 +351,7 @@ function accessModeLabel(mode: string): string {
 
 function executionBoundary(provider: ProviderRow): string {
   if (provider.accessModes.includes("local_tool_session")) return "Local tool/session status; no credential files copied";
+  if (provider.id === "openai_codex") return "Codex app-server account login; no OpenAI API key";
   if (provider.accessModes.includes("local_runtime")) return "Local runtime endpoint; no provider secret required";
   if (provider.executableProviderId) return `Direct executable provider: ${provider.executableProviderId}`;
   if (provider.gatewayProfile?.kind === "openai_compatible") return "Registry row via shared OpenAI-compatible adapter";
@@ -441,6 +476,9 @@ export function ProviderCenter({
   const [testState, setTestState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [policyState, setPolicyState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [policySimulation, setPolicySimulation] = useState<RoutingSimulationResult | null>(null);
+  const [authSession, setAuthSession] = useState<ProviderAuthSession | null>(null);
+  const [authState, setAuthState] = useState<ProviderActionState>({ status: "idle", message: null });
+  const [credentialState, setCredentialState] = useState<ProviderActionState>({ status: "idle", message: null });
 
   const selectedProvider = useMemo(
     () => data?.providers.find((provider) => provider.id === selectedProviderId) ?? null,
@@ -563,6 +601,9 @@ export function ProviderCenter({
     setTestState({ status: "idle", message: null });
     setPolicyState({ status: "idle", message: null });
     setPolicySimulation(null);
+    setAuthSession(null);
+    setAuthState({ status: "idle", message: null });
+    setCredentialState({ status: "idle", message: null });
   };
 
   const configureProvider = async () => {
@@ -574,6 +615,13 @@ export function ProviderCenter({
         ? { type: "gateway_virtual_key_ref", name: draft.gatewayRefName }
         : draft.configMode === "env_key"
           ? { type: "env", name: draft.envVarName }
+          : draft.configMode === "claude_setup_token"
+            ? {
+                type: "stored_provider_secret",
+                id: "claude_code:setup_token",
+                providerRegistryId: "claude_code",
+                secretType: "setup_token",
+              }
           : { type: "none" };
 
     const payload = {
@@ -609,6 +657,88 @@ export function ProviderCenter({
       });
     }
   };
+
+  const startCodexAuth = async (method: "chatgpt" | "chatgpt_device_code") => {
+    setAuthState({ status: "running", message: "Starting Codex app-server auth" });
+    try {
+      const response = await fetch("/api/providers/auth/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerRegistryId: "openai_codex", method }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Codex auth start failed"));
+      setAuthSession(result.session as ProviderAuthSession);
+      setAuthState({ status: "success", message: "Codex auth session ready" });
+    } catch (error) {
+      setAuthState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Codex auth start failed",
+      });
+    }
+  };
+
+  const cancelCodexAuth = async () => {
+    if (!authSession) return;
+    setAuthState({ status: "running", message: "Cancelling Codex auth" });
+    try {
+      const response = await fetch(`/api/providers/auth/${authSession.flowId}/cancel`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Codex auth cancel failed"));
+      setAuthSession(result.session as ProviderAuthSession);
+      setAuthState({ status: "success", message: "Codex auth cancelled" });
+    } catch (error) {
+      setAuthState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Codex auth cancel failed",
+      });
+    }
+  };
+
+  const saveClaudeSetupToken = async () => {
+    if (!selectedProvider || selectedProvider.id !== "claude_code") return;
+    setCredentialState({ status: "running", message: "Saving Claude setup-token" });
+    try {
+      const response = await fetch("/api/providers/credentials/setup-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerRegistryId: "claude_code",
+          token: draft.setupToken,
+          ...(draft.model ? { model: draft.model } : {}),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Claude setup-token save failed"));
+      setCredentialState({ status: "success", message: "Claude setup-token saved" });
+      setDraft({ ...draft, setupToken: "", configMode: "claude_setup_token" });
+      await loadProviders();
+    } catch (error) {
+      setCredentialState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Claude setup-token save failed",
+      });
+    }
+  };
+
+  const authSessionFlowId = authSession?.flowId;
+  const authSessionStatus = authSession?.status;
+
+  useEffect(() => {
+    if (!authSessionFlowId || !authSessionStatus || !["authorization_required", "pending"].includes(authSessionStatus)) return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      try {
+        const response = await fetch(`/api/providers/auth/${authSessionFlowId}/status`);
+        const result = await response.json();
+        if (!cancelled && response.ok) setAuthSession(result.session as ProviderAuthSession);
+      } catch {}
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [authSessionFlowId, authSessionStatus]);
 
   const refreshModels = async () => {
     if (!selectedProvider) return;
@@ -831,8 +961,14 @@ export function ProviderCenter({
             provider={selectedProvider}
             draft={draft}
             actionState={configureState}
+            authSession={selectedProvider?.id === "openai_codex" ? authSession : null}
+            authActionState={authState}
+            credentialActionState={credentialState}
             onDraftChange={setDraft}
             onSave={configureProvider}
+            onStartCodexAuth={startCodexAuth}
+            onCancelCodexAuth={cancelCodexAuth}
+            onSaveClaudeSetupToken={saveClaudeSetupToken}
           />
           <ModelRefreshPanel
             provider={selectedProvider}

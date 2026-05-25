@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { getSkill, getSkillReadme, getAllSkills } from "@/lib/skills";
 import { computeQualityScore } from "@/lib/quality-score";
-import { getSession } from "@/lib/auth/github";
+import { getSessionFromCookies } from "@/lib/auth/policy";
 import { getReviews, getEffectivenessScore, getReviewCount } from "@/lib/reviews";
 import { getInstallCount, getForkCount } from "@/lib/analytics";
 import { getAvailableLocales } from "@/lib/i18n";
@@ -49,9 +48,7 @@ export default async function SkillPage({ params }: Props) {
   const score = computeQualityScore(skill, allSlugs).total;
 
   // Auth and reviews
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sm_session")?.value;
-  const session = token ? getSession(token) : null;
+  const session = await getSessionFromCookies();
   const reviews = getReviews(skill.slug);
   const effectivenessScore = getEffectivenessScore(skill.slug);
   const reviewCount = getReviewCount(skill.slug);

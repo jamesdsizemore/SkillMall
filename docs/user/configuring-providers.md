@@ -2,7 +2,7 @@
 
 SkillMall uses your own provider access through the Provider Center at `/settings/providers`. The Provider Center is the app settings surface for catalog status, configuration references, model refresh, provider tests, and usage/cost summaries.
 
-SkillMall stores secret references, not raw secrets. API providers use environment variable names, Claude Code uses its local tool session, Ollama uses a local runtime with no credential, and local gateway access uses a gateway virtual-key reference.
+SkillMall stores secret references, not raw secrets. API providers use environment variable names, OpenAI Codex uses a Codex app-server auth session object, Claude Code can use either its local tool session or an app-managed setup-token secret reference, Ollama uses a local runtime with no credential, and local gateway access uses a gateway virtual-key reference.
 
 Secret-reference names must be environment-variable-style names, not paths. `OPENAI_API_KEY` and `BIFROST_VIRTUAL_KEY` are valid references; `~/.codex/auth.json`, Claude credential-file paths, and copied session-token locations are rejected.
 
@@ -10,7 +10,7 @@ Secret-reference names must be environment-variable-style names, not paths. `OPE
 
 The Provider Center is organized around the way a user evaluates a provider row:
 
-- **Provider catalog:** Select a broad catalog row and see whether it is API access, local tool/session access, local runtime, gateway/OpenAI-compatible access, cloud/project scoped, custom endpoint, or source-review only.
+- **Provider catalog:** Select a broad catalog row and see whether it is API access, provider account auth, local tool/session access, local runtime, gateway/OpenAI-compatible access, cloud/project scoped, custom endpoint, or source-review only.
 - **Selected provider:** Review the selected row's access type, execution boundary, setup state, model source, registry row ID, executable `ProviderID` mapping when one exists, and safe next action.
 - **Safe setup:** Configure environment-variable references, gateway virtual-key references, local session/runtime choices, endpoints, model labels, manual model labels, and routing-policy IDs without storing raw provider secrets.
 - **Model and status:** Inspect model source, cache freshness, blockers, capability confidence, safe status tests, and refresh availability.
@@ -21,9 +21,9 @@ These sections are workflow labels over the current Provider Center capabilities
 
 ## Provider Catalog vs Executable Providers
 
-The Provider Center has a broad `ProviderRegistryID` catalog. It includes OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.
+The Provider Center has a broad `ProviderRegistryID` catalog. It includes OpenAI, OpenAI Codex, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.
 
-The executable direct/router `ProviderID` set remains narrower: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows can appear in Provider Center and CLI status output without becoming direct clients.
+The executable direct/router `ProviderID` set remains narrower: `openai`, `codex`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`. Registry-only rows can appear in Provider Center and CLI status output without becoming direct clients.
 
 OpenAI-compatible registry rows such as OpenRouter, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, xAI, Together AI, Cerebras, DeepInfra, Alibaba/DashScope/Qwen, Z.AI, and custom endpoints execute through a generic SkillMall-owned OpenAI-compatible target. They do not get added as one-off `ProviderID` values.
 
@@ -34,13 +34,14 @@ Planned-source-review rows are visible but not live-callable until official evid
 | Provider | Auth mode | Recommended model |
 |---|---|---|
 | OpenAI API | `env_key` via `OPENAI_API_KEY` | gpt-4o |
+| OpenAI Codex | `codex_app_server` via Codex app-server account auth | gpt-5.4 |
 | Claude API | `env_key` via `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
-| Claude Code CLI | `local_cli_session` | claude-sonnet-4-6 |
+| Claude Code CLI | `local_cli_session` or `claude_setup_token` | claude-sonnet-4-6 |
 | Google Gemini | `env_key` via `GEMINI_API_KEY` | gemini-2.0-flash-exp |
 | Groq | `env_key` via `GROQ_API_KEY` | llama-3.3-70b-versatile |
 | Ollama | `none_local` | llama3.1 |
 
-API access is separate from subscription or tool-session auth. ChatGPT Pro/Codex subscription auth is not OpenAI API access, and Claude account/Max auth is not Anthropic API access. Claude Code CLI auth is `local_tool_session`; SkillMall does not copy credential files.
+API access is separate from subscription or tool-session auth. ChatGPT Pro/Codex subscription auth is not OpenAI API access, and Claude account/Max auth is not Anthropic API access. SkillMall does not copy Codex or Claude credential files, browser cookies, or session blobs.
 
 ## API Providers
 
@@ -68,7 +69,18 @@ npx skill-mall configure --provider groq --key-env GROQ_API_KEY --model llama-3.
 
 The web Provider Center uses the same contract: it records the environment variable name and status, never the API key value.
 
-Provider Center also enforces the selected provider row's allowed auth modes. API providers use API-key references, Claude Code uses `local_cli_session`, Ollama uses `none_local`, and gateway virtual-key configuration is available only on rows that explicitly support gateway access.
+Provider Center also enforces the selected provider row's allowed auth modes. API providers use API-key references, OpenAI Codex uses `codex_app_server`, Claude Code uses `local_cli_session` or `claude_setup_token`, Ollama uses `none_local`, and gateway virtual-key configuration is available only on rows that explicitly support gateway access.
+
+## OpenAI Codex Account Auth
+
+OpenAI Codex account auth is not an OpenAI API key. In Provider Center, the `openai_codex` row starts a Codex app-server auth session and renders the returned first-class auth object:
+
+- browser login returns an `authUrl`;
+- device-code login returns `verificationUrl` plus `userCode`;
+- the session is tracked by `flowId` and Codex app-server `loginId`;
+- completion is tied to Codex app-server login completion state, not a blind `codex login status` check.
+
+SkillMall starts the Codex app-server with an isolated `CODEX_HOME` under `~/.skill-mall/codex-home` and clears API-key env vars for that process. Do not paste ChatGPT browser tokens, Codex credential-file contents, cookies, or copied session blobs into Provider Center.
 
 ## OpenAI-Compatible Registry Providers
 
@@ -98,7 +110,12 @@ Provider rows that require user-specific regional/account endpoints, such as Ali
 
 ## Claude Code CLI
 
-Claude Code uses your locally authenticated `claude` CLI. SkillMall does not read or store Claude Code credential files.
+Claude Code has two supported Provider Center paths:
+
+- `local_cli_session`: use your locally authenticated `claude` CLI. SkillMall does not read or store Claude Code credential files.
+- `claude_setup_token`: paste a Claude setup-token into the setup-token control. SkillMall stores it in the app-managed encrypted provider secret store and writes only a stored secret reference into provider config.
+
+The setup-token path is separate from `ANTHROPIC_API_KEY`. During Claude Code execution, SkillMall injects the stored setup-token only into the scoped runtime environment as `CLAUDE_CODE_OAUTH_TOKEN` and clears conflicting Claude/Anthropic auth env vars for that child process.
 
 ```bash
 npx skill-mall configure --provider claude-code --model claude-sonnet-4-6
@@ -118,7 +135,7 @@ npx skill-mall configure --provider ollama --model llama3.1
 
 Model refresh follows each provider row's declared `discoveryStrategy`. SkillMall does not assume every provider has universal `/v1/models` support. OpenAI-compatible rows can probe the active configured endpoint or an explicitly supplied endpoint; unconfigured registry rows return `endpoint_required` instead of probing a default public endpoint. Provider-specific/cloud/local rows return the appropriate required-context status, manual rows use manual labels, and planned-source-review rows remain non-callable.
 
-Provider tests are safe readiness/status checks. They report configuration, secret-reference presence, local runtime/tool availability, or planned-source-review status without sending prompts or echoing secrets.
+Provider tests are safe readiness/status checks. They report configuration, secret-reference presence, local runtime/tool availability, provider-account-auth state, or planned-source-review status without sending prompts or echoing secrets. The provider test route rejects prompt and response fields.
 
 Model refresh also records capability metadata when the current source exposes it. Provider Center and `npx skill-mall providers status` show capable model count, capability source confidence, and blockers such as missing metadata, fallback-only labels, manual-only labels, reference-only metadata, stale metadata, or missing price. Reference metadata from Portkey or LiteLLM is useful for local explanation and planning, but it is not shown as live account availability and does not by itself make a route candidate eligible.
 

@@ -6,7 +6,8 @@ clients.
 - `ProviderRegistryID` is the Provider Center row ID. It covers API providers,
   local tools, local runtimes, cloud-project providers, and custom endpoints.
 - `ProviderID` remains the narrow executable client ID for current direct/router
-  clients: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, and `ollama`.
+  clients: `openai`, `codex`, `anthropic`, `claude-code`, `gemini`, `groq`, and
+  `ollama`.
 - Registry inclusion does not imply direct router execution.
 - Planned-source-review rows are visible in the catalog but are not live-callable.
 
@@ -21,11 +22,11 @@ The registry lives in `lib/providers/registry.ts`. Shared model-source adapters
 live in `lib/providers/model-sources.ts`; `lib/providers/model-discovery.ts`
 keeps the older discovery facade aligned with those adapters.
 
-The broad catalog intentionally covers OpenAI, Anthropic, Claude Code, Gemini,
-Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax,
-Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI,
-Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity,
-DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.
+The broad catalog intentionally covers OpenAI, OpenAI Codex, Anthropic, Claude
+Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face,
+Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock,
+Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM,
+Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints.
 
 ## Executable Client Contract
 
@@ -41,8 +42,9 @@ Current executable providers:
 | ProviderID | Registry row | Auth mode |
 | --- | --- | --- |
 | `openai` | `openai` | `env_key` API access |
+| `codex` | `openai_codex` | `codex_app_server` provider account auth |
 | `anthropic` | `anthropic` | `env_key` API access |
-| `claude-code` | `claude_code` | `local_cli_session` |
+| `claude-code` | `claude_code` | `local_cli_session` or `claude_setup_token` |
 | `gemini` | `gemini` | `env_key` API access |
 | `groq` | `groq` | `env_key` API access |
 | `ollama` | `ollama` | `none_local` |
@@ -103,6 +105,7 @@ container runtime endpoints only.
 | Registry ID | Status/classification | Discovery strategy | Executable mapping |
 | --- | --- | --- | --- |
 | `openai` | `active_configurable` / `gateway_configurable_openai_compatible` | `openai_compatible_models` | `openai` |
+| `openai_codex` | `active_configurable` / `provider_account_auth` | `static_fallback_only` | `codex` |
 | `anthropic` | `active_configurable` / `active_configurable` | `official_provider_models` | `anthropic` |
 | `claude_code` | `status_only` / `local_tool_session` | `static_fallback_only` | `claude-code` |
 | `gemini` | `active_configurable` / `active_configurable` | `official_provider_models` | `gemini` |
@@ -154,15 +157,22 @@ endpoint supports `/v1/models`.
 SkillMall stores secret references, not raw secrets:
 
 - API providers use env var references such as `OPENAI_API_KEY`.
+- OpenAI Codex uses Codex app-server account auth through `codex_app_server`.
+  The UI must render the returned `authUrl` or `verificationUrl` plus
+  `userCode`; local CLI status alone is not proof that Provider Center auth
+  worked.
 - Env var and gateway virtual-key reference names must be
   environment-variable-style names, not filesystem paths or credential-file
   locations.
 - Local tool/session rows rely on the official local tool authentication.
+- Claude Code supports `local_cli_session` and `claude_setup_token`. The
+  setup-token path uses an app-managed encrypted stored provider secret ref and
+  is not an Anthropic API key.
 - Local runtimes such as Ollama do not require a credential.
 - Gateway rows use local gateway virtual-key references.
 - Cloud rows require project/resource metadata plus safe secret references.
-- Claude Code is `local_tool_session`; Claude account/Max auth is not
-  Anthropic API-key access.
+- Claude Code local login, Claude setup-token, Claude account/Max auth, and
+  Anthropic API-key access are separate concepts.
 - ChatGPT Pro/Codex subscription auth is not OpenAI API-key access.
 
 SkillMall must not ask users to paste raw ChatGPT browser/session tokens,

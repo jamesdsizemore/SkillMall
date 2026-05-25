@@ -4,7 +4,7 @@ const SECTIONS = [
   {
     href: "/settings/providers",
     label: "Providers",
-    description: "Configure your LLM provider, API key, and model selection.",
+    description: "Review provider references, local sessions, account auth, and model selection.",
   },
   {
     href: "/settings/appearance",

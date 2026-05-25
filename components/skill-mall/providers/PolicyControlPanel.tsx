@@ -53,7 +53,9 @@ function executionProviderFor(provider: ProviderRow | null): string | null {
   return null;
 }
 
-function authModeFor(draft: ProviderDraft): "env_key" | "gateway_virtual_key" | "local_cli_session" | "none_local" {
+function authModeFor(
+  draft: ProviderDraft
+): "env_key" | "gateway_virtual_key" | "local_cli_session" | "none_local" | "codex_app_server" | "claude_setup_token" {
   if (draft.configMode === "gateway_virtual_key_ref") return "gateway_virtual_key";
   return draft.configMode;
 }
@@ -62,6 +64,14 @@ function secretRefFor(draft: ProviderDraft) {
   if (draft.configMode === "env_key") return { type: "env", name: draft.envVarName };
   if (draft.configMode === "gateway_virtual_key_ref") {
     return { type: "gateway_virtual_key_ref", name: draft.gatewayRefName };
+  }
+  if (draft.configMode === "claude_setup_token") {
+    return {
+      type: "stored_provider_secret",
+      id: "claude_code:setup_token",
+      providerRegistryId: "claude_code",
+      secretType: "setup_token",
+    };
   }
   return { type: "none" };
 }

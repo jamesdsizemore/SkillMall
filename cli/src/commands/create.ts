@@ -164,7 +164,7 @@ async function templateCreate(rawArgs: string[]): Promise<void> {
     message: "Skill name (lowercase, hyphens, max 64 chars):",
     placeholder: suggestedName,
     initialValue: suggestedName,
-    validate(val) {
+    validate(val: string) {
       if (!val) return "Name is required";
       if (!isValidSkillName(val))
         return "Name must be lowercase letters, numbers, and hyphens only (max 64 chars)";
@@ -184,7 +184,7 @@ async function templateCreate(rawArgs: string[]): Promise<void> {
     message: "One-line description (max 150 chars):",
     placeholder: description.slice(0, 150),
     initialValue: description.slice(0, 150),
-    validate(val) {
+    validate(val: string) {
       if (val && val.length > 150) return `Too long: ${val.length} chars (max 150)`;
     },
   });

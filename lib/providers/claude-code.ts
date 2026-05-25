@@ -1,5 +1,6 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { buildClaudeCodeEnv } from './claude-code-env'
 import type { LLMClient, ProviderConfig, CompletionOptions } from './types'
 
 const execFileAsync = promisify(execFile)
@@ -7,9 +8,11 @@ const execFileAsync = promisify(execFile)
 export class ClaudeCodeClient implements LLMClient {
   readonly provider = 'claude-code' as const
   private model: string
+  private config: ProviderConfig
 
   constructor(config: ProviderConfig) {
     this.model = config.model
+    this.config = config
   }
 
   async complete(prompt: string, options?: CompletionOptions): Promise<string> {
@@ -23,6 +26,7 @@ export class ClaudeCodeClient implements LLMClient {
       'claude',
       ['--print', '--model', this.model, fullPrompt],
       {
+        env: buildClaudeCodeEnv(this.config),
         maxBuffer: 10 * 1024 * 1024,
         timeout: options?.timeoutMs ?? 120_000,
       }

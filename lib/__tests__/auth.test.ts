@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import Database from "better-sqlite3";
 import crypto from "crypto";
 import path from "path";
@@ -9,6 +9,7 @@ import fs from "fs";
 const TEST_DB_PATH = path.join(os.tmpdir(), `auth-test-${process.pid}.db`);
 
 let testDb: Database.Database;
+const originalEnv = { ...process.env };
 
 beforeAll(() => {
   fs.mkdirSync(path.dirname(TEST_DB_PATH), { recursive: true });
@@ -24,6 +25,11 @@ beforeAll(() => {
       expires_at TEXT NOT NULL
     )
   `);
+});
+
+afterEach(() => {
+  process.env = { ...originalEnv };
+  vi.resetModules();
 });
 
 // Helpers that operate on our test DB directly (no module mocking)
@@ -76,6 +82,7 @@ describe("session management (SQLite direct)", () => {
 describe("getGitHubAuthUrl", () => {
   it("returns a GitHub OAuth URL with correct structure", async () => {
     process.env.GITHUB_CLIENT_ID = "test-client-id";
+    process.env.GITHUB_CLIENT_SECRET = "test-client-secret";
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
 
     const { getGitHubAuthUrl } = await import("../auth/github");
@@ -86,5 +93,28 @@ describe("getGitHubAuthUrl", () => {
     expect(url).toContain("callback%2Fgithub");
     expect(typeof state).toBe("string");
     expect(state.length).toBe(32);
+  });
+
+  it("uses the request origin when NEXT_PUBLIC_APP_URL is not configured", async () => {
+    process.env.GITHUB_CLIENT_ID = "test-client-id";
+    process.env.GITHUB_CLIENT_SECRET = "test-client-secret";
+    delete process.env.NEXT_PUBLIC_APP_URL;
+
+    const { getGitHubAuthUrl } = await import("../auth/github");
+    const { url } = getGitHubAuthUrl({ origin: "http://localhost:3123" });
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("client_id")).toBe("test-client-id");
+    expect(parsed.searchParams.get("redirect_uri")).toBe("http://localhost:3123/api/auth/callback/github");
+    expect(url).not.toContain("undefined");
+  });
+
+  it("throws a configuration error instead of generating client_id=undefined", async () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    process.env.GITHUB_CLIENT_SECRET = "test-client-secret";
+
+    const { getGitHubAuthUrl, AuthConfigurationError } = await import("../auth/github");
+
+    expect(() => getGitHubAuthUrl({ origin: "http://localhost:3123" })).toThrow(AuthConfigurationError);
   });
 });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
 import {
   authenticationRequiredResponse,
   forbiddenResponse,
+  getSessionFromRequest,
   isSkillAuthor,
   requireSkillAuthor,
   requireSkillAuthorWhenPresent,
@@ -22,6 +24,20 @@ describe("auth policy", () => {
     expect(isSkillAuthor(session, { author: "author-user" })).toBe(true);
     expect(isSkillAuthor(session, { author: "other-user" })).toBe(false);
     expect(isSkillAuthor(session, { author: "" })).toBe(false);
+  });
+
+  it("returns an auth-disabled session when GitHub OAuth is unconfigured", () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    delete process.env.GITHUB_CLIENT_SECRET;
+    delete process.env.SKILL_MALL_AUTH_DISABLED;
+
+    const disabledSession = getSessionFromRequest(new NextRequest("http://localhost:3123/api/reviews"));
+
+    expect(disabledSession).toMatchObject({
+      id: "auth-disabled",
+      github_login: "local-dev",
+    });
+    expect(isSkillAuthor(disabledSession!, { author: "any-skill-author" })).toBe(true);
   });
 
   it("requires exact author ownership when requested", async () => {

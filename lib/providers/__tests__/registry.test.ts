@@ -63,6 +63,7 @@ describe('provider registry', () => {
   it('uses registry IDs without widening the executable ProviderID union', () => {
     const executableIds = new Set<ProviderID>([
       'openai',
+      'codex',
       'anthropic',
       'claude-code',
       'gemini',
@@ -71,6 +72,8 @@ describe('provider registry', () => {
     ])
 
     expect(getProviderRegistryEntry('claude_code')?.executableProviderId).toBe('claude-code')
+    expect(getProviderRegistryEntry('openai_codex')?.executableProviderId).toBe('codex')
+    expect(getProviderRegistryEntry('openai_codex')?.classification).toBe('provider_account_auth')
     expect(getProviderRegistryEntry('huggingface')?.executableProviderId).toBeUndefined()
     expect(getProviderRegistryEntry('alibaba_dashscope_qwen')?.executableProviderId).toBeUndefined()
 
@@ -114,6 +117,7 @@ describe('provider registry', () => {
 
   it('enforces auth mode compatibility from provider access modes', () => {
     const openai = getProviderRegistryEntry('openai')
+    const openaiCodex = getProviderRegistryEntry('openai_codex')
     const anthropic = getProviderRegistryEntry('anthropic')
     const claudeCode = getProviderRegistryEntry('claude_code')
     const ollama = getProviderRegistryEntry('ollama')
@@ -122,8 +126,12 @@ describe('provider registry', () => {
     expect(openai && isAuthModeAllowedForProvider(openai, 'env_key')).toBe(true)
     expect(openai && isAuthModeAllowedForProvider(openai, 'gateway_virtual_key')).toBe(true)
     expect(openai && isAuthModeAllowedForProvider(openai, 'local_cli_session')).toBe(false)
+    expect(openaiCodex && isAuthModeAllowedForProvider(openaiCodex, 'codex_app_server')).toBe(true)
+    expect(openaiCodex && isAuthModeAllowedForProvider(openaiCodex, 'claude_setup_token')).toBe(false)
     expect(anthropic && isAuthModeAllowedForProvider(anthropic, 'gateway_virtual_key')).toBe(false)
     expect(claudeCode && isAuthModeAllowedForProvider(claudeCode, 'local_cli_session')).toBe(true)
+    expect(claudeCode && isAuthModeAllowedForProvider(claudeCode, 'claude_setup_token')).toBe(true)
+    expect(claudeCode && isAuthModeAllowedForProvider(claudeCode, 'codex_app_server')).toBe(false)
     expect(ollama && isAuthModeAllowedForProvider(ollama, 'none_local')).toBe(true)
     expect(custom && isAuthModeAllowedForProvider(custom, 'env_key')).toBe(true)
 

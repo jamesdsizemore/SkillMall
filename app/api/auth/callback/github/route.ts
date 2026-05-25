@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  AuthConfigurationError,
   exchangeCodeForToken,
   fetchGitHubUser,
   createSession,
@@ -49,6 +50,9 @@ export async function GET(req: NextRequest) {
 
     return response;
   } catch (err) {
+    if (err instanceof AuthConfigurationError) {
+      return NextResponse.json({ error: "configuration_error", message: err.message }, { status: 500 });
+    }
     console.error("[auth] GitHub OAuth callback failed:", err);
     return NextResponse.json({ error: "oauth_failed", message: "Authentication failed" }, { status: 500 });
   }

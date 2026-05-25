@@ -1,4 +1,5 @@
 import { OpenAIClient } from './openai'
+import { CodexClient } from './codex'
 import { AnthropicClient } from './anthropic'
 import { ClaudeCodeClient } from './claude-code'
 import { GeminiClient } from './gemini'
@@ -9,22 +10,28 @@ import type { LLMClient, ProviderConfig } from './types'
 import { createRouterLLMClient } from '../llm/router/create-client'
 import { resolveRouterProviderConfig } from '../llm/router/config'
 import { resolveEnvSecret } from '../llm/router/secret-refs'
+import { readProviderSecret } from './secret-store'
 
 export { ConfigError } from './types'
 export type { LLMClient, ProviderConfig, ProviderID, CompletionOptions } from './types'
 
 function resolveApiKeyForRouterConfig(config: ProviderConfig): string | undefined {
   if (config.apiKey) return config.apiKey
-  if (config.authMode !== 'env_key' || config.secretRef?.type !== 'env') return undefined
-  const value = resolveEnvSecret(config.secretRef.name)
+  if (config.authMode !== 'env_key') return undefined
+  const value =
+    config.secretRef?.type === 'env'
+      ? resolveEnvSecret(config.secretRef.name)
+      : config.secretRef?.type === 'stored_provider_secret' && config.secretRef.secretType === 'api_key'
+        ? readProviderSecret(config.secretRef.id)
+        : undefined
   if (!value) {
-    throw new ConfigError(`Missing API key environment variable: ${config.secretRef.name}`)
+    throw new ConfigError('Missing API key for configured provider')
   }
   return value
 }
 
 function assertKnownProvider(provider: string): void {
-  if (!['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'].includes(provider)) {
+  if (!['openai', 'codex', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'].includes(provider)) {
     throw new Error(`Unknown provider: ${provider}`)
   }
 }
@@ -39,6 +46,8 @@ export function createDirectLLMClient(config: ProviderConfig): LLMClient {
   switch (config.provider) {
     case 'openai':
       return new OpenAIClient(directConfig)
+    case 'codex':
+      return new CodexClient(directConfig)
     case 'anthropic':
       return new AnthropicClient(directConfig)
     case 'claude-code':
@@ -79,9 +88,6 @@ export function resolveProviderConfig(): ProviderConfig {
     secretRef: routerConfig.secretRef,
     gatewayBackend: routerConfig.gatewayBackend,
     routingPolicyId: routerConfig.routingPolicyId,
-    apiKey:
-      routerConfig.authMode === 'env_key' && routerConfig.secretRef?.type === 'env'
-        ? resolveEnvSecret(routerConfig.secretRef.name)
-        : undefined,
+    apiKey: resolveApiKeyForRouterConfig(routerConfig as ProviderConfig),
   }
 }

@@ -1,14 +1,10 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { getSession } from "@/lib/auth/github";
+import { getSessionFromCookies } from "@/lib/auth/policy";
 import { getInstallsByAgentType, getInstallCount, getEffectivenessTrend } from "@/lib/analytics";
 import { getAllSkills } from "@/lib/skills";
 
 export default async function DashboardPage() {
-  // Auth check — session cookie
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sm_session")?.value;
-  const session = token ? getSession(token) : null;
+  const session = await getSessionFromCookies();
 
   if (!session) {
     redirect("/api/auth/login");
@@ -16,9 +12,7 @@ export default async function DashboardPage() {
 
   // Get all skills authored by this user
   const allSkills = getAllSkills();
-  const mySkills = allSkills.filter(
-    (s) => s.author === session.github_login
-  );
+  const mySkills = allSkills.filter((s) => s.author === session.github_login);
 
   return (
     <div className="bg-sm-bg min-h-screen px-4 py-12 sm:px-6">

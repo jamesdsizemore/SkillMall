@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import Link from "next/link";
-import { getSession } from "@/lib/auth/github";
+import { getSessionFromCookies } from "@/lib/auth/policy";
 
 const NAV_ITEMS = [
   { href: "/settings/providers", label: "Providers" },
@@ -13,9 +12,7 @@ export default async function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sm_session")?.value;
-  const session = token ? getSession(token) : null;
+  const session = await getSessionFromCookies();
 
   if (!session) {
     redirect("/api/auth/login");
@@ -23,7 +20,7 @@ export default async function SettingsLayout({
 
   return (
     <div className="bg-sm-bg min-h-screen">
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-7xl px-6 py-12 lg:px-10">
         <p
           className="mb-1 text-[9px] tracking-widest text-sm-disabled"
           style={{ fontFamily: "var(--font-space-mono, monospace)" }}
@@ -32,10 +29,10 @@ export default async function SettingsLayout({
         </p>
         <h1 className="mb-8 text-2xl font-bold text-sm-display">Settings</h1>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:gap-12">
           {/* Sidebar nav */}
-          <nav className="w-full shrink-0 sm:w-40">
-            <ul className="flex flex-wrap gap-1 sm:block sm:space-y-1">
+          <nav className="w-full shrink-0 lg:w-44">
+            <ul className="flex flex-wrap gap-1 lg:block lg:space-y-1">
               {NAV_ITEMS.map((item) => (
                 <li key={item.href}>
                   <Link

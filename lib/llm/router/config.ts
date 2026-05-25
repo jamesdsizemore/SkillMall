@@ -20,7 +20,7 @@ import type { ProviderRegistryID } from '../../providers/types'
 
 export const ROUTER_USER_CONFIG_PATH = path.join(os.homedir(), '.skill-mall', 'config.json')
 
-const PROVIDER_IDS: ProviderID[] = ['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama']
+const PROVIDER_IDS: ProviderID[] = ['openai', 'codex', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama']
 
 const API_ENV_BY_PROVIDER: Partial<Record<ProviderID, string>> = {
   openai: 'OPENAI_API_KEY',
@@ -62,6 +62,7 @@ function isProviderID(value: string | undefined): value is ProviderID {
 }
 
 export function defaultAuthModeForProvider(provider: ProviderID): LLMAuthMode {
+  if (provider === 'codex') return 'codex_app_server'
   if (provider === 'claude-code') return 'local_cli_session'
   if (provider === 'ollama') return 'none_local'
   return 'env_key'
@@ -102,6 +103,8 @@ function resolveAuthAndSecret(
       ? defaultSecretRefForProvider(provider)
       : authMode === 'gateway_virtual_key'
         ? undefined
+        : authMode === 'codex_app_server'
+          ? { type: 'none' }
         : { type: 'none' })
   const secretRef = rawSecretRef ? sanitizeSecretRef(rawSecretRef) : undefined
 

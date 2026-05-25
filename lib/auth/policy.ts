@@ -2,16 +2,23 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import type { Session } from "../db/types";
 import type { Skill } from "../skills";
-import { getSession } from "./github";
+import {
+  disabledAuthSession,
+  getSession,
+  isAuthDisabled,
+  isDisabledAuthSession,
+} from "./github";
 
 export const SESSION_COOKIE_NAME = "sm_session";
 
 export function getSessionFromRequest(req: NextRequest): Session | null {
+  if (isAuthDisabled()) return disabledAuthSession();
   const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   return token ? getSession(token) : null;
 }
 
 export async function getSessionFromCookies(): Promise<Session | null> {
+  if (isAuthDisabled()) return disabledAuthSession();
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   return token ? getSession(token) : null;
@@ -28,6 +35,7 @@ export function forbiddenResponse(message: string): NextResponse {
 }
 
 export function isSkillAuthor(session: Session, skill: Pick<Skill, "author">): boolean {
+  if (isDisabledAuthSession(session)) return true;
   return Boolean(skill.author) && skill.author === session.github_login;
 }
 

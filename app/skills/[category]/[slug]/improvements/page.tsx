@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { getSkill } from "@/lib/skills";
-import { getSession } from "@/lib/auth/github";
+import { isSkillAuthor, getSessionFromCookies } from "@/lib/auth/policy";
 import { getSuggestions } from "@/lib/self-improvement/analyzer";
 import { SuggestionList } from "@/components/skill-mall/improvements/SuggestionList";
 
@@ -15,12 +14,10 @@ export default async function ImprovementsPage({ params }: Props) {
   const skill = getSkill(category, slug);
   if (!skill) notFound();
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sm_session")?.value;
-  const session = token ? getSession(token) : null;
+  const session = await getSessionFromCookies();
   if (!session) redirect("/api/auth/login");
 
-  const isAuthor = session.github_login === skill.author;
+  const isAuthor = isSkillAuthor(session, skill);
   const suggestions = getSuggestions(slug);
 
   return (

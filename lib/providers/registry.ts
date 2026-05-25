@@ -25,6 +25,23 @@ export const PROVIDER_REGISTRY: ProviderRegistryEntry[] = [
     evidenceNote: 'Official Models API supports model listing.',
   },
   {
+    id: 'openai_codex',
+    name: 'OpenAI Codex',
+    accessModes: ['provider_account_auth'],
+    accessLabel: 'ChatGPT/Codex account auth',
+    authLabel: 'Codex app-server ChatGPT login',
+    setupUrl: 'https://developers.openai.com/codex',
+    officialSourceUrl: 'https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md',
+    discoveryStrategy: 'static_fallback_only',
+    status: 'active_configurable',
+    classification: 'provider_account_auth',
+    liveCallable: true,
+    executableProviderId: 'codex',
+    fallbackModels: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini'],
+    registryInclusionNote: 'Executable Codex adapter backed by Codex app-server account auth, separate from OpenAI API keys.',
+    evidenceNote: 'Codex app-server exposes account/login/start with authUrl or verificationUrl/userCode for ChatGPT-managed auth.',
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic Claude API',
     accessModes: ['api_access'],
@@ -530,12 +547,14 @@ export function getProviderRegistryEntry(id: ProviderRegistryID): ProviderRegist
 }
 
 export function providerRegistryIdForExecutableProvider(provider: ProviderID): ProviderRegistryID {
+  if (provider === 'codex') return 'openai_codex'
   return provider === 'claude-code' ? 'claude_code' : provider
 }
 
 export function providerAccessModeForAuthMode(authMode: LLMAuthMode): ProviderAccessMode {
   if (authMode === 'env_key') return 'api_access'
   if (authMode === 'gateway_virtual_key') return 'gateway_virtual_key'
+  if (authMode === 'codex_app_server' || authMode === 'claude_setup_token') return 'provider_account_auth'
   if (authMode === 'local_cli_session') return 'local_tool_session'
   return 'local_runtime'
 }
@@ -544,6 +563,8 @@ export function isAuthModeAllowedForProvider(
   entry: ProviderRegistryEntry,
   authMode: LLMAuthMode
 ): boolean {
+  if (authMode === 'claude_setup_token') return entry.id === 'claude_code'
+  if (authMode === 'codex_app_server') return entry.id === 'openai_codex'
   if (authMode === 'env_key' && entry.accessModes.includes('custom_openai_compatible')) {
     return true
   }

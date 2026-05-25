@@ -15,12 +15,14 @@ import {
   providerRegistryIdForExecutableProvider,
 } from '@/lib/providers/registry'
 import { discoverProviderModels } from '@/lib/providers/model-discovery'
+import { getProviderSecretStatus, storedProviderSecretId } from '@/lib/providers/secret-store'
 import { defaultAuthModeForProvider } from '@/lib/llm/router/config'
 import type { LLMAuthMode, SecretRef } from '@/lib/llm/router/types'
 import type { ProviderID, ProviderRegistryID } from '@/lib/providers/types'
 
 const executableProviders = new Set<ProviderID>([
   'openai',
+  'codex',
   'anthropic',
   'claude-code',
   'gemini',
@@ -55,13 +57,19 @@ const ConfigureBodySchema = z.object({
   model: z.string().min(1).optional(),
   manualModels: z.array(z.string().min(1)).optional(),
   configMode: z
-    .enum(['env_key', 'gateway_virtual_key_ref', 'local_cli_session', 'none_local'])
+    .enum(['env_key', 'gateway_virtual_key_ref', 'local_cli_session', 'none_local', 'codex_app_server', 'claude_setup_token'])
     .optional(),
-  authMode: z.enum(['env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key']).optional(),
+  authMode: z.enum(['env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key', 'codex_app_server', 'claude_setup_token']).optional(),
   secretRef: z
     .discriminatedUnion('type', [
       z.object({ type: z.literal('env'), name: z.string().min(1) }),
       z.object({ type: z.literal('gateway_virtual_key_ref'), name: z.string().min(1) }),
+      z.object({
+        type: z.literal('stored_provider_secret'),
+        id: z.string().min(1),
+        providerRegistryId: z.string().min(1),
+        secretType: z.enum(['api_key', 'setup_token']),
+      }),
       z.object({ type: z.literal('none') }),
     ])
     .optional(),
@@ -87,6 +95,8 @@ function rejectedRawSecretFields(value: unknown, prefix = ''): string[] {
 
 function authModeFromInput(configMode: string | undefined, authMode: string | undefined): LLMAuthMode | undefined {
   if (configMode === 'gateway_virtual_key_ref') return 'gateway_virtual_key'
+  if (configMode === 'codex_app_server') return 'codex_app_server'
+  if (configMode === 'claude_setup_token') return 'claude_setup_token'
   if (configMode === 'env_key' || configMode === 'local_cli_session' || configMode === 'none_local') {
     return configMode
   }
@@ -103,11 +113,38 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
     }
   }
 
+  if (secretRef.type === 'stored_provider_secret') {
+    const status = getProviderSecretStatus(secretRef.id)
+    return {
+      type: secretRef.type,
+      id: secretRef.id,
+      secretType: secretRef.secretType,
+      valuePresent: status.valuePresent,
+      source: status.source,
+    }
+  }
+
   return {
     type: secretRef.type,
     name: secretRef.name,
     valuePresent: Boolean(process.env[secretRef.name]),
     source: 'reference_only',
+  }
+}
+
+function assertClaudeSetupTokenSecretAvailable(secretRef: SecretRef | undefined): void {
+  const expectedId = storedProviderSecretId('claude_code', 'setup_token')
+  if (
+    secretRef?.type !== 'stored_provider_secret' ||
+    secretRef.id !== expectedId ||
+    secretRef.providerRegistryId !== 'claude_code' ||
+    secretRef.secretType !== 'setup_token'
+  ) {
+    throw new Error('claude_setup_token auth requires the app-managed Claude setup-token secret ref')
+  }
+
+  if (!getProviderSecretStatus(secretRef.id).valuePresent) {
+    throw new Error('Claude setup-token secret is missing; save the setup-token before configuring this auth mode.')
   }
 }
 
@@ -165,6 +202,7 @@ export async function POST(req: NextRequest) {
     if (authMode) {
       assertAuthModeAllowedForProvider(registryEntry, authMode)
       validateSecretRefForAuthMode(authMode, secretRef)
+      if (authMode === 'claude_setup_token') assertClaudeSetupTokenSecretAvailable(secretRef)
     }
 
     if (parsed.data.provider && !provider) {
@@ -250,7 +288,7 @@ export async function POST(req: NextRequest) {
         providerRegistryId: registryEntry.id,
         executionKind: gatewayBackend === 'bifrost_local' ? 'bifrost_local' : 'direct',
         model: parsed.data.model,
-        authMode,
+        authMode: resolvedAuthMode,
         secretRef,
         gatewayBackend,
         baseURL: parsed.data.baseURL,

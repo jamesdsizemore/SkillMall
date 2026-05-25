@@ -41,6 +41,19 @@ const openaiCandidate = {
   estimatedCostUsd: 0.02,
 }
 
+const codexCandidate = {
+  id: 'codex-account',
+  config: {
+    provider: 'codex',
+    providerRegistryId: 'openai_codex',
+    model: 'gpt-5.4',
+    authMode: 'codex_app_server',
+    secretRef: { type: 'none' },
+    gatewayBackend: 'direct',
+  },
+  estimatedCostUsd: 0.03,
+}
+
 afterEach(() => {
   while (tempDbs.length > 0) {
     const entry = tempDbs.pop()
@@ -90,6 +103,31 @@ describe('routing policy store', () => {
     const disabled = setRoutingPolicyEnabled('budget-openai', false, db)
     expect(disabled.enabled).toBe(false)
     expect(listRoutingPolicies(db)).toHaveLength(1)
+  })
+
+  it('accepts OpenAI Codex account-auth candidates emitted by Provider Center', () => {
+    const db = createRouterDb()
+    const saved = upsertRoutingPolicy(
+      {
+        id: 'codex-account-policy',
+        name: 'Codex account policy',
+        mode: 'manual',
+        rules: { candidates: [codexCandidate] },
+      },
+      db
+    )
+
+    expect(saved.rules.candidates?.[0]).toMatchObject({
+      id: 'codex-account',
+      config: {
+        provider: 'codex',
+        providerRegistryId: 'openai_codex',
+        model: 'gpt-5.4',
+        authMode: 'codex_app_server',
+        secretRef: { type: 'none' },
+        gatewayBackend: 'direct',
+      },
+    })
   })
 
   it('rejects unsupported future policy modes', () => {

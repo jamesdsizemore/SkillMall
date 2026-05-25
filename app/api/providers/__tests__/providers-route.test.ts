@@ -7,6 +7,10 @@ import path from 'path'
 const mocks = vi.hoisted(() => ({
   writeProviderConfig: vi.fn(),
   getDb: vi.fn(),
+  writeProviderSecret: vi.fn(),
+  readProviderSecret: vi.fn(),
+  deleteProviderSecret: vi.fn(),
+  getProviderSecretStatus: vi.fn(),
 }))
 
 vi.mock('@/lib/providers/config-store', () => ({
@@ -15,6 +19,14 @@ vi.mock('@/lib/providers/config-store', () => ({
 
 vi.mock('@/lib/db/client', () => ({
   getDb: mocks.getDb,
+}))
+
+vi.mock('@/lib/providers/secret-store', () => ({
+  storedProviderSecretId: (providerRegistryId: string, secretType: string) => `${providerRegistryId}:${secretType}`,
+  writeProviderSecret: mocks.writeProviderSecret,
+  readProviderSecret: mocks.readProviderSecret,
+  deleteProviderSecret: mocks.deleteProviderSecret,
+  getProviderSecretStatus: mocks.getProviderSecretStatus,
 }))
 
 function postRequest(url: string, body: unknown): Request {
@@ -56,6 +68,16 @@ describe('provider API routes', () => {
     vi.resetModules()
     mocks.writeProviderConfig.mockReset()
     mocks.getDb.mockReset()
+    mocks.writeProviderSecret.mockReset()
+    mocks.readProviderSecret.mockReset()
+    mocks.deleteProviderSecret.mockReset()
+    mocks.getProviderSecretStatus.mockReset()
+    mocks.getProviderSecretStatus.mockImplementation((id: string) => ({
+      type: 'stored_provider_secret',
+      id,
+      valuePresent: false,
+      source: 'app_managed_encrypted_store',
+    }))
     process.env = { ...originalEnv }
     delete process.env.SKILL_MALL_PROVIDER
     delete process.env.SKILL_MALL_MODEL
@@ -362,6 +384,135 @@ describe('provider API routes', () => {
     expect(JSON.stringify(json)).not.toContain('/Users/test/.skill-mall/config.json')
   })
 
+  it('configure persists default auth mode for direct executable providers', async () => {
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'codex',
+      providerRegistryId: 'openai_codex',
+      executionKind: 'direct',
+      model: 'gpt-5-mini',
+      authMode: 'codex_app_server',
+      gatewayBackend: 'direct',
+      baseURL: null,
+      routingPolicyId: null,
+      secretRef: { type: 'none' },
+      path: '/Users/test/.skill-mall/config.json',
+    })
+
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai_codex',
+        provider: 'codex',
+        model: 'gpt-5-mini',
+        secretRef: { type: 'none' },
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      providerRegistryId: 'openai_codex',
+      provider: 'codex',
+      authMode: 'codex_app_server',
+      secretStatus: {
+        type: 'none',
+        valuePresent: true,
+      },
+    })
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'codex',
+        providerRegistryId: 'openai_codex',
+        authMode: 'codex_app_server',
+        secretRef: { type: 'none' },
+      })
+    )
+  })
+
+  it('configure refuses claude_setup_token when the encrypted setup-token is missing', async () => {
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'claude_code',
+        provider: 'claude-code',
+        model: 'claude-sonnet-4-6',
+        configMode: 'claude_setup_token',
+        secretRef: {
+          type: 'stored_provider_secret',
+          id: 'claude_code:setup_token',
+          providerRegistryId: 'claude_code',
+          secretType: 'setup_token',
+        },
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json).toMatchObject({
+      error: 'invalid_provider_config',
+    })
+    expect(json.message).toMatch(/setup-token secret is missing/)
+    expect(mocks.writeProviderConfig).not.toHaveBeenCalled()
+  })
+
+  it('configure accepts claude_setup_token only when the stored setup-token exists', async () => {
+    mocks.getProviderSecretStatus.mockImplementation((id: string) => ({
+      type: 'stored_provider_secret',
+      id,
+      valuePresent: id === 'claude_code:setup_token',
+      source: 'app_managed_encrypted_store',
+    }))
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'claude-code',
+      providerRegistryId: 'claude_code',
+      executionKind: 'direct',
+      model: 'claude-sonnet-4-6',
+      authMode: 'claude_setup_token',
+      gatewayBackend: 'direct',
+      baseURL: null,
+      routingPolicyId: null,
+      secretRef: {
+        type: 'stored_provider_secret',
+        id: 'claude_code:setup_token',
+        providerRegistryId: 'claude_code',
+        secretType: 'setup_token',
+      },
+      path: '/Users/test/.skill-mall/config.json',
+    })
+
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'claude_code',
+        provider: 'claude-code',
+        model: 'claude-sonnet-4-6',
+        configMode: 'claude_setup_token',
+        secretRef: {
+          type: 'stored_provider_secret',
+          id: 'claude_code:setup_token',
+          providerRegistryId: 'claude_code',
+          secretType: 'setup_token',
+        },
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json.secretStatus).toMatchObject({
+      type: 'stored_provider_secret',
+      id: 'claude_code:setup_token',
+      secretType: 'setup_token',
+      valuePresent: true,
+    })
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'claude-code',
+        providerRegistryId: 'claude_code',
+        authMode: 'claude_setup_token',
+      })
+    )
+  })
+
   it('configure stores gateway_virtual_key_ref executable provider config', async () => {
     mocks.writeProviderConfig.mockResolvedValue({
       provider: 'openai',
@@ -651,6 +802,54 @@ describe('provider API routes', () => {
     expect(JSON.stringify(json)).not.toContain('gateway-refresh-secret')
   })
 
+  it('model refresh reports stored-provider-secret status from the encrypted store', async () => {
+    mocks.getDb.mockReturnValue(createProviderDb())
+    mocks.getProviderSecretStatus.mockImplementation((id: string) => ({
+      type: 'stored_provider_secret',
+      id,
+      valuePresent: id === 'claude_code:setup_token',
+      source: 'app_managed_encrypted_store',
+    }))
+    vi.doMock('@/lib/llm/router/config', () => ({
+      resolveRouterProviderConfig: () => ({
+        provider: 'claude-code',
+        providerRegistryId: 'claude_code',
+        model: 'claude-sonnet-4-6',
+        authMode: 'claude_setup_token',
+        secretRef: {
+          type: 'stored_provider_secret',
+          id: 'claude_code:setup_token',
+          providerRegistryId: 'claude_code',
+          secretType: 'setup_token',
+        },
+        gatewayBackend: 'direct',
+        warnings: [],
+      }),
+    }))
+
+    const { POST } = await import('../models/refresh/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/models/refresh', {
+        providerRegistryId: 'claude_code',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      providerRegistryId: 'claude_code',
+      configured: true,
+      secretStatus: {
+        type: 'stored_provider_secret',
+        id: 'claude_code:setup_token',
+        secretType: 'setup_token',
+        valuePresent: true,
+        source: 'app_managed_encrypted_store',
+      },
+    })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('model refresh reports planned-source-review, manual, and status-only rows without generic probing', async () => {
     const db = createProviderDb()
     mocks.getDb.mockReturnValue(db)
@@ -730,7 +929,6 @@ describe('provider API routes', () => {
     const response = await POST(
       postRequest('http://localhost/api/providers/test', {
         providerRegistryId: 'openai',
-        prompt: 'do not persist me',
       }) as never
     )
     const json = await response.json()
@@ -747,8 +945,377 @@ describe('provider API routes', () => {
       },
     })
     expect(JSON.stringify(json)).not.toContain('test-route-secret')
-    expect(JSON.stringify(json)).not.toContain('do not persist me')
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('provider test route checks Codex app-server auth status before reporting ready', async () => {
+    const auth = await import('@/lib/providers/codex-app-server-auth')
+    const requestedMethods: string[] = []
+    auth.setCodexAppServerTransportForTest({
+      async request(method, params) {
+        requestedMethods.push(method)
+        expect(params).toEqual({ includeToken: false, refreshToken: false })
+        return {
+          authMethod: null,
+          authToken: null,
+          requiresOpenaiAuth: true,
+        }
+      },
+    })
+    vi.doMock('@/lib/llm/router/config', () => ({
+      resolveRouterProviderConfig: () => ({
+        provider: 'codex',
+        providerRegistryId: 'openai_codex',
+        model: 'gpt-5.4',
+        authMode: 'codex_app_server',
+        secretRef: { type: 'none' },
+        gatewayBackend: 'direct',
+        warnings: [],
+      }),
+    }))
+
+    const { POST } = await import('../test/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/test', {
+        providerRegistryId: 'openai_codex',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(requestedMethods).toEqual(['getAuthStatus'])
+    expect(json).toMatchObject({
+      providerRegistryId: 'openai_codex',
+      configured: true,
+      status: 'missing_secret',
+      secretStatus: {
+        type: 'none',
+        valuePresent: true,
+      },
+    })
+    expect(JSON.stringify(json)).not.toMatch(/accessToken|refreshToken|authToken|sk-/)
+  })
+
+  it('provider test route rejects prompt bodies instead of accepting them', async () => {
+    const { POST } = await import('../test/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/test', {
+        providerRegistryId: 'openai',
+        prompt: 'do not persist me',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toBe('raw_secret_field_rejected')
+    expect(json.rejectedFields).toContain('prompt')
+    expect(JSON.stringify(json)).not.toContain('do not persist me')
+  })
+
+  it('Codex auth start returns app-server authUrl session without raw tokens', async () => {
+    const auth = await import('@/lib/providers/codex-app-server-auth')
+    auth.setCodexAppServerTransportForTest({
+      async request(method, params) {
+        expect(method).toBe('account/login/start')
+        expect(params).toEqual({ type: 'chatgpt' })
+        return {
+          type: 'chatgpt',
+          loginId: 'login-route-1',
+          authUrl: 'https://chatgpt.com/auth',
+        }
+      },
+    })
+
+    const { POST } = await import('../auth/start/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/auth/start', {
+        providerRegistryId: 'openai_codex',
+        method: 'chatgpt',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json.session).toMatchObject({
+      providerRegistryId: 'openai_codex',
+      status: 'authorization_required',
+      loginId: 'login-route-1',
+      authUrl: 'https://chatgpt.com/auth',
+    })
+    expect(JSON.stringify(json)).not.toMatch(/accessToken|refreshToken|sk-/)
+  })
+
+  it('Codex auth status and cancel resolve by flowId without exposing tokens', async () => {
+    const auth = await import('@/lib/providers/codex-app-server-auth')
+    auth.setCodexAppServerTransportForTest({
+      async request(method) {
+        if (method === 'account/login/start') {
+          return {
+            type: 'chatgptDeviceCode',
+            loginId: 'login-route-2',
+            verificationUrl: 'https://auth.openai.com/codex/device',
+            userCode: 'ABCD-1234',
+          }
+        }
+        return { status: 'canceled' }
+      },
+    })
+    const started = await auth.startCodexAppServerAuthSession({ method: 'chatgpt_device_code' })
+    const statusRoute = await import('../auth/[flowId]/status/route')
+    const cancelRoute = await import('../auth/[flowId]/cancel/route')
+
+    const statusResponse = await statusRoute.GET(
+      new Request(`http://localhost/api/providers/auth/${started.flowId}/status`) as never,
+      { params: { flowId: started.flowId } }
+    )
+    const statusJson = await statusResponse.json()
+    const cancelResponse = await cancelRoute.POST(
+      new Request(`http://localhost/api/providers/auth/${started.flowId}/cancel`, { method: 'POST' }) as never,
+      { params: { flowId: started.flowId } }
+    )
+    const cancelJson = await cancelResponse.json()
+
+    expect(statusResponse.status).toBe(200)
+    expect(statusJson.session).toMatchObject({
+      verificationUrl: 'https://auth.openai.com/codex/device',
+      userCode: 'ABCD-1234',
+    })
+    expect(cancelResponse.status).toBe(200)
+    expect(cancelJson.session.status).toBe('cancelled')
+    expect(JSON.stringify({ statusJson, cancelJson })).not.toMatch(/accessToken|refreshToken|sk-/)
+  })
+
+  it('Claude setup-token credential route stores only a redacted stored secret ref', async () => {
+    const setupTokenFixture = ['sk-ant-oat01', 'test-token-value'].join('-')
+    mocks.writeProviderSecret.mockReturnValue({
+      id: 'claude_code:setup_token',
+      providerRegistryId: 'claude_code',
+      secretType: 'setup_token',
+      valuePresent: true,
+    })
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'claude-code',
+      providerRegistryId: 'claude_code',
+      executionKind: 'direct',
+      model: 'claude-sonnet-4-6',
+      authMode: 'claude_setup_token',
+      gatewayBackend: 'direct',
+      secretRef: {
+        type: 'stored_provider_secret',
+        id: 'claude_code:setup_token',
+        providerRegistryId: 'claude_code',
+        secretType: 'setup_token',
+      },
+    })
+
+    const { POST } = await import('../credentials/setup-token/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/credentials/setup-token', {
+        providerRegistryId: 'claude_code',
+        token: setupTokenFixture,
+        model: 'claude-sonnet-4-6',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mocks.writeProviderSecret).toHaveBeenCalledWith({
+      providerRegistryId: 'claude_code',
+      secretType: 'setup_token',
+      value: setupTokenFixture,
+    })
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'claude-code',
+      providerRegistryId: 'claude_code',
+      authMode: 'claude_setup_token',
+    }))
+    expect(json.secretStatus).toMatchObject({
+      type: 'stored_provider_secret',
+      id: 'claude_code:setup_token',
+      valuePresent: true,
+    })
+    expect(JSON.stringify(json)).not.toContain(setupTokenFixture)
+  })
+
+  it('API-key credential route stores direct provider keys as encrypted secret refs', async () => {
+    const apiKeyFixture = 'sk-test-openai-api-key'
+    mocks.writeProviderSecret.mockReturnValue({
+      id: 'openai:api_key',
+      providerRegistryId: 'openai',
+      secretType: 'api_key',
+      valuePresent: true,
+    })
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'openai',
+      providerRegistryId: 'openai',
+      executionKind: 'direct',
+      model: 'gpt-5.1',
+      authMode: 'env_key',
+      gatewayBackend: 'direct',
+      secretRef: {
+        type: 'stored_provider_secret',
+        id: 'openai:api_key',
+        providerRegistryId: 'openai',
+        secretType: 'api_key',
+      },
+    })
+
+    const { POST } = await import('../credentials/api-key/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/credentials/api-key', {
+        providerRegistryId: 'openai',
+        apiKey: apiKeyFixture,
+        model: 'gpt-5.1',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mocks.writeProviderSecret).toHaveBeenCalledWith({
+      providerRegistryId: 'openai',
+      secretType: 'api_key',
+      value: apiKeyFixture,
+    })
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'openai',
+      providerRegistryId: 'openai',
+      executionKind: 'direct',
+      authMode: 'env_key',
+      secretRef: {
+        type: 'stored_provider_secret',
+        id: 'openai:api_key',
+        providerRegistryId: 'openai',
+        secretType: 'api_key',
+      },
+    }))
+    expect(json.secretStatus).toMatchObject({
+      type: 'stored_provider_secret',
+      id: 'openai:api_key',
+      valuePresent: true,
+    })
+    expect(JSON.stringify(json)).not.toContain(apiKeyFixture)
+  })
+
+  it('API-key credential route stores OpenAI-compatible registry providers with base URL', async () => {
+    const apiKeyFixture = 'sk-test-openrouter-api-key'
+    mocks.writeProviderSecret.mockReturnValue({
+      id: 'openrouter:api_key',
+      providerRegistryId: 'openrouter',
+      secretType: 'api_key',
+      valuePresent: true,
+    })
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'openai',
+      providerRegistryId: 'openrouter',
+      executionKind: 'openai_compatible',
+      model: 'openai/gpt-5',
+      authMode: 'env_key',
+      gatewayBackend: 'direct',
+      baseURL: 'https://openrouter.ai/api/v1',
+      secretRef: {
+        type: 'stored_provider_secret',
+        id: 'openrouter:api_key',
+        providerRegistryId: 'openrouter',
+        secretType: 'api_key',
+      },
+    })
+
+    const { POST } = await import('../credentials/api-key/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/credentials/api-key', {
+        providerRegistryId: 'openrouter',
+        apiKey: apiKeyFixture,
+        model: 'openai/gpt-5',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'openai',
+      providerRegistryId: 'openrouter',
+      executionKind: 'openai_compatible',
+      baseURL: 'https://openrouter.ai/api/v1',
+      secretRef: {
+        type: 'stored_provider_secret',
+        id: 'openrouter:api_key',
+        providerRegistryId: 'openrouter',
+        secretType: 'api_key',
+      },
+    }))
+    expect(json).toMatchObject({
+      providerRegistryId: 'openrouter',
+      provider: 'openai',
+      model: 'openai/gpt-5',
+    })
+    expect(JSON.stringify(json)).not.toContain(apiKeyFixture)
+  })
+
+  it('Claude setup-token credential route rolls back the encrypted secret if config write fails', async () => {
+    const setupTokenFixture = ['sk-ant-oat01', 'test-token-value'].join('-')
+    mocks.writeProviderSecret.mockReturnValue({
+      id: 'claude_code:setup_token',
+      providerRegistryId: 'claude_code',
+      secretType: 'setup_token',
+      valuePresent: true,
+    })
+    mocks.writeProviderConfig.mockRejectedValue(new Error('config write failed'))
+
+    const { POST } = await import('../credentials/setup-token/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/credentials/setup-token', {
+        providerRegistryId: 'claude_code',
+        token: setupTokenFixture,
+        model: 'claude-sonnet-4-6',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json).toMatchObject({
+      error: 'invalid_setup_token',
+      message: 'config write failed',
+    })
+    expect(mocks.deleteProviderSecret).toHaveBeenCalledWith('claude_code:setup_token')
+    expect(JSON.stringify(json)).not.toContain(setupTokenFixture)
+  })
+
+  it('Claude setup-token DELETE downgrades config before deleting the stored token', async () => {
+    const calls: string[] = []
+    mocks.writeProviderConfig.mockImplementation(async (input) => {
+      calls.push(`config:${input.authMode}`)
+      return {
+        ...input,
+        model: input.model ?? 'claude-sonnet-4-6',
+        path: '/Users/test/.skill-mall/config.json',
+      }
+    })
+    mocks.deleteProviderSecret.mockImplementation(() => {
+      calls.push('delete')
+      return true
+    })
+
+    const { DELETE } = await import('../credentials/setup-token/route')
+    const response = await DELETE()
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(calls).toEqual(['config:local_cli_session', 'delete'])
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'claude-code',
+      providerRegistryId: 'claude_code',
+      authMode: 'local_cli_session',
+      secretRef: { type: 'none' },
+    }))
+    expect(json).toMatchObject({
+      success: true,
+      authMode: 'local_cli_session',
+      deleted: true,
+      secretStatus: {
+        id: 'claude_code:setup_token',
+        valuePresent: false,
+      },
+    })
   })
 
   it('policy route upserts, lists, disables, and rejects prompt or raw secret fields', async () => {

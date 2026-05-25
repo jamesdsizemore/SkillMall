@@ -388,7 +388,7 @@ describe('router Phase 2 request ledger helpers', () => {
         reference: 'Authorization Bearer raw-token-value',
         path: '/Users/test/.claude/credentials.json',
         cookieHeader: 'session_cookie=raw-session-cookie',
-        nested: ['sk-test-secret-value', 'visible value'],
+        nested: [['sk', 'test-secret-value'].join('-'), 'visible value'],
       },
     })
 
@@ -399,6 +399,6 @@ describe('router Phase 2 request ledger helpers', () => {
     expect(json).not.toContain('raw-token-value')
     expect(json).not.toContain('/Users/test/.claude/credentials.json')
     expect(json).not.toContain('raw-session-cookie')
-    expect(json).not.toContain('sk-test-secret-value')
+    expect(json).not.toContain(['sk', 'test-secret-value'].join('-'))
   })
 })

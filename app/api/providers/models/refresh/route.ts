@@ -4,6 +4,8 @@ import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { refreshRegistryProviderModels } from '@/lib/llm/router/model-refresh'
 import { getProviderRegistryEntry, PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { resolveEnvSecret } from '@/lib/llm/router/secret-refs'
+import { getProviderSecretStatus, readProviderSecret } from '@/lib/providers/secret-store'
+import type { SecretRef } from '@/lib/llm/router/types'
 import type { ProviderRegistryID } from '@/lib/providers/types'
 
 const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegistryID, ...ProviderRegistryID[]]
@@ -18,6 +20,34 @@ export const dynamic = 'force-dynamic'
 
 async function requestJson(req: NextRequest): Promise<unknown> {
   return req.json().catch(() => ({}))
+}
+
+function secretStatus(secretRef: SecretRef | undefined | null, apiKey?: string) {
+  if (!secretRef) return null
+  if (secretRef.type === 'none') {
+    return {
+      type: 'none',
+      valuePresent: true,
+      source: 'no_secret_required',
+    }
+  }
+  if (secretRef.type === 'stored_provider_secret') {
+    const status = getProviderSecretStatus(secretRef.id)
+    return {
+      type: secretRef.type,
+      id: secretRef.id,
+      secretType: secretRef.secretType,
+      valuePresent: status.valuePresent,
+      source: status.source,
+    }
+  }
+
+  return {
+    type: secretRef.type,
+    name: secretRef.name,
+    valuePresent: Boolean(apiKey),
+    source: 'reference_only',
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -52,7 +82,14 @@ export async function POST(req: NextRequest) {
     activeConfig && (activeConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(activeConfig.provider)) === entry.id
   )
   const secretRef = activeMatches && activeConfig ? activeConfig.secretRef : undefined
-  const apiKey = secretRef && 'name' in secretRef ? resolveEnvSecret(secretRef.name) : undefined
+  const apiKey =
+    secretRef?.type === 'env'
+      ? resolveEnvSecret(secretRef.name)
+      : secretRef?.type === 'gateway_virtual_key_ref'
+        ? resolveEnvSecret(secretRef.name)
+      : secretRef?.type === 'stored_provider_secret' && secretRef.secretType === 'api_key'
+        ? readProviderSecret(secretRef.id)
+        : undefined
   const baseUrl =
     parsed.data.baseURL ??
     (activeMatches && activeConfig ? activeConfig.baseURL : undefined) ??
@@ -99,14 +136,7 @@ export async function POST(req: NextRequest) {
         ...(refreshed.status === 'planned_source_review' ? { liveCallable: false } : {}),
         ...(refreshed.blocker ? { message: refreshed.blocker } : {}),
       },
-      secretStatus: secretRef
-        ? {
-            type: secretRef.type,
-            name: 'name' in secretRef ? secretRef.name : undefined,
-            valuePresent: secretRef.type === 'none' ? true : Boolean(apiKey),
-            source: secretRef.type === 'none' ? 'no_secret_required' : 'reference_only',
-          }
-        : null,
+      secretStatus: secretStatus(secretRef, apiKey),
     })
   } catch (error) {
     return NextResponse.json(

@@ -9,6 +9,7 @@ type ProviderGroup = {
 function accessModeLabel(mode: string): string {
   const labels: Record<string, string> = {
     api_access: "API access",
+    provider_account_auth: "Provider account auth",
     local_tool_session: "Local CLI/session access",
     local_runtime: "Local runtime",
     gateway_virtual_key: "Gateway access",
@@ -29,6 +30,11 @@ function groupsForProviders(providers: ProviderRow[]): ProviderGroup[] {
           provider.status !== "planned_source_review" &&
           provider.classification !== "gateway_configurable_openai_compatible"
       ),
+    },
+    {
+      label: "Account auth providers",
+      description: "First-class account or subscription auth flows.",
+      providers: providers.filter((provider) => provider.accessModes.includes("provider_account_auth")),
     },
     {
       label: "Local tools / sessions",

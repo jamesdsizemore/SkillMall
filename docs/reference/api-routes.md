@@ -18,7 +18,7 @@ All API routes use `Content-Type: application/json`. No authentication is requir
 
 Returns Provider Center-ready sanitized provider/router status and the broad provider registry catalog. This route returns secret reference display data only; it does not return raw API keys, subscription tokens, browser/session tokens, copied credentials, or local CLI credential file paths.
 
-The returned catalog includes broad `ProviderRegistryID` rows for OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The configured `activeProvider` remains an executable `ProviderID` from the narrower direct/router set: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, or `ollama`.
+The returned catalog includes broad `ProviderRegistryID` rows for OpenAI, OpenAI Codex, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The configured `activeProvider` remains an executable `ProviderID` from the narrower direct/router set: `openai`, `codex`, `anthropic`, `claude-code`, `gemini`, `groq`, or `ollama`.
 
 Rows with `planned_source_review` status are visible but not live-callable. Phase 4 promotes Alibaba/DashScope/Qwen and Z.AI as configured OpenAI-compatible/source-backed-static rows, promotes Perplexity as a source-backed model/pricing catalog row with execution still gated, and promotes DeepInfra with a provider-specific model-list adapter plus OpenAI-compatible execution profile. Ambiguous managed NVIDIA NIM variants remain out of scope; the NIM row covers local/container runtime endpoints only.
 
@@ -31,17 +31,19 @@ Rows with `planned_source_review` status are visible but not live-callable. Phas
   activeProviderRegistryId: string | null
   executionKind: 'direct' | 'openai_compatible' | 'bifrost_local' | null
   activeModel: string | null
-  authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key' | null
+  authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key' | 'codex_app_server' | 'claude_setup_token' | null
   gatewayBackend: 'direct' | 'bifrost_local'
-  accessLabel: 'api_access' | 'local_tool_session' | 'local_runtime' | 'gateway_access' | null
+  accessLabel: 'api_access' | 'local_tool_session' | 'local_runtime' | 'gateway_access' | 'provider_account_auth' | null
   secretRef:
     | { type: 'env', name: string }
     | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'stored_provider_secret', id: string, providerRegistryId: string, secretType: 'api_key' | 'setup_token' }
     | { type: 'none' }
     | null
   secretStatus:
     | { type: 'env', name: string, valuePresent: boolean, source: 'reference_only' }
     | { type: 'gateway_virtual_key_ref', name: string, valuePresent: boolean, source: 'reference_only' }
+    | { type: 'stored_provider_secret', id: string, secretType?: string, valuePresent: boolean, source: 'app_managed_encrypted_store' }
     | { type: 'none', valuePresent: true, source: 'no_secret_required' }
     | null
   baseURL: string | null
@@ -106,11 +108,12 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
   provider?: string            // executable ProviderID only when currently supported
   model?: string               // defaults to provider's default model
   manualModels?: string[]      // custom/manual metadata rows only
-  configMode?: 'env_key' | 'gateway_virtual_key_ref' | 'local_cli_session' | 'none_local'
-  authMode?: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key'
+  configMode?: 'env_key' | 'gateway_virtual_key_ref' | 'local_cli_session' | 'none_local' | 'codex_app_server' | 'claude_setup_token'
+  authMode?: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key' | 'codex_app_server' | 'claude_setup_token'
   secretRef?:
     | { type: 'env', name: string }
     | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'stored_provider_secret', id: string, providerRegistryId: string, secretType: 'api_key' | 'setup_token' }
     | { type: 'none' }
   gatewayBackend?: 'direct' | 'bifrost_local'
   baseURL?: string              // bifrost_local must point to localhost, 127.0.0.1, or ::1
@@ -128,11 +131,12 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
   provider: string | null
   executionKind?: 'direct' | 'openai_compatible' | 'bifrost_local'
   model: string | undefined
-  authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key'
+  authMode: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key' | 'codex_app_server' | 'claude_setup_token'
   gatewayBackend: 'direct' | 'bifrost_local'
   secretRef:
     | { type: 'env', name: string }
     | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'stored_provider_secret', id: string, providerRegistryId: string, secretType: 'api_key' | 'setup_token' }
     | { type: 'none' }
     | null
   secretStatus: object | null
@@ -142,9 +146,126 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
 }
 ```
 
-API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. OpenAI-compatible registry execution requires an env secret reference and a configured base URL when the row does not have a safe default endpoint. Subscription/tool-session auth, such as Claude Code CLI, uses `local_cli_session` and SkillMall does not copy credential files. The requested `configMode` / `authMode` must match the selected Provider Center row: API providers cannot be configured as local sessions, local runtimes cannot be configured with API-key refs, and provider rows without gateway access cannot be configured with gateway virtual-key auth.
+API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. OpenAI-compatible registry execution requires an env secret reference and a configured base URL when the row does not have a safe default endpoint. OpenAI Codex uses `codex_app_server`, which requires no SkillMall secret ref and is completed through the Codex app-server auth session routes. Claude Code can use `local_cli_session` or `claude_setup_token`; setup-token config uses a stored provider secret ref and is not an Anthropic API key. SkillMall does not copy credential files. The requested `configMode` / `authMode` must match the selected Provider Center row: API providers cannot be configured as local sessions, local runtimes cannot be configured with API-key refs, and provider rows without gateway access cannot be configured with gateway virtual-key auth.
 
-Phase 3 surfaces `bifrost_local` as the only approved optional local gateway backend. It uses `gateway_virtual_key` plus a `gateway_virtual_key_ref` environment-variable name, never a raw virtual key in the request body or config file. `bifrost_local` base URLs are intentionally restricted to localhost-class addresses. Bifrost local is not SkillMall's source of truth and is not a required hosted gateway. GoModel, LiteLLM proxy mode, hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, `cheapest_compatible`, `quality_first`, and semantic routers remain unimplemented unless a later approved phase changes the contract.
+Phase 3 surfaces `bifrost_local` as the only approved optional local gateway backend. It uses `gateway_virtual_key` plus a `gateway_virtual_key_ref` environment-variable name, never a raw virtual key in the request body or config file. `bifrost_local` base URLs are intentionally restricted to localhost-class addresses. Bifrost local is not SkillMall's source of truth and is not a required hosted gateway. Direct OpenClaw-style OAuth endpoints, browser-session scraping, cookie import, copied credential-file contents, GoModel, LiteLLM proxy mode, hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, `cheapest_compatible`, `quality_first`, and semantic routers remain unimplemented unless a later approved phase changes the contract.
+
+---
+
+## POST /api/providers/auth/start
+
+Starts an OpenAI Codex app-server auth session for the `openai_codex` Provider Center row. The request accepts only the row id and auth method. Raw tokens, cookies, browser sessions, and credential-file paths are rejected before app-server work begins.
+
+**Request body:**
+
+```typescript
+{
+  providerRegistryId: 'openai_codex'
+  method?: 'chatgpt' | 'chatgpt_device_code'
+}
+```
+
+**Response:**
+
+```typescript
+{
+  session: {
+    providerRegistryId: 'openai_codex'
+    method: 'chatgpt' | 'chatgpt_device_code'
+    status: 'authorization_required' | 'pending' | 'ready' | 'cancelled' | 'expired' | 'failed'
+    flowId: string
+    loginId: string
+    authUrl?: string
+    verificationUrl?: string
+    userCode?: string
+    expiresAt: string
+    message: string
+    error?: string
+  }
+}
+```
+
+The browser-login method renders `authUrl`. The device-code method renders `verificationUrl` plus `userCode`. Completion is associated with the app-server `loginId` notification, not just local CLI status.
+
+---
+
+## GET /api/providers/auth/[flowId]/status
+
+Returns the redacted in-memory Codex app-server auth session for a Provider Center `flowId`.
+
+**Response:**
+
+```typescript
+{
+  session: ProviderAuthSession
+}
+```
+
+If the session is unknown, the route returns `404` with `error: 'codex_auth_session_not_found'`.
+
+---
+
+## POST /api/providers/auth/[flowId]/cancel
+
+Cancels the Codex app-server auth session associated with `flowId` by sending `account/login/cancel` for the stored `loginId`.
+
+**Response:**
+
+```typescript
+{
+  session: ProviderAuthSession
+}
+```
+
+If the session is unknown, the route returns `404` with `error: 'codex_auth_session_not_found'`.
+
+---
+
+## POST /api/providers/credentials/setup-token
+
+Stores a Claude Code setup-token for the `claude_code` Provider Center row. The route validates the setup-token shape, writes the secret to SkillMall's app-managed encrypted provider secret store, and writes only a stored secret reference into provider config.
+
+**Request body:**
+
+```typescript
+{
+  providerRegistryId: 'claude_code'
+  token: string
+  model?: string
+}
+```
+
+**Response:**
+
+```typescript
+{
+  success: true
+  providerRegistryId: 'claude_code'
+  authMode: 'claude_setup_token'
+  secretRef: { type: 'stored_provider_secret', id: string, providerRegistryId: 'claude_code', secretType: 'setup_token' }
+  secretStatus: { type: 'stored_provider_secret', id: string, secretType: 'setup_token', valuePresent: true, source: 'app_managed_encrypted_store' }
+}
+```
+
+The response never returns the setup-token value. The setup-token is separate from `ANTHROPIC_API_KEY`.
+
+---
+
+## DELETE /api/providers/credentials/setup-token
+
+Deletes the stored Claude Code setup-token and returns the `claude_code` row to `local_cli_session`.
+
+**Response:**
+
+```typescript
+{
+  success: true
+  providerRegistryId: 'claude_code'
+  authMode: 'local_cli_session'
+  deleted: boolean
+  secretStatus: { type: 'stored_provider_secret', id: string, valuePresent: false, source: 'app_managed_encrypted_store' }
+}
+```
 
 ---
 
@@ -363,14 +484,13 @@ Capability metadata is stored with source confidence. Official APIs/docs are aut
 
 ## POST /api/providers/test
 
-Returns a safe provider configuration/status test. This route checks registry/config/secret-reference readiness and does not persist or echo prompt/response bodies. It rejects raw secret fields using the same secret boundary as `/api/providers/configure`.
+Returns a safe provider configuration/status test. This route checks registry/config/secret-reference readiness and does not persist or echo prompt/response bodies. It rejects raw secret fields and prompt/response fields using the same boundary as `/api/providers/configure`.
 
 **Request body:**
 
 ```typescript
 {
   providerRegistryId?: string
-  prompt?: string               // ignored for storage/response echoing
 }
 ```
 

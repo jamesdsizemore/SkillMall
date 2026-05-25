@@ -1,0 +1,43 @@
+{
+  "url": "http://localhost:3100/settings/providers",
+  "results": [
+    {
+      "profile": "desktop",
+      "codexProof": {
+        "hasCodexPanel": true,
+        "hasAuthUrl": false,
+        "hasVerificationUrl": true,
+        "hasUserCode": true,
+        "hasLoginId": true,
+        "failed": false,
+        "hasRawTokenText": false
+      },
+      "claudeProof": {
+        "hasClaudeAuthPaths": true,
+        "hasLocalCli": true,
+        "hasSetupToken": true,
+        "hasRawTokenText": false,
+        "falselyClaimsWebAuth": false
+      }
+    },
+    {
+      "profile": "mobile",
+      "codexProof": {
+        "hasCodexPanel": true,
+        "hasAuthUrl": false,
+        "hasVerificationUrl": true,
+        "hasUserCode": true,
+        "hasLoginId": true,
+        "failed": false,
+        "hasRawTokenText": false
+      },
+      "claudeProof": {
+        "hasClaudeAuthPaths": true,
+        "hasLocalCli": true,
+        "hasSetupToken": true,
+        "hasRawTokenText": false,
+        "falselyClaimsWebAuth": false
+      }
+    }
+  ]
+}

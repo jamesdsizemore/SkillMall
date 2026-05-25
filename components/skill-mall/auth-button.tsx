@@ -10,6 +10,7 @@ type Props = {
 
 export function AuthButton({ session }: Props) {
   const [signingOut, setSigningOut] = useState(false);
+  const authDisabled = session?.id === "auth-disabled";
 
   if (!session) {
     return (
@@ -19,6 +20,18 @@ export function AuthButton({ session }: Props) {
         style={{ fontFamily: "var(--font-space-mono, monospace)" }}
       >
         [ SIGN IN ]
+      </Link>
+    );
+  }
+
+  if (authDisabled) {
+    return (
+      <Link
+        href="/settings"
+        className="text-[9px] tracking-widest text-sm-secondary hover:text-sm-primary transition-colors border border-sm-border px-2 py-1"
+        style={{ fontFamily: "var(--font-space-mono, monospace)" }}
+      >
+        [ AUTH DISABLED ]
       </Link>
     );
   }

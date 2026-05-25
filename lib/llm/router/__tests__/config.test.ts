@@ -39,7 +39,7 @@ describe('router Phase 1 config helpers', () => {
   it('throws for invalid secret refs', () => {
     expect(() => sanitizeSecretRef({ type: 'env' })).toThrow('Env secret ref requires')
     expect(() => sanitizeSecretRef({ type: 'file_ref', path: '~/.secret' })).toThrow(
-      'Unsupported Phase 1 secret ref type'
+      'Unsupported router secret ref type'
     )
     expect(() => sanitizeSecretRef(null)).toThrow('Secret ref must be an object')
   })
@@ -161,5 +161,28 @@ describe('router Phase 1 config helpers', () => {
     expect(() =>
       validateSecretRefForAuthMode('gateway_virtual_key', { type: 'env', name: 'OPENAI_API_KEY' })
     ).toThrow('gateway_virtual_key auth requires a gateway virtual key ref')
+  })
+
+  it('requires claude_setup_token to use a stored setup-token ref', () => {
+    const ref = sanitizeSecretRef({
+      type: 'stored_provider_secret',
+      id: 'claude_code:setup_token',
+      providerRegistryId: 'claude_code',
+      secretType: 'setup_token',
+    })
+
+    expect(validateSecretRefForAuthMode('claude_setup_token', ref)).toEqual(ref)
+    expect(JSON.stringify(ref)).not.toContain('sk-ant')
+    expect(() => validateSecretRefForAuthMode('claude_setup_token', { type: 'none' })).toThrow(
+      'claude_setup_token auth requires a stored setup-token secret ref'
+    )
+  })
+
+  it('keeps codex_app_server free of SkillMall-managed secrets', () => {
+    expect(validateSecretRefForAuthMode('codex_app_server', undefined)).toEqual({ type: 'none' })
+    expect(validateSecretRefForAuthMode('codex_app_server', { type: 'none' })).toEqual({ type: 'none' })
+    expect(() =>
+      validateSecretRefForAuthMode('codex_app_server', { type: 'env', name: 'OPENAI_API_KEY' })
+    ).toThrow('codex_app_server auth must not include a SkillMall secret ref')
   })
 })

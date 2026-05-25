@@ -1,10 +1,11 @@
 // T102 STUB — will be replaced with full implementation when GitHub OAuth is configured
 
 import { cookies } from "next/headers";
-import { getSession } from "./github";
+import { disabledAuthSession, getSession, isAuthDisabled } from "./github";
 import type { Session } from "../db/types";
 
 export async function getCurrentSession(): Promise<Session | null> {
+  if (isAuthDisabled()) return disabledAuthSession();
   const cookieStore = await cookies();
   const token = cookieStore.get("sm_session")?.value;
   if (!token) return null;

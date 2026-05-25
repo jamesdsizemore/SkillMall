@@ -16,6 +16,7 @@ const routerAuthModes = new Set<string>(PHASE2_AUTH_MODES)
 const routerGatewayBackends = new Set<string>(PHASE2_GATEWAY_BACKENDS)
 const routerRoutingPolicyModes = new Set<string>(PHASE2_ROUTING_POLICY_MODES)
 const secretRefNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
+const storedSecretIdPattern = /^[A-Za-z0-9_.:-]+$/
 
 export function assertPhase1AuthMode(value: unknown): LLMAuthMode {
   if (typeof value === 'string' && authModes.has(value)) return value as LLMAuthMode
@@ -51,7 +52,13 @@ export function sanitizeSecretRef(ref: unknown): SecretRef {
     throw new Error('Secret ref must be an object')
   }
 
-  const candidate = ref as { type?: unknown; name?: unknown }
+  const candidate = ref as {
+    type?: unknown
+    name?: unknown
+    id?: unknown
+    providerRegistryId?: unknown
+    secretType?: unknown
+  }
 
   if (candidate.type === 'none') {
     return { type: 'none' }
@@ -68,7 +75,16 @@ export function sanitizeSecretRef(ref: unknown): SecretRef {
     }
   }
 
-  throw new Error(`Unsupported Phase 1 secret ref type: ${String(candidate.type)}`)
+  if (candidate.type === 'stored_provider_secret') {
+    return {
+      type: 'stored_provider_secret',
+      id: sanitizeStoredSecretId(candidate.id),
+      providerRegistryId: sanitizeStoredSecretId(candidate.providerRegistryId),
+      secretType: sanitizeStoredSecretType(candidate.secretType),
+    }
+  }
+
+  throw new Error(`Unsupported router secret ref type: ${String(candidate.type)}`)
 }
 
 export function sanitizeSecretRefName(value: unknown, label: string): string {
@@ -91,15 +107,37 @@ export function resolveEnvSecret(name: string): string | undefined {
   return process.env[name]
 }
 
+function sanitizeStoredSecretId(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error('Stored provider secret requires a non-empty id')
+  }
+  const id = value.trim()
+  if (!storedSecretIdPattern.test(id)) {
+    throw new Error('Stored provider secret id must be an opaque safe identifier')
+  }
+  return id
+}
+
+function sanitizeStoredSecretType(value: unknown): 'api_key' | 'setup_token' {
+  if (value === 'api_key' || value === 'setup_token') return value
+  throw new Error(`Unsupported stored provider secret type: ${String(value)}`)
+}
+
 export function validateSecretRefForAuthMode(
   authMode: LLMAuthMode,
   secretRef: SecretRef | undefined
 ): SecretRef | undefined {
   if (authMode === 'env_key') {
-    if (!secretRef || secretRef.type !== 'env' || secretRef.name.trim().length === 0) {
-      throw new Error('env_key auth requires an env secret ref')
+    if (!secretRef) {
+      throw new Error('env_key auth requires an env secret ref or stored API-key secret ref')
     }
-    return secretRef
+    if (secretRef.type === 'env' && secretRef.name.trim().length > 0) {
+      return secretRef
+    }
+    if (secretRef.type === 'stored_provider_secret' && secretRef.secretType === 'api_key') {
+      return secretRef
+    }
+    throw new Error('env_key auth requires an env secret ref or stored API-key secret ref')
   }
 
   if (authMode === 'gateway_virtual_key') {
@@ -111,6 +149,24 @@ export function validateSecretRefForAuthMode(
       throw new Error('gateway_virtual_key auth requires a gateway virtual key ref')
     }
     return secretRef
+  }
+
+  if (authMode === 'claude_setup_token') {
+    if (
+      !secretRef ||
+      secretRef.type !== 'stored_provider_secret' ||
+      secretRef.secretType !== 'setup_token'
+    ) {
+      throw new Error('claude_setup_token auth requires a stored setup-token secret ref')
+    }
+    return secretRef
+  }
+
+  if (authMode === 'codex_app_server') {
+    if (secretRef && secretRef.type !== 'none') {
+      throw new Error('codex_app_server auth must not include a SkillMall secret ref')
+    }
+    return secretRef ?? { type: 'none' }
   }
 
   if (secretRef && secretRef.type !== 'none') {

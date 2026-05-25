@@ -93,6 +93,8 @@ export async function writeProviderConfig(input: {
       ? defaultSecretRefForProvider(input.provider)
       : authMode === 'gateway_virtual_key'
         ? undefined
+        : authMode === 'codex_app_server'
+          ? { type: 'none' }
         : { type: 'none' })
   const secretRef = validateSecretRefForAuthMode(authMode, sanitizeSecretRef(rawSecretRef))
 

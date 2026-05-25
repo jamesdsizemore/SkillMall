@@ -8,6 +8,7 @@ import {
 } from "../../../lib/providers/registry";
 import { discoverProviderModels } from "../../../lib/providers/model-discovery";
 import { writeProviderConfig } from "../../../lib/providers/config-store";
+import { getProviderSecretStatus } from "../../../lib/providers/secret-store";
 import {
   defaultAuthModeForProvider,
   defaultSecretRefForProvider,
@@ -152,6 +153,16 @@ function secretStatus(secretRef: SecretRef | undefined | null) {
   if (!secretRef) return null;
   if (secretRef.type === "none") {
     return { type: "none", valuePresent: true, source: "no_secret_required" };
+  }
+  if (secretRef.type === "stored_provider_secret") {
+    const status = getProviderSecretStatus(secretRef.id);
+    return {
+      type: secretRef.type,
+      id: secretRef.id,
+      secretType: secretRef.secretType,
+      valuePresent: status.valuePresent,
+      source: status.source,
+    };
   }
   return {
     type: secretRef.type,
@@ -315,7 +326,7 @@ async function configureInteractive(): Promise<void> {
     const keyInput = await p.text({
       message: "API key environment variable:",
       initialValue: defaultSecretRef?.type === "env" ? defaultSecretRef.name : "",
-      validate: (value) => (!value ? "An environment variable name is required for API access" : undefined),
+      validate: (value: string) => (!value ? "An environment variable name is required for API access" : undefined),
     });
     if (p.isCancel(keyInput)) {
       p.cancel("Cancelled.");

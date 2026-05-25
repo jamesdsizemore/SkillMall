@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
+import { getCodexAppServerAuthStatus } from '@/lib/providers/codex-app-server-auth'
 import { getProviderRegistryEntry, PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
+import { getProviderSecretStatus } from '@/lib/providers/secret-store'
 import type { SecretRef } from '@/lib/llm/router/types'
 import type { ProviderRegistryID } from '@/lib/providers/types'
 
@@ -10,8 +12,7 @@ const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegis
 
 const TestBodySchema = z.object({
   providerRegistryId: z.enum(registryIds).optional(),
-  prompt: z.string().optional(),
-}).passthrough()
+}).strict()
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,10 @@ const forbiddenSecretFieldNames = new Set([
   'credential_path',
   'credentialFile',
   'credential_file',
+  'prompt',
+  'response',
+  'promptBody',
+  'responseBody',
 ])
 
 function rejectedRawSecretFields(value: unknown, prefix = ''): string[] {
@@ -53,6 +58,10 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
     }
   }
 
+  if (secretRef.type === 'stored_provider_secret') {
+    return getProviderSecretStatus(secretRef.id)
+  }
+
   return {
     type: secretRef.type,
     name: secretRef.name,
@@ -61,8 +70,20 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
   }
 }
 
-function statusForSecret(secretRef: SecretRef | undefined | null): 'ready' | 'missing_secret' {
+async function statusForActiveProvider(
+  providerRegistryId: string,
+  authMode: string | undefined,
+  secretRef: SecretRef | undefined | null
+): Promise<'ready' | 'missing_secret'> {
+  if (providerRegistryId === 'openai_codex' && authMode === 'codex_app_server') {
+    const authStatus = await getCodexAppServerAuthStatus()
+    return authStatus.ready ? 'ready' : 'missing_secret'
+  }
+
   if (!secretRef || secretRef.type === 'none') return 'ready'
+  if (secretRef.type === 'stored_provider_secret') {
+    return getProviderSecretStatus(secretRef.id).valuePresent ? 'ready' : 'missing_secret'
+  }
   return process.env[secretRef.name] ? 'ready' : 'missing_secret'
 }
 
@@ -113,11 +134,14 @@ export async function POST(req: NextRequest) {
   )
   const secretRef = activeMatches && activeConfig ? activeConfig.secretRef : undefined
   const discoveryPlan = modelDiscoveryPlanForEntry(entry)
+  const activeStatus = activeMatches
+    ? await statusForActiveProvider(entry.id, activeConfig?.authMode, secretRef)
+    : null
   const status =
     entry.status === 'planned_source_review'
       ? 'planned_source_review'
       : activeMatches
-        ? statusForSecret(secretRef)
+        ? activeStatus
         : entry.executableProviderId
           ? 'not_configured'
           : 'metadata_only'
@@ -134,7 +158,7 @@ export async function POST(req: NextRequest) {
       },
       {
         name: 'secret_reference',
-        status: secretRef ? statusForSecret(secretRef) : 'not_applicable',
+        status: activeStatus ?? (secretRef ? await statusForActiveProvider(entry.id, activeConfig?.authMode, secretRef) : 'not_applicable'),
       },
       {
         name: 'model_discovery',

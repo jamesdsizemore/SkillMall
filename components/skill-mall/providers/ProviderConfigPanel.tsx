@@ -1,8 +1,9 @@
-import type { ProviderActionState, ProviderDraft, ProviderRow } from "./ProviderCenter";
+import type { ProviderActionState, ProviderAuthSession, ProviderDraft, ProviderRow } from "./ProviderCenter";
 
 function accessModeLabel(mode: string): string {
   const labels: Record<string, string> = {
     api_access: "API access",
+    provider_account_auth: "Provider account auth",
     local_tool_session: "Local CLI/session access",
     local_runtime: "Local runtime",
     gateway_virtual_key: "Gateway access",
@@ -41,6 +42,14 @@ function canUseGatewayRef(provider: ProviderRow): boolean {
 
 function canUseNoSecret(provider: ProviderRow): boolean {
   return provider.accessModes.includes("local_tool_session") || provider.accessModes.includes("local_runtime");
+}
+
+function isCodexProvider(provider: ProviderRow): boolean {
+  return provider.id === "openai_codex";
+}
+
+function isClaudeCodeProvider(provider: ProviderRow): boolean {
+  return provider.id === "claude_code";
 }
 
 function Field({
@@ -87,14 +96,26 @@ export function ProviderConfigPanel({
   provider,
   draft,
   actionState,
+  authSession,
+  authActionState,
+  credentialActionState,
   onDraftChange,
   onSave,
+  onStartCodexAuth,
+  onCancelCodexAuth,
+  onSaveClaudeSetupToken,
 }: {
   provider: ProviderRow | null;
   draft: ProviderDraft;
   actionState: ProviderActionState;
+  authSession?: ProviderAuthSession | null;
+  authActionState?: ProviderActionState;
+  credentialActionState?: ProviderActionState;
   onDraftChange: (draft: ProviderDraft) => void;
   onSave: () => void;
+  onStartCodexAuth?: (method: "chatgpt" | "chatgpt_device_code") => void;
+  onCancelCodexAuth?: () => void;
+  onSaveClaudeSetupToken?: () => void;
 }) {
   if (!provider) {
     return (
@@ -107,6 +128,8 @@ export function ProviderConfigPanel({
 
   const disabled = provider.status === "planned_source_review" || actionState.status === "running";
   const showManualModels = provider.discoveryStrategy === "manual_custom_models" || provider.modelStatus.models.length > 0;
+  const codexProvider = isCodexProvider(provider);
+  const claudeProvider = isClaudeCodeProvider(provider);
 
   return (
     <section className="border border-sm-border bg-sm-surface p-4">
@@ -115,8 +138,11 @@ export function ProviderConfigPanel({
           <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ STAGE 1 / SAFE SETUP ]</p>
           <h3 className="text-lg font-bold text-sm-display">{provider.name}</h3>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-sm-secondary">
-            Configure reference names, local runtime/session choices, endpoint labels, and model labels. SkillMall stores
-            references and metadata here, not raw provider secrets.
+            {codexProvider
+              ? "Start a Codex app-server account login and render the returned authorization page or device code here."
+              : claudeProvider
+                ? "Use local Claude CLI login, or configure a separate Claude setup-token without mixing it with Anthropic API keys."
+                : "Configure reference names, local runtime/session choices, endpoint labels, and model labels. SkillMall stores references and metadata here, not raw provider secrets."}
           </p>
         </div>
         <a
@@ -159,6 +185,19 @@ export function ProviderConfigPanel({
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
+        {codexProvider && (
+          <button
+            type="button"
+            onClick={() => onDraftChange({ ...draft, configMode: "codex_app_server" })}
+            className={`border px-3 py-1.5 text-[9px] tracking-widest font-label ${
+              draft.configMode === "codex_app_server"
+                ? "border-sm-display bg-sm-display text-sm-bg"
+                : "border-sm-border text-sm-secondary hover:border-sm-primary"
+            }`}
+          >
+            [ CODEX APP-SERVER ]
+          </button>
+        )}
         {canUseEnvRef(provider) && (
           <button
             type="button"
@@ -198,6 +237,19 @@ export function ProviderConfigPanel({
             [ LOCAL SESSION ]
           </button>
         )}
+        {claudeProvider && (
+          <button
+            type="button"
+            onClick={() => onDraftChange({ ...draft, configMode: "claude_setup_token" })}
+            className={`border px-3 py-1.5 text-[9px] tracking-widest font-label ${
+              draft.configMode === "claude_setup_token"
+                ? "border-sm-display bg-sm-display text-sm-bg"
+                : "border-sm-border text-sm-secondary hover:border-sm-primary"
+            }`}
+          >
+            [ SETUP TOKEN ]
+          </button>
+        )}
         {canUseNoSecret(provider) && (
           <button
             type="button"
@@ -212,6 +264,96 @@ export function ProviderConfigPanel({
           </button>
         )}
       </div>
+
+      {codexProvider && (
+        <div className="mb-4 border border-sm-border-subtle p-3">
+          <p className="mb-2 text-[9px] tracking-widest text-sm-secondary font-label">[ OPENAI CODEX AUTH SESSION ]</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onStartCodexAuth?.("chatgpt")}
+              disabled={authActionState?.status === "running"}
+              className="border border-sm-border px-3 py-1.5 text-[9px] tracking-widest text-sm-secondary hover:border-sm-display hover:text-sm-display disabled:opacity-40 font-label"
+            >
+              [ START BROWSER LOGIN ]
+            </button>
+            <button
+              type="button"
+              onClick={() => onStartCodexAuth?.("chatgpt_device_code")}
+              disabled={authActionState?.status === "running"}
+              className="border border-sm-border px-3 py-1.5 text-[9px] tracking-widest text-sm-secondary hover:border-sm-display hover:text-sm-display disabled:opacity-40 font-label"
+            >
+              [ START DEVICE CODE ]
+            </button>
+            {authSession && (
+              <button
+                type="button"
+                onClick={onCancelCodexAuth}
+                className="border border-sm-border px-3 py-1.5 text-[9px] tracking-widest text-sm-secondary hover:border-sm-accent hover:text-sm-accent font-label"
+              >
+                [ CANCEL ]
+              </button>
+            )}
+          </div>
+          {authSession && (
+            <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-sm-primary sm:grid-cols-2">
+              <p><span className="text-sm-disabled">Status:</span> {authSession.status}</p>
+              <p><span className="text-sm-disabled">Login id:</span> {authSession.loginId}</p>
+              {authSession.authUrl && (
+                <a className="break-all text-sm-blue" href={authSession.authUrl} target="_blank" rel="noopener noreferrer">
+                  Open authorization page
+                </a>
+              )}
+              {authSession.verificationUrl && (
+                <a className="break-all text-sm-blue" href={authSession.verificationUrl} target="_blank" rel="noopener noreferrer">
+                  {authSession.verificationUrl}
+                </a>
+              )}
+              {authSession.userCode && (
+                <p><span className="text-sm-disabled">User code:</span> <span className="font-bold">{authSession.userCode}</span></p>
+              )}
+              <p className="sm:col-span-2 text-sm-secondary">{authSession.message}</p>
+            </div>
+          )}
+          <ActionStatus state={authActionState ?? { status: "idle", message: null }} />
+        </div>
+      )}
+
+      {claudeProvider && (
+        <div className="mb-4 border border-sm-border-subtle p-3">
+          <p className="mb-2 text-[9px] tracking-widest text-sm-secondary font-label">[ CLAUDE CODE AUTH PATHS ]</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="border border-sm-border-subtle p-3">
+              <p className="text-[9px] tracking-widest text-sm-disabled font-label">[ LOCAL CLI LOGIN ]</p>
+              <p className="mt-1 text-xs leading-relaxed text-sm-secondary">
+                Uses the locally authenticated Claude CLI session. This may open Terminal; it is not a Provider Center web auth page.
+              </p>
+            </div>
+            <label className="block border border-sm-border-subtle p-3">
+              <span className="text-[9px] tracking-widest text-sm-disabled font-label">[ CLAUDE SETUP-TOKEN ]</span>
+              <input
+                type="password"
+                value={draft.setupToken}
+                onChange={(event) => onDraftChange({ ...draft, setupToken: event.target.value })}
+                placeholder="sk-ant-oat01-..."
+                className="mt-2 w-full border-b border-sm-border bg-transparent py-2 text-sm text-sm-primary outline-none placeholder:text-sm-disabled"
+              />
+              <button
+                type="button"
+                onClick={onSaveClaudeSetupToken}
+                disabled={!draft.setupToken.trim() || credentialActionState?.status === "running"}
+                className="mt-3 border border-sm-border px-3 py-1.5 text-[9px] tracking-widest text-sm-secondary hover:border-sm-display hover:text-sm-display disabled:opacity-40 font-label"
+              >
+                [ SAVE SETUP-TOKEN ]
+              </button>
+              <ActionStatus state={credentialActionState ?? { status: "idle", message: null }} />
+              <span className="mt-2 block text-xs leading-relaxed text-sm-secondary">
+                Stored separately from Anthropic API-key access and injected only for SkillMall-owned Claude Code execution.
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {draft.configMode === "env_key" && (
