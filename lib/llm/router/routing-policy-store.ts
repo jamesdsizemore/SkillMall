@@ -11,7 +11,7 @@ import {
 } from './secret-refs'
 import type { LLMAuthMode, RoutingPolicyMode } from './types'
 
-const providerIds = new Set<ProviderID>(['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'])
+const providerIds = new Set<ProviderID>(['openai', 'codex', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'])
 const policyIdPattern = /^[a-z0-9][a-z0-9._-]{1,80}$/
 export const FORBIDDEN_ROUTING_POLICY_FIELD_NAMES = new Set([
   'apiKey',

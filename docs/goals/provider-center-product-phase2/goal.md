@@ -4,7 +4,7 @@ Follow `docs/recovery/2026-05-21-provider-center-product-phase-2-implementation-
 
 ## Owner Outcome
 
-Provider Center turns safe provider configuration into a guided, understandable workflow for existing provider/auth/router capabilities, without adding new auth modes, new providers, new routing modes, credential storage, or executable adapters.
+Provider Center turns LLM access for SkillMall skill creation into a guided, understandable, required credential configuration workflow. The app must be able to configure, securely store, redact, rotate/delete, and use provider credentials for skill-generation workflows.
 
 ## Completion Oracle
 
@@ -12,7 +12,9 @@ The goal is complete only when:
 
 - current source is revalidated after PR #16;
 - a Judge-approved setup contract exists before code edits;
-- Phase 2-owned setup guidance, validation/readiness explanation, and save/test/refresh sequencing are implemented;
+- Phase 2-owned credential setup, validation/readiness explanation, save/test/refresh sequencing, and redaction behavior are implemented;
+- API access is a first-class/default setup path where a provider uses API credentials;
+- configured credentials are usable by the app for LLM-backed skill creation and are never returned in UI/API/log/doc/proof output;
 - the provider status-test `prompt` ambiguity is resolved or blocked with exact evidence;
 - focused and broad verification commands are run or blocked with exact evidence;
 - desktop and mobile browser proof is captured or an exact runtime blocker is recorded;
@@ -25,9 +27,12 @@ The goal is complete only when:
 
 - Do not implement until the user explicitly approves Phase 2 implementation by running this goal.
 - Start from updated `main` after PR #16 is merged, unless the user explicitly approves stacked Phase 2 implementation.
-- Do not add providers, auth modes, routing modes, gateway dependencies, OAuth/device flows, keychain storage, credential storage, credential-file ingestion, or executable provider adapters.
-- Do not widen `ProviderID`.
-- Do not accept, store, echo, screenshot, or document raw secrets, tokens, cookies, credential files, credential paths, prompt bodies, or response bodies.
+- Do not treat provider/auth/router as the product; it exists to power SkillMall skill creation.
+- API access and app-configured credentials are required product capabilities, not optional extras.
+- Do not store credentials in plaintext config, UI state, logs, API responses, screenshots, docs, tests, or GoalBuddy receipts.
+- Do not scrape browser sessions, silently copy credential files, or ask users to paste random browser/session blobs, cookies, or copied credential-file contents.
+- Do not widen `ProviderID` unless required by an approved executable adapter contract.
+- Prompt/response bodies must not be stored in docs, tests, API payloads, logs, receipts, screenshots, or browser proof.
 - Do not use hosted dashboards or required extra-cost infrastructure.
 - Do not hand off partial work as complete.
 

@@ -234,6 +234,40 @@ describe('router provider config resolution', () => {
     expect(JSON.stringify(config)).not.toContain('groq-env-token')
   })
 
+  it('can prefer saved Provider Center config over bootstrap env provider defaults', () => {
+    process.env.SKILL_MALL_PROVIDER = 'groq'
+    process.env.SKILL_MALL_MODEL = 'llama-3.3-70b-versatile'
+
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        provider: 'codex',
+        activeProviderRegistryId: 'openai_codex',
+        model: 'gpt-5.1',
+        providerTargets: {
+          openai_codex: {
+            provider: 'codex',
+            providerRegistryId: 'openai_codex',
+            executionKind: 'direct',
+            model: 'gpt-5.1',
+            authMode: 'local_cli_session',
+            secretRef: { type: 'none' },
+            gatewayBackend: 'direct',
+          },
+        },
+      })
+    )
+
+    const config = resolveRouterProviderConfig({ preferStoredConfig: true })
+    expect(config).toMatchObject({
+      provider: 'codex',
+      providerRegistryId: 'openai_codex',
+      model: 'gpt-5.1',
+      authMode: 'local_cli_session',
+      secretRef: { type: 'none' },
+    })
+  })
+
   it('writes env secret references without raw API keys', async () => {
     vi.spyOn(fsPromises, 'readFile').mockRejectedValue(new Error('missing'))
     vi.spyOn(fsPromises, 'mkdir').mockResolvedValue(undefined)

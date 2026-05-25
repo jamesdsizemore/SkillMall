@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
           { status: 404 }
         )
       }
-      const config = resolveRouterProviderConfig()
+      const config = resolveRouterProviderConfig({ preferStoredConfig: true })
       const saved = await writeProviderConfig({
         provider: config.provider,
         providerRegistryId: config.providerRegistryId,

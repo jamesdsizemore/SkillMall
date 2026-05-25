@@ -121,15 +121,17 @@ describe('router Phase 1 config helpers', () => {
     }
   })
 
-  it('requires env_key to use an env secret ref', () => {
+  it('requires env_key to use an API credential ref', () => {
     const ref = sanitizeSecretRef({ type: 'env', name: 'OPENAI_API_KEY' })
+    const storedRef = sanitizeSecretRef({ type: 'stored_api_key', id: 'provider:openai:api_key' })
 
     expect(validateSecretRefForAuthMode('env_key', ref)).toEqual(ref)
+    expect(validateSecretRefForAuthMode('env_key', storedRef)).toEqual(storedRef)
     expect(() => validateSecretRefForAuthMode('env_key', undefined)).toThrow(
-      'env_key auth requires an env secret ref'
+      'env_key auth requires an API key secret ref'
     )
     expect(() => validateSecretRefForAuthMode('env_key', { type: 'none' })).toThrow(
-      'env_key auth requires an env secret ref'
+      'env_key auth requires an env secret ref or stored API-key ref'
     )
   })
 

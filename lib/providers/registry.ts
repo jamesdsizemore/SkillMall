@@ -25,6 +25,23 @@ export const PROVIDER_REGISTRY: ProviderRegistryEntry[] = [
     evidenceNote: 'Official Models API supports model listing.',
   },
   {
+    id: 'openai_codex',
+    name: 'OpenAI Codex Auth Token',
+    accessModes: ['local_tool_session'],
+    accessLabel: 'OpenAI Codex local auth token/session',
+    authLabel: 'Existing OpenAI Codex authentication',
+    setupUrl: 'https://developers.openai.com/codex',
+    officialSourceUrl: 'https://developers.openai.com/codex',
+    discoveryStrategy: 'static_fallback_only',
+    status: 'active_configurable',
+    classification: 'local_tool_session',
+    liveCallable: true,
+    executableProviderId: 'codex',
+    fallbackModels: ['gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano'],
+    registryInclusionNote: 'Maps to the local Codex CLI authenticated session without accepting raw OpenAI browser/session credentials.',
+    evidenceNote: 'SkillMall delegates authentication to the local Codex CLI session.',
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic Claude API',
     accessModes: ['api_access'],
@@ -43,7 +60,7 @@ export const PROVIDER_REGISTRY: ProviderRegistryEntry[] = [
   },
   {
     id: 'claude_code',
-    name: 'Claude Code CLI',
+    name: 'Claude Code CLI Auth Token',
     accessModes: ['local_tool_session'],
     accessLabel: 'Local tool session',
     authLabel: 'Existing Claude Code CLI authentication',
@@ -530,7 +547,9 @@ export function getProviderRegistryEntry(id: ProviderRegistryID): ProviderRegist
 }
 
 export function providerRegistryIdForExecutableProvider(provider: ProviderID): ProviderRegistryID {
-  return provider === 'claude-code' ? 'claude_code' : provider
+  if (provider === 'claude-code') return 'claude_code'
+  if (provider === 'codex') return 'openai_codex'
+  return provider
 }
 
 export function providerAccessModeForAuthMode(authMode: LLMAuthMode): ProviderAccessMode {

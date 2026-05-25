@@ -16,6 +16,7 @@ const routerAuthModes = new Set<string>(PHASE2_AUTH_MODES)
 const routerGatewayBackends = new Set<string>(PHASE2_GATEWAY_BACKENDS)
 const routerRoutingPolicyModes = new Set<string>(PHASE2_ROUTING_POLICY_MODES)
 const secretRefNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
+const storedSecretIdPattern = /^[A-Za-z0-9_.:-]+$/
 
 export function assertPhase1AuthMode(value: unknown): LLMAuthMode {
   if (typeof value === 'string' && authModes.has(value)) return value as LLMAuthMode
@@ -51,7 +52,7 @@ export function sanitizeSecretRef(ref: unknown): SecretRef {
     throw new Error('Secret ref must be an object')
   }
 
-  const candidate = ref as { type?: unknown; name?: unknown }
+  const candidate = ref as { type?: unknown; name?: unknown; id?: unknown }
 
   if (candidate.type === 'none') {
     return { type: 'none' }
@@ -65,6 +66,13 @@ export function sanitizeSecretRef(ref: unknown): SecretRef {
     return {
       type: 'gateway_virtual_key_ref',
       name: sanitizeSecretRefName(candidate.name, 'Gateway virtual key ref'),
+    }
+  }
+
+  if (candidate.type === 'stored_api_key') {
+    return {
+      type: 'stored_api_key',
+      id: sanitizeStoredSecretId(candidate.id, 'Stored API key ref'),
     }
   }
 
@@ -86,6 +94,19 @@ export function sanitizeSecretRefName(value: unknown, label: string): string {
   return name
 }
 
+export function sanitizeStoredSecretId(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${label} requires a non-empty reference id`)
+  }
+
+  const id = value.trim()
+  if (!storedSecretIdPattern.test(id)) {
+    throw new Error(`${label} must be a non-path reference id`)
+  }
+
+  return id
+}
+
 export function resolveEnvSecret(name: string): string | undefined {
   if (!name.trim()) throw new Error('Env secret name is required')
   return process.env[name]
@@ -96,10 +117,16 @@ export function validateSecretRefForAuthMode(
   secretRef: SecretRef | undefined
 ): SecretRef | undefined {
   if (authMode === 'env_key') {
-    if (!secretRef || secretRef.type !== 'env' || secretRef.name.trim().length === 0) {
-      throw new Error('env_key auth requires an env secret ref')
+    if (!secretRef) {
+      throw new Error('env_key auth requires an API key secret ref')
     }
-    return secretRef
+    if (secretRef.type === 'env' && secretRef.name.trim().length > 0) {
+      return secretRef
+    }
+    if (secretRef.type === 'stored_api_key' && secretRef.id.trim().length > 0) {
+      return secretRef
+    }
+    throw new Error('env_key auth requires an env secret ref or stored API-key ref')
   }
 
   if (authMode === 'gateway_virtual_key') {

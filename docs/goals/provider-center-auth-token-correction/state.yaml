@@ -1,0 +1,266 @@
+version: 2
+active_task: T002
+goal:
+  slug: provider-center-auth-token-correction
+  title: Provider Center Auth Token Correction
+  status: active
+  created_at: '2026-05-21'
+  workspace: "/Users/jamesdsizemore/Developer/skill-mall"
+  branch_at_prep: codex/provider-center-product-phase2
+  implementation_branch: null
+  source_plan: docs/recovery/2026-05-21-provider-center-auth-token-correction-implementation-plan.md
+  source_research: docs/recovery/2026-05-21-codex-claude-auth-token-research-report.md
+  owner_outcome: Provider Center renders real OpenAI Codex app-server auth objects and honest Claude Code local-login/setup-token setup instead of fake web auth buttons.
+  proof_type: research_revalidation_contract_implementation_tests_browser_review_goalbuddy_receipts
+  intake:
+    original_request: "Create an implementation plan with a GoalBuddy board using the user's development workflow after correcting the OpenAI Codex and Claude Code auth-token research report."
+    interpreted_outcome: "Prepare an implementation-ready recovery plan and GoalBuddy board that force research revalidation, contract approval, scoped implementation, browser proof, and truthful blocker reporting before any product-code changes."
+    input_shape: corrected_research_report
+    audience: "SkillMall coding agents and James as product owner"
+    authority: planning_only_until_goal_started
+    completion_proof: "OpenAI Codex auth button renders app-server authUrl or verificationUrl/userCode from a first-class session object; Claude Code setup is honestly split into local login and setup-token; tests, review, secret scan, and browser proof pass."
+    likely_misfire: "A coding agent keeps launching local CLI auth commands, polls status, and calls it a web auth token flow even though the UI never received an auth URL, user code, login id, or completion notification."
+  oracle:
+    signal: "Clicking OpenAI Codex auth in Provider Center produces a visible app-server-backed auth session object. The UI displays authUrl or verificationUrl/userCode and tracks completion by loginId. Claude Code clearly presents local CLI login or setup-token setup without claiming an unavailable web auth object."
+    final_proof: "Final receipt confirms changed files, focused/broad tests, typecheck, lint, diff check, secret scan, desktop/mobile browser proof, code review, no hidden blockers, and decision: complete."
+  hard_constraints:
+    - Do not start implementation until the user explicitly runs this goal or otherwise approves implementation.
+    - Start from the corrected research report and current source, not prior assumptions.
+    - Keep ChatGPT Pro/Codex account auth separate from OpenAI API-key access.
+    - Keep Claude Code local login and Claude setup-token separate from Anthropic API-key access.
+    - Use Codex app-server as the primary OpenAI Codex auth path.
+    - Do not use direct OpenClaw-style OpenAI device-code endpoints unless Codex app-server is blocked and the user explicitly approves the fallback.
+    - Do not scrape browser sessions, silently copy credential files, ask for cookies, ask for browser-session blobs, or return raw access tokens.
+    - Do not claim a web auth flow exists unless the UI receives and renders authUrl or verificationUrl/userCode.
+    - Do not use codex login status or claude auth status alone as proof that an in-app auth button worked.
+    - Do not collapse provider auth methods into one generic token field.
+    - Do not store prompt or response bodies in UI state, fixtures, docs, tests, API payloads, logs, receipts, screenshots, or browser proof.
+    - Do not stage, commit, push, or open a PR without explicit user approval.
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+board:
+  surface: local_goalbuddy_board
+  path: docs/goals/provider-center-auth-token-correction/.goalbuddy-board/index.html
+tasks:
+  - id: T001
+    type: pm
+    assignee: PM
+    status: done
+    objective: Record implementation authority, classify the current dirty state, and recommend current-branch versus clean-branch/worktree execution before any product-code edits.
+    allowed_files:
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T001-authority-dirty-state.md
+    verify:
+      - git status --short --branch => branch and dirty/untracked state recorded
+      - git diff --name-only => modified tracked files classified
+      - git ls-files -o --exclude-standard => untracked files classified
+      - test -f docs/recovery/2026-05-21-codex-claude-auth-token-research-report.md => corrected research report exists
+      - test -f docs/recovery/2026-05-21-provider-center-auth-token-correction-implementation-plan.md => recovery plan exists
+    stop_if:
+      - User has not approved implementation.
+      - Dirty product-code files cannot be separated from recovery-owned work.
+      - Agent attempts to stage, commit, push, or open a PR without explicit user approval.
+    receipt:
+      result: done
+      decision: pass
+      summary: "Implementation authority confirmed; current dirty branch is unsafe for recovery implementation."
+      note: "Proceed from a clean recovery worktree/branch and carry over only the corrected research report, recovery implementation plan, GoalBuddy board, and T001 receipt."
+      evidence:
+        - docs/goals/provider-center-auth-token-correction/notes/T001-authority-dirty-state.md
+  - id: T002
+    type: scout
+    assignee: Scout
+    status: active
+    objective: Revalidate corrected research and current source for Codex app-server auth, Claude local/setup-token auth, OpenClaw reference behavior, current SkillMall code, and relevant Next.js docs.
+    allowed_files:
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T002-source-revalidation.md
+    verify:
+      - sed -n '1,260p' docs/recovery/2026-05-21-codex-claude-auth-token-research-report.md => corrected research recorded
+      - codex --version && codex login --help && codex app-server --help => local Codex capabilities recorded
+      - codex app-server generate-ts --out /tmp/codex-app-protocol/ts => app-server protocol generated and auth response shapes recorded
+      - claude --version && claude auth login --help && claude auth status --json && claude setup-token --help => local Claude capabilities recorded
+      - rg -n "device|verificationUrl|userCode|loginId|authUrl|setup-token|setupToken|OAuth|auth method" /tmp/openclaw-research extensions || true => OpenClaw/reference evidence recorded if available
+      - rg -n "ProviderCenter|ProviderConfigPanel|connect|local-cli-auth|codex|claude|secret|setup_token|authUrl|verificationUrl|userCode|loginId" components app lib docs => current source evidence recorded
+      - sed -n '1,180p' node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md => relevant Next.js route docs recorded before route edits
+    stop_if:
+      - Scout relies on memory or the prior broken implementation without current-source evidence.
+      - Scout skips Codex app-server generated protocol.
+      - Scout treats Claude local CLI login as equivalent to a web auth object without proof.
+      - Scout skips relevant Next.js docs required by AGENTS.md before route/component work.
+    receipt: null
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Approve a concrete auth/session/secret/runtime/UI contract and exact allowed-file map before Worker edits.
+    allowed_files:
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T003-auth-contract.md
+    verify:
+      - test -f docs/goals/provider-center-auth-token-correction/notes/T002-source-revalidation.md => revalidation exists
+      - rg -n "Codex app-server|loginId|authUrl|verificationUrl|userCode|account/login/completed|Claude|setup-token|allowed files|stop condition|secret" docs/goals/provider-center-auth-token-correction/notes/T003-auth-contract.md => contract is explicit
+    stop_if:
+      - Contract allows direct OpenClaw-style endpoints without explicit user approval.
+      - Contract collapses API keys, Codex account auth, Claude setup-token, Claude local login, or Anthropic API keys into one token type.
+      - Contract lacks exact allowed files per Worker slice.
+      - Contract lacks cancellation, expiry, failure, and redaction behavior.
+    receipt: null
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement provider auth method, secret-ref, config-store, and redaction model needed for Codex app-server auth sessions and Claude setup-token without breaking existing API/env/gateway/local-runtime paths.
+    allowed_files:
+      - lib/providers/types.ts
+      - lib/providers/registry.ts
+      - lib/providers/defaults.ts
+      - lib/providers/index.ts
+      - lib/providers/secret-store.ts
+      - lib/providers/__tests__/providers.test.ts
+      - lib/providers/__tests__/registry.test.ts
+      - lib/llm/router/types.ts
+      - lib/llm/router/secret-refs.ts
+      - lib/llm/router/config.ts
+      - lib/llm/router/__tests__/config.test.ts
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T004-auth-domain-secret-model.md
+    verify:
+      - npm test -- lib/providers lib/llm/router => pass or exact blocker
+      - rg -n "setup_token|storedProviderSecret|provider auth|redact|api_key|codex|claude" lib/providers lib/llm/router => expected model changes visible
+    stop_if:
+      - Worker stores plaintext credentials in provider config.
+      - Worker weakens existing raw-secret rejection.
+      - Worker removes existing API/env/gateway/local-runtime behavior.
+      - Worker edits UI or API routes in this task without Judge approval.
+    receipt: null
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement Codex app-server auth session start/status/cancel backend using loginId, authUrl or verificationUrl/userCode, redacted session state, and completion notification handling.
+    allowed_files:
+      - lib/providers/codex.ts
+      - lib/providers/codex-app-server-auth.ts
+      - lib/providers/codex-app-server/**
+      - lib/providers/__tests__/codex-app-server-auth.test.ts
+      - app/api/providers/connect/route.ts
+      - app/api/providers/connect/status/route.ts
+      - app/api/providers/connect/cancel/route.ts
+      - app/api/providers/__tests__/providers-route.test.ts
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T005-codex-app-server-auth.md
+    verify:
+      - npm test -- lib/providers app/api/providers => pass or exact blocker
+      - rg -n "account/login/start|account/login/completed|loginId|authUrl|verificationUrl|userCode|cancel|flowId" lib/providers app/api/providers => Codex app-server session behavior visible
+    stop_if:
+      - Backend returns raw access tokens to the UI.
+      - Backend polls only codex login status and calls it completion.
+      - Backend does not preserve loginId to flowId mapping.
+      - Backend uses direct OpenClaw-style endpoints without explicit approval.
+    receipt: null
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Update Provider Center UI to render real Codex app-server auth objects and honest Claude local-login/setup-token states.
+    allowed_files:
+      - components/skill-mall/providers/ProviderCenter.tsx
+      - components/skill-mall/providers/ProviderConfigPanel.tsx
+      - components/skill-mall/providers/__tests__/provider-center.test.tsx
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T006-provider-center-auth-ui.md
+    verify:
+      - npm test -- components/skill-mall/providers => pass or exact blocker
+      - rg -n "authUrl|verificationUrl|userCode|setup-token|local CLI|Open authorization|copy code|cancel|expired|completed" components/skill-mall/providers => UI states visible
+    stop_if:
+      - UI claims a web auth flow exists without returned authUrl or verificationUrl/userCode.
+      - UI shows raw tokens.
+      - UI hides failure/cancel/expired states.
+      - UI combines Claude setup-token with API-key or Codex account auth language.
+    receipt: null
+  - id: T007
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Implement Claude setup-token storage/runtime environment behavior and keep Claude local CLI login honestly labeled.
+    allowed_files:
+      - lib/providers/claude-code.ts
+      - lib/providers/local-cli-auth.ts
+      - lib/providers/secret-store.ts
+      - lib/providers/__tests__/local-cli-auth.test.ts
+      - lib/providers/__tests__/claude-code-auth.test.ts
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T007-claude-setup-token-runtime.md
+    verify:
+      - npm test -- lib/providers => pass or exact blocker
+      - rg -n "setup-token|setup_token|CLAUDE|ANTHROPIC|env|redact|local CLI" lib/providers => runtime/setup behavior visible
+    stop_if:
+      - Worker logs or returns setup-token values.
+      - Worker injects setup-token globally instead of scoped runtime env.
+      - Worker treats claude auth status as proof that Provider Center rendered a web auth object.
+      - Worker edits unrelated router/client files without Judge approval.
+    receipt: null
+  - id: T008
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: Update user/reference docs for Codex app-server auth objects, Claude local login, Claude setup-token, API-key separation, redaction, and unsupported unsafe flows.
+    allowed_files:
+      - docs/user/configuring-providers.md
+      - docs/reference/api-routes.md
+      - docs/reference/provider-catalog.md
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T008-docs.md
+    verify:
+      - rg -n "Codex app-server|authUrl|verificationUrl|userCode|Claude Code|setup-token|local CLI|API key|redacted|cookie|session blob|credential file" docs/user docs/reference => docs reflect the corrected contract
+    stop_if:
+      - Docs tell users to paste browser/session tokens, cookies, or credential-file contents.
+      - Docs imply Claude setup-token is an Anthropic API key.
+      - Docs claim app-server auth is complete without UI/browser proof.
+    receipt: null
+  - id: T009
+    type: judge
+    assignee: Judge
+    status: queued
+    objective: Review implementation for bugs, auth/session contract drift, unsafe secret handling, incomplete flows, and missing verification.
+    allowed_files:
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T009-code-review.md
+    verify:
+      - git diff -- components app lib docs => reviewed diff recorded
+      - rg -n "finding|severity|approved|blocked|fix required|secret|authUrl|verificationUrl|setup-token" docs/goals/provider-center-auth-token-correction/notes/T009-code-review.md => review decision recorded
+    stop_if:
+      - Any high or medium severity finding remains unfixed.
+      - Review finds raw-token exposure, fake auth status proof, or Claude/Codex auth concept collapse.
+      - Review finds changed files outside approved ownership without documented approval.
+    receipt: null
+  - id: T010
+    type: pm
+    assignee: PM
+    status: queued
+    objective: Run final verification, browser proof, secret scan, GoalBuddy checker, and final receipt with decision.
+    allowed_files:
+      - docs/goals/provider-center-auth-token-correction/state.yaml
+      - docs/goals/provider-center-auth-token-correction/notes/T010-final-receipt.md
+      - docs/goals/provider-center-auth-token-correction/notes/browser-proof/**
+    verify:
+      - npm test -- components/skill-mall/providers => pass or exact blocker
+      - npm test -- lib/providers app/api/providers => pass or exact blocker
+      - npm test -- lib/providers app/api/providers lib/llm/router => pass or exact blocker
+      - npm test => pass or exact unrelated blocker
+      - npx tsc --noEmit --pretty false => pass or exact blocker
+      - npm run lint => pass or exact unrelated blocker
+      - git diff --check => pass
+      - secret/proof artifact scan => pass without printing secrets
+      - desktop and mobile browser proof => OpenAI Codex auth object and Claude honest behavior recorded
+      - node /Users/jamesdsizemore/.codex/plugins/cache/goalbuddy/goalbuddy/0.3.7/skills/goalbuddy/scripts/check-goal-state.mjs docs/goals/provider-center-auth-token-correction/state.yaml => pass
+    stop_if:
+      - OpenAI Codex button does not render authUrl or verificationUrl/userCode.
+      - Claude Code button still claims a web auth object without evidence.
+      - Any raw token, cookie, session blob, prompt body, or response body appears in proof artifacts.
+      - Final receipt cannot honestly record decision: complete.
+      - Agent attempts commit/push/PR without explicit user approval.
+    receipt: null

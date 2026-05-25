@@ -16,9 +16,9 @@ All API routes use `Content-Type: application/json`. No authentication is requir
 
 ## GET /api/providers
 
-Returns Provider Center-ready sanitized provider/router status and the broad provider registry catalog. This route returns secret reference display data only; it does not return raw API keys, subscription tokens, browser/session tokens, copied credentials, or local CLI credential file paths.
+Returns Provider Center-ready sanitized provider/router status and the broad provider registry catalog. This route returns redacted secret reference/status data only; it does not return raw API keys, subscription tokens, browser/session tokens, copied credentials, or local CLI credential file paths.
 
-The returned catalog includes broad `ProviderRegistryID` rows for OpenAI, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The configured `activeProvider` remains an executable `ProviderID` from the narrower direct/router set: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, or `ollama`.
+The returned catalog includes broad `ProviderRegistryID` rows for OpenAI API, OpenAI Codex Auth Token, Anthropic, Claude Code, Gemini, Groq, Ollama, OpenRouter, Alibaba/DashScope/Qwen, Hugging Face, Z.AI, MiniMax, Kimi/Moonshot, DeepSeek, Mistral, Cohere, xAI, AWS Bedrock, Azure OpenAI, Google Vertex AI, Together AI, Fireworks, Replicate, NVIDIA NIM, Perplexity, DeepInfra, Cerebras, and custom OpenAI-compatible endpoints. The configured `activeProvider` remains an executable `ProviderID` from the narrower direct/router set: `openai`, `anthropic`, `claude-code`, `gemini`, `groq`, or `ollama`.
 
 Rows with `planned_source_review` status are visible but not live-callable. Phase 4 promotes Alibaba/DashScope/Qwen and Z.AI as configured OpenAI-compatible/source-backed-static rows, promotes Perplexity as a source-backed model/pricing catalog row with execution still gated, and promotes DeepInfra with a provider-specific model-list adapter plus OpenAI-compatible execution profile. Ambiguous managed NVIDIA NIM variants remain out of scope; the NIM row covers local/container runtime endpoints only.
 
@@ -37,11 +37,13 @@ Rows with `planned_source_review` status are visible but not live-callable. Phas
   secretRef:
     | { type: 'env', name: string }
     | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'stored_api_key', id: string }
     | { type: 'none' }
     | null
   secretStatus:
     | { type: 'env', name: string, valuePresent: boolean, source: 'reference_only' }
     | { type: 'gateway_virtual_key_ref', name: string, valuePresent: boolean, source: 'reference_only' }
+    | { type: 'stored_api_key', id: string, valuePresent: boolean, source: 'encrypted_local_store' }
     | { type: 'none', valuePresent: true, source: 'no_secret_required' }
     | null
   baseURL: string | null
@@ -94,9 +96,9 @@ Rows with `planned_source_review` status are visible but not live-callable. Phas
 
 ## POST /api/providers/configure
 
-Writes non-secret provider configuration to `~/.skill-mall/config.json`. Existing executable providers persist as direct/router targets. Registry-only OpenAI-compatible rows can persist as registry execution targets through the shared OpenAI-compatible adapter by storing `provider: "openai"` as the implementation identity plus the broad `providerRegistryId` and `executionKind: "openai_compatible"`. This does not widen executable `ProviderID` support.
+Writes provider configuration to `~/.skill-mall/config.json`. API credential setup stores credential material in encrypted local app-managed storage and writes only a redacted `stored_api_key` reference into config. Existing executable providers persist as direct/router targets. Registry-only OpenAI-compatible rows can persist as registry execution targets through the shared OpenAI-compatible adapter by storing `provider: "openai"` as the implementation identity plus the broad `providerRegistryId` and `executionKind: "openai_compatible"`. This does not widen executable `ProviderID` support.
 
-It does not write `.env.local`, does not mutate `process.env`, and rejects raw secret fields before writing config. Rejected fields include `apiKey`, `rawKey`, `token`, `sessionToken`, browser-token fields, and credential-file/path fields. Secret-reference names must be environment-variable-style names such as `OPENAI_API_KEY` or `BIFROST_VIRTUAL_KEY`; path-like names such as `~/.codex/auth.json` or `/Users/me/.claude/...` are rejected.
+It does not write `.env.local`, does not mutate `process.env`, and rejects unsafe secret fields before writing config. Top-level `apiKey` is accepted only when `configMode` is `api_key`; the value is encrypted into the local SkillMall secret store and is never returned. Rejected fields include nested `apiKey`, `rawKey`, `token`, `sessionToken`, browser-token fields, and credential-file/path fields. Secret-reference names must be environment-variable-style names such as `OPENAI_API_KEY` or `BIFROST_VIRTUAL_KEY`; path-like names such as `~/.codex/auth.json` or `/Users/me/.claude/...` are rejected.
 
 **Request body:**
 
@@ -106,11 +108,14 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
   provider?: string            // executable ProviderID only when currently supported
   model?: string               // defaults to provider's default model
   manualModels?: string[]      // custom/manual metadata rows only
-  configMode?: 'env_key' | 'gateway_virtual_key_ref' | 'local_cli_session' | 'none_local'
+  action?: 'delete_credential'
+  configMode?: 'api_key' | 'env_key' | 'gateway_virtual_key_ref' | 'local_cli_session' | 'none_local'
+  apiKey?: string              // accepted only with configMode: 'api_key'; encrypted and never returned
   authMode?: 'env_key' | 'local_cli_session' | 'none_local' | 'gateway_virtual_key'
   secretRef?:
     | { type: 'env', name: string }
     | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'stored_api_key', id: string }
     | { type: 'none' }
   gatewayBackend?: 'direct' | 'bifrost_local'
   baseURL?: string              // bifrost_local must point to localhost, 127.0.0.1, or ::1
@@ -133,6 +138,7 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
   secretRef:
     | { type: 'env', name: string }
     | { type: 'gateway_virtual_key_ref', name: string }
+    | { type: 'stored_api_key', id: string }
     | { type: 'none' }
     | null
   secretStatus: object | null
@@ -142,7 +148,9 @@ It does not write `.env.local`, does not mutate `process.env`, and rejects raw s
 }
 ```
 
-API access is configured with `env_key` by storing the environment variable name, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. OpenAI-compatible registry execution requires an env secret reference and a configured base URL when the row does not have a safe default endpoint. Subscription/tool-session auth, such as Claude Code CLI, uses `local_cli_session` and SkillMall does not copy credential files. The requested `configMode` / `authMode` must match the selected Provider Center row: API providers cannot be configured as local sessions, local runtimes cannot be configured with API-key refs, and provider rows without gateway access cannot be configured with gateway virtual-key auth.
+API access is configured with `env_key` plus either a stored API-key ref, for example `{ "type": "stored_api_key", "id": "provider:openai:api_key" }`, or an environment-variable reference, for example `{ "type": "env", "name": "OPENAI_API_KEY" }`. OpenAI-compatible registry execution requires a stored API key or env secret reference and a configured base URL when the row does not have a safe default endpoint. Local auth/session rows, including OpenAI Codex Auth Token and Claude Code CLI, use `local_cli_session` and SkillMall does not copy credential files. The requested `configMode` / `authMode` must match the selected Provider Center row: API providers cannot be configured as local sessions, local runtimes cannot be configured with API-key refs, and provider rows without gateway access cannot be configured with gateway virtual-key auth.
+
+Use `action: "delete_credential"` with `providerRegistryId` to delete the app-managed stored API credential for that provider. The response returns `credentialDeleted: true` and redacted `valuePresent: false` status; it never returns the credential value.
 
 Phase 3 surfaces `bifrost_local` as the only approved optional local gateway backend. It uses `gateway_virtual_key` plus a `gateway_virtual_key_ref` environment-variable name, never a raw virtual key in the request body or config file. `bifrost_local` base URLs are intentionally restricted to localhost-class addresses. Bifrost local is not SkillMall's source of truth and is not a required hosted gateway. GoModel, LiteLLM proxy mode, hosted gateways, `codex_session`, `oauth_device_flow`, `keychain_ref`, `cheapest_compatible`, `quality_first`, and semantic routers remain unimplemented unless a later approved phase changes the contract.
 
@@ -363,16 +371,17 @@ Capability metadata is stored with source confidence. Official APIs/docs are aut
 
 ## POST /api/providers/test
 
-Returns a safe provider configuration/status test. This route checks registry/config/secret-reference readiness and does not persist or echo prompt/response bodies. It rejects raw secret fields using the same secret boundary as `/api/providers/configure`.
+Returns a safe provider configuration/status test. This route checks registry/config/secret-reference readiness and does not accept, persist, or echo prompt/response bodies. It rejects raw secret fields using the same secret boundary as `/api/providers/configure` before strict request parsing.
 
 **Request body:**
 
 ```typescript
 {
   providerRegistryId?: string
-  prompt?: string               // ignored for storage/response echoing
 }
 ```
+
+Unknown fields return `invalid_input`. Raw secret-like fields still return `raw_secret_field_rejected` first.
 
 **Response:**
 

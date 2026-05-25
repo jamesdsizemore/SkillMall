@@ -34,10 +34,14 @@ type RawProviderConfig = {
 
 async function readRawConfig(): Promise<RawProviderConfig> {
   try {
-    return JSON.parse(await fs.readFile(USER_CONFIG_PATH, 'utf-8')) as RawProviderConfig
+    return JSON.parse(await fs.readFile(userConfigPath(), 'utf-8')) as RawProviderConfig
   } catch {
     return {}
   }
+}
+
+function userConfigPath(): string {
+  return process.env.SKILL_MALL_CONFIG_PATH ?? USER_CONFIG_PATH
 }
 
 export async function writeProviderConfig(input: {
@@ -124,9 +128,10 @@ export async function writeProviderConfig(input: {
     ...(input.routingPolicyId ? { routingPolicyId: input.routingPolicyId } : {}),
   }
 
-  await fs.mkdir(path.dirname(USER_CONFIG_PATH), { recursive: true })
+  const configPath = userConfigPath()
+  await fs.mkdir(path.dirname(configPath), { recursive: true })
   await fs.writeFile(
-    USER_CONFIG_PATH,
+    configPath,
     JSON.stringify(
       {
         ...existing,
@@ -153,6 +158,6 @@ export async function writeProviderConfig(input: {
     gatewayBackend,
     baseURL,
     routingPolicyId: input.routingPolicyId,
-    path: USER_CONFIG_PATH,
+    path: configPath,
   }
 }

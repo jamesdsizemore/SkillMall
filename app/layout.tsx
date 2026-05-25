@@ -64,8 +64,8 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <header className="sticky top-0 z-50 border-b border-sm-border bg-sm-surface/90 backdrop-blur-md">
-          <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-            <Link href="/" className="flex items-center gap-2.5">
+          <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6">
+            <Link href="/" className="flex shrink-0 items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center bg-sm-display font-label text-xs font-black text-sm-bg">
                 SM
               </span>
@@ -80,10 +80,10 @@ export default async function RootLayout({
               </span>
             </Link>
 
-            <nav className="flex items-center gap-4">
+            <nav className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 sm:gap-x-4">
               <Link
                 href="/contributing"
-                className="text-sm text-sm-secondary transition-colors hover:text-sm-primary"
+                className="hidden text-sm text-sm-secondary transition-colors hover:text-sm-primary sm:inline"
               >
                 Contribute
               </Link>

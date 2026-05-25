@@ -11,6 +11,7 @@ import type { ProviderID, ProviderRegistryID } from '../types'
 
 const REQUIRED_PROVIDER_IDS: ProviderRegistryID[] = [
   'openai',
+  'openai_codex',
   'anthropic',
   'claude_code',
   'gemini',
@@ -63,6 +64,7 @@ describe('provider registry', () => {
   it('uses registry IDs without widening the executable ProviderID union', () => {
     const executableIds = new Set<ProviderID>([
       'openai',
+      'codex',
       'anthropic',
       'claude-code',
       'gemini',
@@ -70,6 +72,7 @@ describe('provider registry', () => {
       'ollama',
     ])
 
+    expect(getProviderRegistryEntry('openai_codex')?.executableProviderId).toBe('codex')
     expect(getProviderRegistryEntry('claude_code')?.executableProviderId).toBe('claude-code')
     expect(getProviderRegistryEntry('huggingface')?.executableProviderId).toBeUndefined()
     expect(getProviderRegistryEntry('alibaba_dashscope_qwen')?.executableProviderId).toBeUndefined()
@@ -115,6 +118,7 @@ describe('provider registry', () => {
   it('enforces auth mode compatibility from provider access modes', () => {
     const openai = getProviderRegistryEntry('openai')
     const anthropic = getProviderRegistryEntry('anthropic')
+    const openaiCodex = getProviderRegistryEntry('openai_codex')
     const claudeCode = getProviderRegistryEntry('claude_code')
     const ollama = getProviderRegistryEntry('ollama')
     const custom = getProviderRegistryEntry('custom_openai_compatible')
@@ -122,6 +126,7 @@ describe('provider registry', () => {
     expect(openai && isAuthModeAllowedForProvider(openai, 'env_key')).toBe(true)
     expect(openai && isAuthModeAllowedForProvider(openai, 'gateway_virtual_key')).toBe(true)
     expect(openai && isAuthModeAllowedForProvider(openai, 'local_cli_session')).toBe(false)
+    expect(openaiCodex && isAuthModeAllowedForProvider(openaiCodex, 'local_cli_session')).toBe(true)
     expect(anthropic && isAuthModeAllowedForProvider(anthropic, 'gateway_virtual_key')).toBe(false)
     expect(claudeCode && isAuthModeAllowedForProvider(claudeCode, 'local_cli_session')).toBe(true)
     expect(ollama && isAuthModeAllowedForProvider(ollama, 'none_local')).toBe(true)

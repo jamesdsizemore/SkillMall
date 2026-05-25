@@ -2,9 +2,9 @@
 
 > **For agentic workers:** This is a phase implementation plan, not approval to code. Start implementation only after the user explicitly runs the Phase 2 `/goal` command or otherwise approves Phase 2 implementation.
 
-**Phase:** Provider Center Product Phase 2 - Configuration UX + Setup Guidance
+**Phase:** Provider Center Product Phase 2 - Required LLM Credential Configuration For Skill Creation
 
-**Owner outcome:** Provider Center turns safe provider configuration into a guided, understandable workflow for existing provider/auth/router capabilities, without adding new auth modes, new providers, new routing modes, credential storage, or executable adapters.
+**Owner outcome:** Provider Center gives SkillMall the required LLM access needed to create skills. Users must be able to configure, securely store, redact, rotate/delete, and use provider credentials in the app.
 
 **Workspace:** `/Users/jamesdsizemore/Developer/skill-mall`
 
@@ -38,16 +38,21 @@ Do not stage, commit, push, or open a PR for Phase 2 artifacts unless the user e
 
 ## Non-Negotiables
 
-- Phase 2 is configuration UX and setup guidance only.
-- Do not add providers, auth modes, routing modes, gateway dependencies, OAuth/device flows, keychain storage, credential storage, credential-file ingestion, or executable provider adapters.
-- Do not widen `ProviderID`.
+- SkillMall is a skill creator. Provider/auth/router work is supporting infrastructure for LLM-backed skill creation, not the product itself.
+- In-app credential configuration is a required product capability, not optional documentation or future work.
+- API access is a first-class/default setup path for API-backed providers.
+- Configured credentials must be usable by SkillMall LLM calls after save.
+- Credentials must be stored only through encrypted local/app-managed storage or another approved secure storage mechanism.
+- The app must redact credential values from UI, API responses, logs, screenshots, docs, tests, and GoalBuddy receipts.
+- The app must support credential replacement/rotation and delete/revoke-from-SkillMall behavior.
+- Do not silently copy provider or CLI credential files.
+- Do not scrape browser sessions.
+- Do not ask users to paste random browser/session blobs, cookies, copied browser tokens, or credential-file contents.
+- Do not widen `ProviderID` unless an approved implementation contract requires a tested executable adapter.
 - Do not treat broad `ProviderRegistryID` rows as direct executable providers.
-- Do not ask users to paste raw API keys, copied tokens, browser/session tokens, cookies, credential-file contents, or credential-file paths.
-- API-key access remains optional and must be labeled as API access.
-- Subscription/account/tool-session auth remains separate from API-key access.
-- Claude Code remains local tool/session access. SkillMall must not copy Claude Code credential files.
+- Provider credential entry must be explicitly labeled by credential/access type, such as API access or provider auth token, and must never be confused with browser-session scraping.
 - Local runtime rows remain endpoint/status workflows, not secret workflows.
-- Gateway virtual-key rows remain reference workflows, not raw virtual-key fields.
+- Gateway virtual-key rows may use app-managed credentials only when the UI labels them as gateway credentials and stores them through the same secure credential lifecycle.
 - Do not store prompt or response bodies in UI state, fixtures, docs, tests, API payloads, logs, receipts, screenshots, or browser proof.
 - Do not introduce hosted dashboards, paid hosted control planes, or required extra-cost infrastructure.
 - Do not promote `cheapest_compatible`, `quality_first`, semantic routing, learned routing, complexity routing, eval routing, or automatic optimization.
@@ -60,14 +65,14 @@ Do not stage, commit, push, or open a PR for Phase 2 artifacts unless the user e
 These facts were checked during Phase 2 planning on 2026-05-21. The `/goal` executor must revalidate them before implementation.
 
 - Phase 1 is merged into `main` through PR #16 at `b19fa84`.
-- `ProviderConfigPanel` currently renders safe setup fields, but the experience is still field-centric:
+- `ProviderConfigPanel` currently renders setup fields, but the experience is still field-centric and does not yet make required in-app credential configuration obvious:
   - config mode buttons: env var ref, gateway ref, local session, no secret ref
   - fields: env ref name, gateway virtual-key ref name, base URL, model label, manual model labels, routing policy
   - a setup source link and terse model-discovery/gateway note
 - `ProviderCenter` owns selected provider state, draft construction, save/test/refresh actions, and action-state messages.
-- `app/api/providers/configure/route.ts` already rejects raw secret field names before parsing and validates auth/access-mode mismatches.
+- `app/api/providers/configure/route.ts` currently rejects raw secret field names before parsing and validates auth/access-mode mismatches; this must be corrected so explicit API/provider credential entry is allowed only through the approved credential setup path while unsafe browser/session blobs and credential-file contents remain rejected.
 - `lib/llm/router/secret-refs.ts` already enforces environment-variable-style reference names.
-- `lib/providers/config-store.ts` writes non-secret provider config and rejects raw `apiKey`.
+- `lib/providers/config-store.ts` writes non-secret provider config and currently rejects raw `apiKey`; this must become a secure reference to app-managed encrypted credential storage rather than a blanket rejection of credential configuration.
 - `app/api/providers/test/route.ts` currently accepts an optional `prompt` field even though it does not store or echo prompt/response bodies.
 - `docs/user/configuring-providers.md` already explains safe references, Provider Center workflow, provider catalog boundaries, API/local session/local runtime/gateway differences, and safe provider tests.
 - `components/skill-mall/providers/__tests__/provider-center.test.tsx` covers Phase 1 labels, unsupported mode hiding, active model behavior, disabled refresh for endpoint-required rows, and absence of raw secret prompts.
@@ -79,9 +84,10 @@ These facts were checked during Phase 2 planning on 2026-05-21. The `/goal` exec
 
 ### In Scope
 
-- Make safe setup feel like a product workflow rather than a raw form.
+- Make credential setup feel like the required LLM configuration workflow for creating skills, not a raw internal router form.
 - Add per-access-mode setup guidance for:
-  - API env-var references
+  - app-managed API credential entry
+  - API env-var references as an advanced/developer path
   - gateway virtual-key references
   - local CLI/session access
   - local runtime endpoints
@@ -90,10 +96,11 @@ These facts were checked during Phase 2 planning on 2026-05-21. The `/goal` exec
   - metadata-only/source-review rows
 - Add setup requirement/readiness labels that explain:
   - which inputs are required for the selected provider/config mode
-  - what SkillMall stores
-  - what SkillMall does not store
+  - what credential SkillMall will store securely
+  - what unsafe credential sources SkillMall will reject
   - why save/test/refresh is enabled, disabled, blocked, or likely to fail
 - Improve inline validation and copy for:
+  - API/provider credential entry
   - reference names
   - base URLs
   - endpoint-required rows
@@ -101,7 +108,7 @@ These facts were checked during Phase 2 planning on 2026-05-21. The `/goal` exec
   - auth/access-mode mismatches
   - source-review and metadata-only rows
 - Clarify save/test/refresh sequencing after Phase 1:
-  - save safe references or metadata
+  - save encrypted credentials, references, or metadata as appropriate
   - run safe status test
   - refresh models only when the selected row/endpoint supports it
   - route/policy work stays later unless the existing routing-policy id field needs safer context
@@ -113,12 +120,13 @@ These facts were checked during Phase 2 planning on 2026-05-21. The `/goal` exec
 
 ### Out Of Scope
 
-- OAuth/device-code flows.
-- Raw token/session configuration.
-- Keychain integration.
-- Credential-file ingestion or credential-file path references.
+- Browser-session scraping.
+- Silent credential-file copying.
+- Random browser/session blob paste.
+- Credential-file contents or credential-file path references.
+- Plaintext credential storage in `~/.skill-mall/config.json`, UI state, logs, docs, tests, screenshots, or GoalBuddy receipts.
 - Provider-specific executable adapters.
-- New provider rows or provider promotion.
+- New provider rows only if they are unrelated to making required LLM credential setup work for the current broad provider catalog.
 - New routing policy modes or policy-builder expansion.
 - Deep model/capability polish; Phase 3 owns that.
 - Usage/cost dashboard expansion; Phase 4 owns that.
@@ -132,11 +140,11 @@ These facts were checked during Phase 2 planning on 2026-05-21. The `/goal` exec
 
 Phase 2 should keep the Phase 1 IA and make Stage 1 useful:
 
-1. **Setup mode explanation:** When a user selects a config mode, the panel explains what that mode means, what is required, and what will be saved.
+1. **Credential mode explanation:** When a user selects a setup mode, the panel explains what credential/access type it configures, what is required, and how SkillMall stores or rejects it.
 2. **Provider-specific requirements:** The selected provider row should show a small requirements/checklist surface for the current access mode instead of forcing the user to infer from labels.
-3. **Safe input hints:** Reference-name, endpoint, model, and manual-model fields should explain valid examples and unsafe examples without rendering raw-secret prompts.
+3. **Credential input hints:** API/provider credential, reference-name, endpoint, model, and manual-model fields should explain valid inputs and unsafe rejected inputs without asking for browser/session blobs.
 4. **Readiness preview:** Before save, the UI should say whether the selected draft looks ready to save, metadata-only, blocked, or requires a local/runtime/account/project step.
-5. **Save/test/refresh order:** The UI should guide the user toward the next safe action after setup, and it should not imply model refresh can work for rows that need endpoint/account/project/local runtime context.
+5. **Save/test/refresh order:** The UI should guide the user toward the next safe action after credential setup, and it should not imply model refresh can work for rows that need endpoint/account/project/local runtime context.
 6. **Safe status test:** Provider tests remain readiness checks only. They should not accept, store, echo, or imply prompt/response testing.
 
 ---
@@ -196,9 +204,10 @@ Judge approves a concrete setup contract before Worker edits. The contract must 
 
 Worker updates `ProviderConfigPanel` and, if needed, `ProviderCenter` to add:
 
-- config-mode explanation and requirements;
+- credential/config-mode explanation and requirements;
+- API credential entry as the first-class/default API-backed provider path;
 - input examples and validation guidance;
-- safe readiness preview;
+- secure storage/redaction/delete or rotate readiness preview;
 - metadata-only/source-review/cloud/project/local-runtime guidance;
 - save/test/refresh sequencing copy that does not deepen Phase 3-5 features.
 
@@ -210,15 +219,16 @@ Default target:
 
 - remove optional `prompt` from accepted schema;
 - reject unknown request fields with `invalid_input`;
-- keep raw-secret rejection before parsing so unsafe raw secret field names still return `raw_secret_field_rejected`;
+- keep unsafe credential-source rejection before parsing so browser/session blobs, cookies, credential-file contents, and credential-file paths still return `raw_secret_field_rejected`;
 - keep response body prompt-free and response-body-free.
 
 ### Slice D: Tests And Docs
 
 Worker updates tests and docs for:
 
-- setup guidance labels and requirements;
-- no raw secret/token/cookie/credential fields;
+- required credential setup labels and requirements;
+- app-managed credential storage/redaction/delete or rotate behavior;
+- no browser/session blob, cookie, credential-file-content, or credential-file-path fields;
 - prompt field no longer accepted by provider status test, or documented blocker if not removed;
 - safe reference naming;
 - save/test/refresh sequencing.
@@ -241,12 +251,15 @@ git diff --check
 
 Focused expected test coverage:
 
-- Provider Center renders setup guidance for each supported config mode.
-- Provider Center does not render raw secret, token, browser/session, cookie, credential-file, credential-path, prompt-body, or response-body prompts.
+- Provider Center renders required credential setup guidance for each supported config mode.
+- Provider Center defaults API-backed providers to API credential setup.
+- Provider Center supports app-managed credential replacement/rotation and delete/revoke-from-SkillMall behavior.
+- Provider Center does not render browser/session blob, cookie, credential-file-content, credential-path, prompt-body, or response-body prompts.
 - Provider Center explains disabled/blocked save/test/refresh states for source-review, metadata-only, endpoint-required, local-runtime, and local-session rows.
-- Provider route tests prove `POST /api/providers/test` rejects raw secret fields before parsing.
+- Configure route tests prove approved API/provider credential setup stores credentials through encrypted app-managed storage and never returns values.
+- Configure route tests prove unsafe credential-source fields are rejected before parsing.
 - Provider route tests prove `POST /api/providers/test` does not accept `prompt` unless the Judge records a compatibility blocker and explicitly keeps it documented as ignored.
-- Configure route tests remain green for raw secret rejection, path-like secret refs, auth/access-mode mismatch, and safe persistence.
+- Configure route tests remain green for browser/session blob rejection, path-like credential rejection, auth/access-mode mismatch, encrypted credential persistence, redaction, replacement/rotation, and delete/revoke behavior.
 
 ---
 
@@ -281,8 +294,8 @@ Update docs only where behavior or user-facing setup guidance changes:
 
 Docs must preserve:
 
-- reference-only secret handling;
-- optional API access label;
+- secure app-managed credential handling;
+- API access as a first-class/default setup path;
 - subscription/tool-session separation;
 - no credential-file/path handling;
 - no prompt/response storage;

@@ -28,11 +28,12 @@ export const PHASE2_ROUTING_POLICY_MODES = [
 
 export type RoutingPolicyMode = (typeof PHASE2_ROUTING_POLICY_MODES)[number]
 
-export type SecretRefType = 'env' | 'none' | 'gateway_virtual_key_ref'
+export type SecretRefType = 'env' | 'none' | 'gateway_virtual_key_ref' | 'stored_api_key'
 
 export type SecretRef =
   | { type: 'env'; name: string }
   | { type: 'gateway_virtual_key_ref'; name: string }
+  | { type: 'stored_api_key'; id: string }
   | { type: 'none' }
 
 export interface RouterProviderConfig {

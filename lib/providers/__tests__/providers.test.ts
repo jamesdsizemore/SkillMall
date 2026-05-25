@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createDirectLLMClient, createLLMClient } from '../index'
 import { OpenAIClient } from '../openai'
+import { CodexClient } from '../codex'
 import { AnthropicClient } from '../anthropic'
 import { ClaudeCodeClient } from '../claude-code'
 import { GeminiClient } from '../gemini'
@@ -11,6 +12,11 @@ describe('createLLMClient', () => {
   it('returns router-compatible client for openai provider', () => {
     const client = createLLMClient({ provider: 'openai', apiKey: 'test-key', model: 'gpt-4o' })
     expect(client.provider).toBe('openai')
+  })
+
+  it('returns router-compatible client for codex provider (no apiKey required)', () => {
+    const client = createLLMClient({ provider: 'codex', model: 'gpt-5.1' })
+    expect(client.provider).toBe('codex')
   })
 
   it('returns router-compatible client for anthropic provider', () => {
@@ -55,6 +61,10 @@ describe('createLLMClient', () => {
 describe('createDirectLLMClient', () => {
   it('constructs OpenAIClient for openai provider', () => {
     expect(createDirectLLMClient({ provider: 'openai', apiKey: 'test-key', model: 'gpt-4o' })).toBeInstanceOf(OpenAIClient)
+  })
+
+  it('constructs CodexClient for codex provider', () => {
+    expect(createDirectLLMClient({ provider: 'codex', model: 'gpt-5.1' })).toBeInstanceOf(CodexClient)
   })
 
   it('constructs AnthropicClient for anthropic provider', () => {

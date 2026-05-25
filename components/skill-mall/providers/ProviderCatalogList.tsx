@@ -31,8 +31,8 @@ function groupsForProviders(providers: ProviderRow[]): ProviderGroup[] {
       ),
     },
     {
-      label: "Local tools / sessions",
-      description: "Official local session status only.",
+      label: "Auth tokens / local sessions",
+      description: "OpenAI Codex and Claude Code local auth/session options.",
       providers: providers.filter((provider) => provider.accessModes.includes("local_tool_session")),
     },
     {

@@ -1,9 +1,10 @@
 import type { GatewayBackend, LLMAuthMode, RouterExecutionKind, SecretRef } from '../llm/router/types'
 
-export type ProviderID = 'openai' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
+export type ProviderID = 'openai' | 'codex' | 'anthropic' | 'claude-code' | 'gemini' | 'groq' | 'ollama'
 
 export type ProviderRegistryID =
   | 'openai'
+  | 'openai_codex'
   | 'anthropic'
   | 'claude_code'
   | 'gemini'

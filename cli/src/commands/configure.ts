@@ -153,6 +153,14 @@ function secretStatus(secretRef: SecretRef | undefined | null) {
   if (secretRef.type === "none") {
     return { type: "none", valuePresent: true, source: "no_secret_required" };
   }
+  if (secretRef.type === "stored_api_key") {
+    return {
+      type: "stored_api_key",
+      id: secretRef.id,
+      valuePresent: true,
+      source: "encrypted_local_store",
+    };
+  }
   return {
     type: secretRef.type,
     name: secretRef.name,

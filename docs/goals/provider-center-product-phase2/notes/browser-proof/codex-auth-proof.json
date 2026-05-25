@@ -1,0 +1,31 @@
+{
+  "outputPath": "/Users/jamesdsizemore/Developer/skill-mall/docs/goals/provider-center-product-phase2/notes/browser-proof/desktop-provider-center-codex-auth.png",
+  "checks": {
+    "hasConnectOpenAICodex": true,
+    "hasApiKey": false,
+    "hasCredentialType": false,
+    "hasUseForSkillCreation": false,
+    "lines": [
+      "[ LLM SETUP ]",
+      "",
+      "Provider Center",
+      "",
+      "Pick an LLM provider. Enter an API key or connect supported auth. Retrieve current models, choose one, then create a skill.",
+      "",
+      "[ LLM PROVIDER ]",
+      "OpenAI API",
+      "OpenAI Codex Auth Token",
+      "Anthropic Claude API",
+      "Claude Code CLI Auth Token",
+      "Google Gemini API",
+      "Groq",
+      "Ollama",
+      "OpenRouter",
+      "Alibaba Cloud Model Studio / DashScope / Qwen",
+      "Hugging Face Inference Providers",
+      "Z.AI",
+      "MiniMax",
+      "Kimi / Moonshot AI"
+    ]
+  }
+}

@@ -1,4 +1,5 @@
 import { OpenAIClient } from './openai'
+import { CodexClient } from './codex'
 import { AnthropicClient } from './anthropic'
 import { ClaudeCodeClient } from './claude-code'
 import { GeminiClient } from './gemini'
@@ -9,22 +10,29 @@ import type { LLMClient, ProviderConfig } from './types'
 import { createRouterLLMClient } from '../llm/router/create-client'
 import { resolveRouterProviderConfig } from '../llm/router/config'
 import { resolveEnvSecret } from '../llm/router/secret-refs'
+import { readStoredApiKeySync } from './secret-store'
 
 export { ConfigError } from './types'
 export type { LLMClient, ProviderConfig, ProviderID, CompletionOptions } from './types'
 
 function resolveApiKeyForRouterConfig(config: ProviderConfig): string | undefined {
   if (config.apiKey) return config.apiKey
-  if (config.authMode !== 'env_key' || config.secretRef?.type !== 'env') return undefined
-  const value = resolveEnvSecret(config.secretRef.name)
-  if (!value) {
-    throw new ConfigError(`Missing API key environment variable: ${config.secretRef.name}`)
+  if (config.authMode !== 'env_key') return undefined
+  if (config.secretRef?.type === 'stored_api_key') {
+    const value = readStoredApiKeySync(config.secretRef.id)
+    if (!value) throw new ConfigError(`Missing stored API key: ${config.secretRef.id}`)
+    return value
   }
-  return value
+  if (config.secretRef?.type === 'env') {
+    const value = resolveEnvSecret(config.secretRef.name)
+    if (!value) throw new ConfigError(`Missing API key environment variable: ${config.secretRef.name}`)
+    return value
+  }
+  return undefined
 }
 
 function assertKnownProvider(provider: string): void {
-  if (!['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'].includes(provider)) {
+  if (!['openai', 'codex', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama'].includes(provider)) {
     throw new Error(`Unknown provider: ${provider}`)
   }
 }
@@ -39,6 +47,8 @@ export function createDirectLLMClient(config: ProviderConfig): LLMClient {
   switch (config.provider) {
     case 'openai':
       return new OpenAIClient(directConfig)
+    case 'codex':
+      return new CodexClient(directConfig)
     case 'anthropic':
       return new AnthropicClient(directConfig)
     case 'claude-code':
@@ -63,12 +73,13 @@ export function createLLMClient(config: ProviderConfig): LLMClient {
 }
 
 /**
- * Resolve provider config from env vars or ~/.skill-mall/config.json.
- * Resolution order: SKILL_MALL_PROVIDER env var → config file.
+ * Resolve provider config from ~/.skill-mall/config.json for app runtime.
+ * The Provider Center must be able to activate saved credentials even when
+ * local development env vars exist as old bootstrap defaults.
  * Throws ConfigError if no provider is configured.
  */
 export function resolveProviderConfig(): ProviderConfig {
-  const routerConfig = resolveRouterProviderConfig()
+  const routerConfig = resolveRouterProviderConfig({ preferStoredConfig: true })
   return {
     provider: routerConfig.provider,
     providerRegistryId: routerConfig.providerRegistryId,
@@ -82,6 +93,8 @@ export function resolveProviderConfig(): ProviderConfig {
     apiKey:
       routerConfig.authMode === 'env_key' && routerConfig.secretRef?.type === 'env'
         ? resolveEnvSecret(routerConfig.secretRef.name)
+        : routerConfig.authMode === 'env_key' && routerConfig.secretRef?.type === 'stored_api_key'
+          ? readStoredApiKeySync(routerConfig.secretRef.id)
         : undefined,
   }
 }

@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db/client'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
+import { storedSecretValuePresentSync } from '@/lib/providers/secret-store'
 import type { SecretRef } from '@/lib/llm/router/types'
 import type { ProviderRegistryEntry, ProviderRegistryID } from '@/lib/providers/types'
 
@@ -25,6 +26,15 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
       type: 'none',
       valuePresent: true,
       source: 'no_secret_required',
+    }
+  }
+
+  if (secretRef.type === 'stored_api_key') {
+    return {
+      type: 'stored_api_key',
+      id: secretRef.id,
+      valuePresent: storedSecretValuePresentSync(secretRef.id),
+      source: 'encrypted_local_store',
     }
   }
 
@@ -216,7 +226,7 @@ function providerRow(
 }
 
 function activeStatus() {
-  const config = resolveRouterProviderConfig()
+  const config = resolveRouterProviderConfig({ preferStoredConfig: true })
   const activeProviderRegistryId = config.providerRegistryId ?? providerRegistryIdForExecutableProvider(config.provider)
   const activeAccessLabel = accessLabel(config.authMode, config.gatewayBackend)
 

@@ -1,6 +1,7 @@
 import { resolveEnvSecret } from '../llm/router/secret-refs'
 import type { SecretRef } from '../llm/router/types'
 import { getProviderRegistryEntry } from './registry'
+import { readStoredApiKeySync } from './secret-store'
 import type {
   ProviderDiscoveryStrategy,
   ProviderRegistryEntry,
@@ -135,6 +136,7 @@ export function sanitizeProviderModelRaw(raw: Record<string, unknown>): Record<s
 function envSecretValue(input: ProviderModelSourceInput): string | undefined {
   if (input.apiKey) return input.apiKey
   if (!input.secretRef || input.secretRef.type === 'none') return undefined
+  if (input.secretRef.type === 'stored_api_key') return readStoredApiKeySync(input.secretRef.id)
   return resolveEnvSecret(input.secretRef.name)
 }
 

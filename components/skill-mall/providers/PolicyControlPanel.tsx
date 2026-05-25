@@ -54,11 +54,15 @@ function executionProviderFor(provider: ProviderRow | null): string | null {
 }
 
 function authModeFor(draft: ProviderDraft): "env_key" | "gateway_virtual_key" | "local_cli_session" | "none_local" {
+  if (draft.configMode === "api_key") return "env_key";
   if (draft.configMode === "gateway_virtual_key_ref") return "gateway_virtual_key";
   return draft.configMode;
 }
 
-function secretRefFor(draft: ProviderDraft) {
+function secretRefFor(draft: ProviderDraft, provider: ProviderRow | null) {
+  if (draft.configMode === "api_key") {
+    return { type: "stored_api_key", id: `provider:${provider?.id ?? "unknown"}:api_key` };
+  }
   if (draft.configMode === "env_key") return { type: "env", name: draft.envVarName };
   if (draft.configMode === "gateway_virtual_key_ref") {
     return { type: "gateway_virtual_key_ref", name: draft.gatewayRefName };
@@ -85,7 +89,7 @@ function policyPayload(policyDraft: PolicyDraft, provider: ProviderRow | null, p
                   : "direct",
             model,
             authMode: authModeFor(providerDraft),
-            secretRef: secretRefFor(providerDraft),
+            secretRef: secretRefFor(providerDraft, provider),
             gatewayBackend: providerDraft.configMode === "gateway_virtual_key_ref" ? "bifrost_local" : "direct",
             ...(providerDraft.baseURL ? { baseURL: providerDraft.baseURL } : {}),
           },

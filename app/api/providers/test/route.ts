@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { getProviderRegistryEntry, PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { modelDiscoveryPlanForEntry } from '@/lib/providers/model-discovery'
+import { storedSecretValuePresentSync } from '@/lib/providers/secret-store'
+import { checkLocalCliAuthStatus } from '@/lib/providers/local-cli-auth'
 import type { SecretRef } from '@/lib/llm/router/types'
 import type { ProviderRegistryID } from '@/lib/providers/types'
 
@@ -10,8 +12,7 @@ const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegis
 
 const TestBodySchema = z.object({
   providerRegistryId: z.enum(registryIds).optional(),
-  prompt: z.string().optional(),
-}).passthrough()
+}).strict()
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,15 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
     }
   }
 
+  if (secretRef.type === 'stored_api_key') {
+    return {
+      type: 'stored_api_key',
+      id: secretRef.id,
+      valuePresent: storedSecretValuePresentSync(secretRef.id),
+      source: 'encrypted_local_store',
+    }
+  }
+
   return {
     type: secretRef.type,
     name: secretRef.name,
@@ -63,8 +73,20 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
 
 function statusForSecret(secretRef: SecretRef | undefined | null): 'ready' | 'missing_secret' {
   if (!secretRef || secretRef.type === 'none') return 'ready'
+  if (secretRef.type === 'stored_api_key') {
+    return storedSecretValuePresentSync(secretRef.id) ? 'ready' : 'missing_secret'
+  }
   return process.env[secretRef.name] ? 'ready' : 'missing_secret'
 }
+
+type ProviderTestStatus =
+  | 'ready'
+  | 'missing_secret'
+  | 'missing_local_cli'
+  | 'missing_local_auth'
+  | 'planned_source_review'
+  | 'not_configured'
+  | 'metadata_only'
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
@@ -91,7 +113,7 @@ export async function POST(req: NextRequest) {
 
   let activeConfig: ReturnType<typeof resolveRouterProviderConfig> | null = null
   try {
-    activeConfig = resolveRouterProviderConfig()
+    activeConfig = resolveRouterProviderConfig({ preferStoredConfig: true })
   } catch {
     activeConfig = null
   }
@@ -113,9 +135,19 @@ export async function POST(req: NextRequest) {
   )
   const secretRef = activeMatches && activeConfig ? activeConfig.secretRef : undefined
   const discoveryPlan = modelDiscoveryPlanForEntry(entry)
-  const status =
+  const localCliAuth =
+    entry.accessModes.includes('local_tool_session')
+      ? await checkLocalCliAuthStatus(entry.id)
+      : null
+  const status: ProviderTestStatus =
     entry.status === 'planned_source_review'
       ? 'planned_source_review'
+      : localCliAuth && !localCliAuth.available
+        ? 'missing_local_cli'
+        : localCliAuth && !localCliAuth.authenticated
+          ? 'missing_local_auth'
+          : localCliAuth && localCliAuth.authenticated
+            ? 'ready'
       : activeMatches
         ? statusForSecret(secretRef)
         : entry.executableProviderId
@@ -136,6 +168,16 @@ export async function POST(req: NextRequest) {
         name: 'secret_reference',
         status: secretRef ? statusForSecret(secretRef) : 'not_applicable',
       },
+      ...(localCliAuth
+        ? [{
+            name: 'local_cli_auth',
+            status: localCliAuth.available && localCliAuth.authenticated
+              ? 'ready'
+              : localCliAuth.available
+                ? 'missing_local_auth'
+                : 'missing_local_cli',
+          }]
+        : []),
       {
         name: 'model_discovery',
         status: discoveryPlan.canRefreshNow ? 'supported_when_configured' : discoveryPlan.strategy,
@@ -144,6 +186,14 @@ export async function POST(req: NextRequest) {
     authMode: activeMatches && activeConfig ? activeConfig.authMode : null,
     gatewayBackend: activeMatches && activeConfig ? activeConfig.gatewayBackend : null,
     secretStatus: sanitizeSecretStatus(secretRef),
-    message: 'Safe configuration/status test only; prompt and response bodies are not stored or echoed.',
+    localCliAuth: localCliAuth
+      ? {
+          available: localCliAuth.available,
+          authenticated: localCliAuth.authenticated,
+          authMethod: localCliAuth.authMethod ?? null,
+          message: localCliAuth.message,
+        }
+      : null,
+    message: 'Safe configuration/status test only; prompt and response bodies are not accepted, stored, or echoed.',
   })
 }

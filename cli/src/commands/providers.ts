@@ -3,6 +3,7 @@ import path from "path";
 import { pc } from "../utils.js";
 import { resolveRouterProviderConfig } from "../../../lib/llm/router/config";
 import { resolveEnvSecret, sanitizeSecretRef } from "../../../lib/llm/router/secret-refs";
+import { readStoredApiKeySync, storedSecretValuePresentSync } from "../../../lib/providers/secret-store";
 import { discoverProviderModels, modelDiscoveryPlanForEntry } from "../../../lib/providers/model-discovery";
 import {
   PROVIDER_REGISTRY,
@@ -273,6 +274,14 @@ function secretStatus(secretRef: SecretRef | undefined | null) {
       type: "none",
       valuePresent: true,
       source: "no_secret_required",
+    };
+  }
+  if (secretRef.type === "stored_api_key") {
+    return {
+      type: "stored_api_key",
+      id: secretRef.id,
+      valuePresent: storedSecretValuePresentSync(secretRef.id),
+      source: "encrypted_local_store",
     };
   }
 
@@ -570,10 +579,14 @@ async function refreshModelsCommand(flags: ProviderFlags): Promise<void> {
     if (flags.keyEnv) {
       const ref = sanitizeSecretRef({ type: "env", name: flags.keyEnv });
       keyEnv = ref.type === "env" ? ref.name : undefined;
-    } else if (activeMatches && active.secretRef?.type !== "none") {
+    } else if (activeMatches && (active.secretRef?.type === "env" || active.secretRef?.type === "gateway_virtual_key_ref")) {
       keyEnv = active.secretRef?.name;
     }
-    const apiKey = keyEnv ? resolveEnvSecret(keyEnv) : undefined;
+    const apiKey = keyEnv
+      ? resolveEnvSecret(keyEnv)
+      : activeMatches && active.secretRef?.type === "stored_api_key"
+        ? readStoredApiKeySync(active.secretRef.id)
+        : undefined;
     const baseUrl =
       flags.baseURL ??
       (activeMatches ? active.baseURL ?? undefined : undefined) ??

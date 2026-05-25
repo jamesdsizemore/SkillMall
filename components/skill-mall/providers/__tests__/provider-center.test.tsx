@@ -10,6 +10,7 @@ import {
   type UsageResponse,
 } from "../ProviderCenter";
 import { ProviderConfigPanel } from "../ProviderConfigPanel";
+import { PolicyControlPanel } from "../PolicyControlPanel";
 import { UsageCostPanel } from "../UsageCostPanel";
 
 function provider(overrides: Partial<ProviderRow>): ProviderRow {
@@ -99,6 +100,17 @@ const providersResponse: ProvidersResponse = {
   providers: [
     provider({ id: "openai", name: "OpenAI API" }),
     provider({
+      id: "openai_codex",
+      name: "OpenAI Codex Auth Token",
+      accessModes: ["local_tool_session"],
+      accessLabel: "OpenAI Codex local auth token/session",
+      authLabel: "Existing OpenAI Codex authentication",
+      classification: "local_tool_session",
+      discoveryStrategy: "static_fallback_only",
+      executableProviderId: "codex",
+      gatewayProfile: null,
+    }),
+    provider({
       id: "anthropic",
       name: "Anthropic Claude API",
       accessModes: ["api_access"],
@@ -110,7 +122,7 @@ const providersResponse: ProvidersResponse = {
     }),
     provider({
       id: "claude_code",
-      name: "Claude Code CLI",
+      name: "Claude Code CLI Auth Token",
       accessModes: ["local_tool_session"],
       accessLabel: "Local CLI/session access",
       classification: "local_tool_session",
@@ -202,48 +214,78 @@ const usageResponse: UsageResponse = {
 };
 
 describe("Provider Center UI", () => {
-  it("renders broad provider groups and distinct access labels", () => {
-    const html = renderToStaticMarkup(<ProviderCenter initialData={providersResponse} initialUsage={usageResponse} />);
+  it("renders the simple primary LLM setup flow without provider-center plumbing", () => {
+    const html = renderToStaticMarkup(<ProviderCenter initialData={providersResponse} />);
 
     expect(html).toContain("Provider Center");
-    expect(html).toContain("SELECTED PROVIDER");
-    expect(html).toContain("ACCESS TYPE");
-    expect(html).toContain("EXECUTION BOUNDARY");
-    expect(html).toContain("SETUP STATE");
-    expect(html).toContain("SAFE NEXT ACTION");
-    expect(html).toContain("Direct executable provider: openai");
-    expect(html).toContain("STAGE 1 / SAFE SETUP");
-    expect(html).toContain("STAGE 2 / MODEL + STATUS");
-    expect(html).toContain("STAGE 3 / LOCAL ROUTING POLICY");
-    expect(html).toContain("STAGE 4 / USAGE + COST");
-    expect(html).toContain("API providers");
-    expect(html).toContain("Local tools / sessions");
-    expect(html).toContain("Local runtimes");
-    expect(html).toContain("Gateway / OpenAI-compatible / custom");
-    expect(html).toContain("Cloud / project providers");
-    expect(html).toContain("Planned / source-review rows");
-    expect(html).toContain("API access");
-    expect(html).toContain("Local CLI/session access");
-    expect(html).toContain("Local runtime");
-    expect(html).toContain("Gateway access");
-    expect(html).toContain("Cloud project");
-    expect(html).toContain("Custom OpenAI-compatible");
-    expect(html).toContain("AUTH CONTRACT");
-    expect(html).toContain("MODEL COUNT");
-    expect(html).toContain("LAST CHECKED");
-    expect(html).toContain("CACHE STATE");
-    expect(html).toContain("BLOCKER");
+    expect(html).toContain("LLM PROVIDER");
+    expect(html).toContain("OpenAI Codex Auth Token");
+    expect(html).toContain("Claude Code CLI Auth Token");
+    expect(html).toContain("API KEY");
+    expect(html).toContain("MODELS");
+    expect(html).toContain("RETRIEVE CURRENT MODELS");
+    expect(html).toContain("SELECT MODEL");
+    expect(html).not.toContain("SELECTED PROVIDER");
+    expect(html).not.toContain("NEXT SAFE ACTION");
+    expect(html).not.toContain("STAGE 3 / LOCAL ROUTING POLICY");
+    expect(html).not.toContain("STAGE 4 / USAGE + COST");
+    expect(html).not.toContain("CREDENTIAL TYPE");
+    expect(html).not.toContain("USE FOR SKILL CREATION");
+    expect(html).not.toContain("API providers");
+    expect(html).not.toContain("MODEL COUNT");
   });
 
-  it("does not render raw secret fields or unsafe credential prompts", () => {
-    const html = renderToStaticMarkup(<ProviderCenter initialData={providersResponse} initialUsage={usageResponse} />);
+  it("renders approved credential entry without unsafe credential prompts", () => {
+    const html = renderToStaticMarkup(<ProviderCenter initialData={providersResponse} />);
 
     expect(html).not.toMatch(/apiKey/i);
     expect(html).not.toMatch(/sk-\.\.\.|sk-[A-Za-z0-9_-]+/);
-    expect(html).not.toMatch(/type="password"/);
+    expect(html).toMatch(/type="password"/);
+    expect(html).toContain("API KEY");
     expect(html).not.toMatch(/browser token/i);
     expect(html).not.toMatch(/session token/i);
     expect(html).not.toMatch(/credential path/i);
+  });
+
+  it("renders Codex and Claude Code as direct local auth-token connection paths", () => {
+    const codex = providersResponse.providers.find((row) => row.id === "openai_codex");
+    const claude = providersResponse.providers.find((row) => row.id === "claude_code");
+    const localDraft: ProviderDraft = {
+      configMode: "local_cli_session",
+      apiKey: "",
+      envVarName: "LOCAL_SESSION_REF",
+      gatewayRefName: "BIFROST_VIRTUAL_KEY",
+      baseURL: "",
+      model: "gpt-5.1",
+      manualModels: "gpt-5.1",
+      routingPolicyId: "",
+    };
+
+    const codexHtml = renderToStaticMarkup(
+      <ProviderConfigPanel
+        provider={codex ?? null}
+        draft={localDraft}
+        actionState={{ status: "idle", message: null }}
+        onDraftChange={() => undefined}
+        onSave={async () => true}
+      />
+    );
+    const claudeHtml = renderToStaticMarkup(
+      <ProviderConfigPanel
+        provider={claude ?? null}
+        draft={{ ...localDraft, model: "claude-sonnet-4-6", manualModels: "claude-sonnet-4-6" }}
+        actionState={{ status: "idle", message: null }}
+        onDraftChange={() => undefined}
+        onSave={async () => true}
+      />
+    );
+
+    expect(codexHtml).toContain("CONNECT OPENAI CODEX");
+    expect(claudeHtml).toContain("CONNECT CLAUDE CODE");
+    expect(codexHtml).not.toContain("CREDENTIAL TYPE");
+    expect(claudeHtml).not.toContain("CREDENTIAL TYPE");
+    expect(codexHtml).not.toMatch(/type="password"/);
+    expect(claudeHtml).not.toMatch(/type="password"/);
   });
 
   it("renders actual and estimated usage cost labels distinctly", () => {
@@ -259,43 +301,53 @@ describe("Provider Center UI", () => {
 
   it("renders routing policy and budget controls without unsupported modes", () => {
     const html = renderToStaticMarkup(
-      <ProviderCenter
-        initialData={{
-          ...providersResponse,
+      <PolicyControlPanel
+        provider={providersResponse.providers[0]}
+        providerDraft={{
+          configMode: "api_key",
+          apiKey: "",
+          envVarName: "OPENAI_API_REF",
+          gatewayRefName: "BIFROST_VIRTUAL_KEY",
+          baseURL: "",
+          model: "model-a",
+          manualModels: "model-a",
           routingPolicyId: "budget-openai",
         }}
-        initialUsage={usageResponse}
-        initialPolicies={{
-          supportedModes: ["manual", "fallback_chain", "local_first", "budget_guarded_manual"],
-          unsupportedModes: ["cheapest_compatible", "quality_first", "semantic_router"],
-          policies: [
-            {
-              id: "budget-openai",
-              name: "Budget OpenAI",
-              mode: "budget_guarded_manual",
-              rules: {
-                candidates: [
-                  {
-                    id: "api",
-                    config: {
-                      provider: "openai",
-                      providerRegistryId: "openai",
-                      model: "model-a",
-                      authMode: "env_key",
-                      secretRef: { type: "env", name: "OPENAI_API_REF" },
-                      gatewayBackend: "direct",
-                    },
-                    estimatedCostUsd: 0.02,
+        policies={[
+          {
+            id: "budget-openai",
+            name: "Budget OpenAI",
+            mode: "budget_guarded_manual",
+            rules: {
+              candidates: [
+                {
+                  id: "api",
+                  config: {
+                    provider: "openai",
+                    providerRegistryId: "openai",
+                    model: "model-a",
+                    authMode: "env_key",
+                    secretRef: { type: "env", name: "OPENAI_API_REF" },
+                    gatewayBackend: "direct",
                   },
-                ],
-              },
-              budget: { remainingUsd: 0.01, limitUsd: 20 },
-              enabled: true,
-              createdAt: "2026-05-20T10:00:00.000Z",
-              updatedAt: "2026-05-20T10:00:00.000Z",
+                  estimatedCostUsd: 0.02,
+                },
+              ],
             },
-          ],
-        }}
+            budget: { remainingUsd: 0.01, limitUsd: 20 },
+            enabled: true,
+            createdAt: "2026-05-20T10:00:00.000Z",
+            updatedAt: "2026-05-20T10:00:00.000Z",
+          },
+        ]}
+        supportedModes={["manual", "fallback_chain", "local_first", "budget_guarded_manual"]}
+        activeRoutingPolicyId="budget-openai"
+        actionState={{ status: "idle", message: null }}
+        onSavePolicy={() => undefined}
+        onActivatePolicy={() => undefined}
+        onTogglePolicy={() => undefined}
+        onSimulatePolicy={() => undefined}
+        simulationResult={null}
       />
     );
 
@@ -363,11 +415,10 @@ describe("Provider Center UI", () => {
           activeModel: "configured-live-model",
           providers: [configuredOpenAI],
         }}
-        initialUsage={usageResponse}
       />
     );
 
-    const modelField = html.match(/\[ MODEL LABEL \][\s\S]*?<\/label>/)?.[0] ?? "";
+    const modelField = html.match(/\[ SELECT MODEL \][\s\S]*?<\/label>/)?.[0] ?? "";
     expect(html).toContain("configured-live-model");
     expect(modelField).toContain('value="configured-live-model"');
     expect(modelField).not.toContain('value="policy-not-a-model"');
@@ -401,11 +452,10 @@ describe("Provider Center UI", () => {
             }),
           ],
         }}
-        initialUsage={usageResponse}
       />
     );
 
-    const refreshButton = html.match(/<button[^>]*>\[ REFRESH MODELS \]<\/button>/)?.[0] ?? "";
+    const refreshButton = html.match(/<button[^>]*>\[ RETRIEVE CURRENT MODELS \]<\/button>/)?.[0] ?? "";
     expect(refreshButton).toContain("disabled");
   });
 
@@ -413,6 +463,7 @@ describe("Provider Center UI", () => {
     const custom = providersResponse.providers.find((row) => row.id === "custom_openai_compatible");
     const draft: ProviderDraft = {
       configMode: "gateway_virtual_key_ref",
+      apiKey: "",
       envVarName: "CUSTOM_LLM_REF",
       gatewayRefName: "BIFROST_VIRTUAL_KEY",
       baseURL: "http://localhost:4000/v1",
@@ -427,17 +478,115 @@ describe("Provider Center UI", () => {
         draft={draft}
         actionState={{ status: "idle", message: null }}
         onDraftChange={() => undefined}
-        onSave={() => undefined}
+        onSave={async () => true}
       />
     );
 
-    expect(html).toContain("GATEWAY VIRTUAL-KEY REF NAME");
+    expect(html).toContain("GATEWAY REF NAME");
     expect(html).toContain("OPENAI-COMPATIBLE BASE URL");
-    expect(html).toContain("MODEL LABEL");
+    expect(html).toContain("SELECT MODEL");
     expect(html).toContain("MANUAL MODEL LABELS");
-    expect(html).toContain("ROUTING POLICY");
+    expect(html).toContain("ADVANCED");
     expect(html).not.toMatch(/apiKey/i);
-    expect(html).not.toMatch(/type="password"/);
     expect(html).not.toMatch(/credential path/i);
+  });
+
+  it("defaults API-backed providers to app-managed API credential setup", () => {
+    const html = renderToStaticMarkup(
+      <ProviderCenter
+        initialData={{
+          ...providersResponse,
+          configured: false,
+          activeProvider: null,
+          activeProviderRegistryId: null,
+          activeModel: null,
+          providers: [provider({ id: "openai", name: "OpenAI API" })],
+        }}
+      />
+    );
+
+    expect(html).toContain("API KEY");
+    expect(html).toContain("type=\"password\"");
+    expect(html).toContain("Encrypted local storage");
+    expect(html).toContain("SAVE API KEY ONLY");
+    expect(html).not.toMatch(/browser session/i);
+    expect(html).not.toMatch(/credential file path/i);
+  });
+
+  it("shows redacted stored credential status and delete control for configured API credentials", () => {
+    const configured = provider({
+      id: "openai",
+      name: "OpenAI API",
+      configStatus: {
+        configured: true,
+        authMode: "env_key",
+        gatewayBackend: "direct",
+        accessLabel: "api_access",
+        secretRef: { type: "stored_api_key", id: "provider:openai:api_key" },
+        secretStatus: {
+          type: "stored_api_key",
+          id: "provider:openai:api_key",
+          valuePresent: true,
+          source: "encrypted_local_store",
+        },
+        baseURL: null,
+        routingPolicyId: null,
+        activeModel: "model-a",
+      },
+    });
+    const draft = {
+      configMode: "api_key",
+      apiKey: "",
+      envVarName: "OPENAI_API_KEY",
+      gatewayRefName: "BIFROST_VIRTUAL_KEY",
+      baseURL: "",
+      model: "model-a",
+      manualModels: "model-a",
+      routingPolicyId: "",
+    } as ProviderDraft;
+
+    const html = renderToStaticMarkup(
+      <ProviderConfigPanel
+        provider={configured}
+        draft={draft}
+        actionState={{ status: "idle", message: null }}
+        onDraftChange={() => undefined}
+        onSave={async () => true}
+        onDeleteCredential={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Stored credential present");
+    expect(html).toContain("DELETE STORED CREDENTIAL");
+    expect(html).not.toContain("sk-");
+    expect(html).not.toMatch(/credential file/i);
+  });
+
+  it("explains blocked source-review setup without enabling save", () => {
+    const sourceReview = providersResponse.providers.find((row) => row.id === "alibaba_dashscope_qwen");
+    const draft: ProviderDraft = {
+      configMode: "env_key",
+      apiKey: "",
+      envVarName: "ALIBABA_DASHSCOPE_API_KEY",
+      gatewayRefName: "BIFROST_VIRTUAL_KEY",
+      baseURL: "",
+      model: "qwen-model",
+      manualModels: "",
+      routingPolicyId: "",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProviderConfigPanel
+        provider={sourceReview ?? null}
+        draft={draft}
+        actionState={{ status: "idle", message: null }}
+        onDraftChange={() => undefined}
+        onSave={async () => true}
+      />
+    );
+
+    const saveButton = html.match(/<button[^>]*>\[ SAVE CONFIG \]<\/button>/)?.[0] ?? "";
+    expect(html).toContain("SOURCE REVIEW REQUIRED");
+    expect(saveButton).toContain("disabled");
   });
 });

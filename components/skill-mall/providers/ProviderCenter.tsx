@@ -1,11 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ProviderCatalogList } from "./ProviderCatalogList";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProviderConfigPanel } from "./ProviderConfigPanel";
-import { ModelRefreshPanel } from "./ModelRefreshPanel";
-import { UsageCostPanel } from "./UsageCostPanel";
-import { PolicyControlPanel } from "./PolicyControlPanel";
 
 export type ProviderAccessMode =
   | "api_access"
@@ -16,8 +12,9 @@ export type ProviderAccessMode =
   | "custom_openai_compatible";
 
 export type ProviderSecretStatus = {
-  type: "env" | "gateway_virtual_key_ref" | "none";
+  type: "env" | "gateway_virtual_key_ref" | "stored_api_key" | "none";
   name?: string;
+  id?: string;
   valuePresent: boolean;
   source: string;
 } | null;
@@ -48,7 +45,7 @@ export type ProviderRow = {
     authMode: string | null;
     gatewayBackend: string | null;
     accessLabel: string | null;
-    secretRef: { type: string; name?: string } | null;
+    secretRef: { type: string; name?: string; id?: string } | null;
     secretStatus: ProviderSecretStatus;
     baseURL: string | null;
     routingPolicyId: string | null;
@@ -98,7 +95,7 @@ export type ProvidersResponse = {
   authMode: string | null;
   gatewayBackend: string | null;
   accessLabel: string | null;
-  secretRef: { type: string; name?: string } | null;
+  secretRef: { type: string; name?: string; id?: string } | null;
   secretStatus: ProviderSecretStatus;
   baseURL: string | null;
   routingPolicyId: string | null;
@@ -119,7 +116,7 @@ export type RoutingPolicyRow = {
         executionKind?: string;
         model: string;
         authMode?: string;
-        secretRef?: { type: string; name?: string };
+        secretRef?: { type: string; name?: string; id?: string };
         gatewayBackend?: string;
         baseURL?: string;
       };
@@ -176,7 +173,8 @@ export type UsageSummary = {
 };
 
 export type ProviderDraft = {
-  configMode: "env_key" | "gateway_virtual_key_ref" | "local_cli_session" | "none_local";
+  configMode: "api_key" | "env_key" | "gateway_virtual_key_ref" | "local_cli_session" | "none_local";
+  apiKey: string;
   envVarName: string;
   gatewayRefName: string;
   baseURL: string;
@@ -190,28 +188,18 @@ export type ProviderActionState = {
   message: string | null;
 };
 
-const emptyUsage: UsageResponse = {
-  available: false,
-  summary: {
-    request_count: 0,
-    succeeded_count: 0,
-    failed_count: 0,
-    input_tokens: 0,
-    output_tokens: 0,
-    actual_cost_usd: 0,
-    estimated_cost_usd: 0,
-  },
-  byProvider: [],
-  costLabels: {
-    actual_cost_usd: "provider_or_gateway_reported_actual_cost",
-    estimated_cost_usd: "locally_estimated_cost",
-  },
-};
-
-const emptyPolicies: RoutingPoliciesResponse = {
-  policies: [],
-  supportedModes: ["manual", "fallback_chain", "local_first", "budget_guarded_manual"],
-  unsupportedModes: ["cheapest_compatible", "quality_first", "semantic_router"],
+export type ProviderAuthSession = {
+  providerRegistryId: "openai_codex";
+  method: "chatgpt" | "chatgpt_device_code";
+  status: "authorization_required" | "pending" | "ready" | "cancelled" | "failed";
+  flowId: string;
+  loginId: string;
+  authUrl?: string;
+  verificationUrl?: string;
+  userCode?: string;
+  startedAt: string;
+  expiresAt: string;
+  message: string;
 };
 
 function fallbackEnvName(provider: ProviderRow | null): string {
@@ -223,6 +211,7 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
   if (!provider) {
     return {
       configMode: "env_key",
+      apiKey: "",
       envVarName: "PROVIDER_ENV_VAR",
       gatewayRefName: "BIFROST_VIRTUAL_KEY",
       baseURL: "",
@@ -241,7 +230,7 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
     : provider.accessModes.includes("local_runtime")
       ? "none_local"
       : provider.accessModes.includes("api_access") || provider.accessModes.includes("custom_openai_compatible")
-        ? "env_key"
+        ? "api_key"
         : provider.accessModes.includes("gateway_virtual_key")
           ? "gateway_virtual_key_ref"
           : "env_key";
@@ -254,7 +243,14 @@ function draftForProvider(provider: ProviderRow | null): ProviderDraft {
           ? provider.accessModes.includes("local_tool_session")
             ? "local_cli_session"
             : "none_local"
+          : configuredSecret?.type === "env"
+            ? provider.accessModes.includes("api_access") || provider.accessModes.includes("custom_openai_compatible")
+              ? "api_key"
+              : "env_key"
+            : configuredSecret?.type === "stored_api_key"
+              ? "api_key"
           : defaultMode,
+    apiKey: "",
     envVarName: configuredSecret?.type === "env" && configuredSecret.name ? configuredSecret.name : fallbackEnvName(provider),
     gatewayRefName:
       configuredSecret?.type === "gateway_virtual_key_ref" && configuredSecret.name
@@ -284,6 +280,15 @@ function actionMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type ProviderStatusResult = {
+  status?: string;
+  message?: string;
+};
+
 export function buildPolicySimulationBody(payload: unknown) {
   if (!payload || typeof payload !== "object") return payload;
   const { estimatedCostUsd, operation, requirePricing, ...policy } = payload as {
@@ -300,134 +305,16 @@ function canRefreshProviderWithDraft(provider: ProviderRow | null, draft: Provid
   const requiresEndpoint = provider.modelStatus.refresh.requiresEndpoint;
   const hasConfiguredEndpoint = provider.configStatus.configured;
   const hasDraftEndpoint = draft.baseURL.trim().length > 0;
-  return !requiresEndpoint || hasConfiguredEndpoint || hasDraftEndpoint;
-}
-
-function accessModeLabel(mode: string): string {
-  const labels: Record<string, string> = {
-    api_access: "API access",
-    local_tool_session: "Local tool/session access",
-    local_runtime: "Local runtime",
-    gateway_virtual_key: "Gateway reference access",
-    cloud_project: "Cloud/project scoped",
-    custom_openai_compatible: "Custom OpenAI-compatible endpoint",
-  };
-  return labels[mode] ?? mode.replace(/_/g, " ");
-}
-
-function executionBoundary(provider: ProviderRow): string {
-  if (provider.accessModes.includes("local_tool_session")) return "Local tool/session status; no credential files copied";
-  if (provider.accessModes.includes("local_runtime")) return "Local runtime endpoint; no provider secret required";
-  if (provider.executableProviderId) return `Direct executable provider: ${provider.executableProviderId}`;
-  if (provider.gatewayProfile?.kind === "openai_compatible") return "Registry row via shared OpenAI-compatible adapter";
-  if (provider.accessModes.includes("cloud_project")) return "Cloud/project metadata row; project setup stays gated";
-  if (provider.status === "planned_source_review") return "Source-review row; live calls blocked";
-  return "Registry metadata row; not a direct executable ProviderID";
-}
-
-function setupState(provider: ProviderRow): string {
-  if (provider.status === "planned_source_review") return "Source review required before setup";
-  if (provider.configStatus.configured) return "Configured with safe references";
-  if (provider.accessModes.includes("local_tool_session")) return "Uses local tool/session auth";
-  if (provider.accessModes.includes("local_runtime")) return "Requires local runtime availability";
-  if (provider.accessModes.includes("cloud_project")) return "Requires project/resource context";
-  return "Ready for reference-only configuration";
-}
-
-function modelState(provider: ProviderRow): string {
-  if (provider.modelStatus.stale) return "Stale, fallback, or reference metadata";
-  if (provider.modelStatus.authoritative) return "Authoritative model source";
-  return "Source-backed or cached model labels";
-}
-
-function safeNextAction(provider: ProviderRow, refreshReady: boolean): string {
-  if (provider.status === "planned_source_review") return "Review provider evidence before live calls";
-  if (!provider.configStatus.configured) return "Configure a safe reference or local endpoint";
-  if (refreshReady) return "Refresh models or run a safe status test";
-  if (provider.configStatus.routingPolicyId) return "Review local routing and usage state";
-  return "Add or activate a local routing policy if needed";
-}
-
-function SelectedProviderContext({
-  provider,
-  refreshReady,
-}: {
-  provider: ProviderRow | null;
-  refreshReady: boolean;
-}) {
-  if (!provider) {
-    return (
-      <section className="border border-sm-border bg-sm-surface p-4">
-        <p className="text-[9px] tracking-widest text-sm-secondary font-label">[ SELECTED PROVIDER ]</p>
-        <p className="mt-2 text-sm text-sm-disabled">Provider catalog status is loading.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="border border-sm-border bg-sm-surface p-4">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="mb-1 text-[9px] tracking-widest text-sm-secondary font-label">[ SELECTED PROVIDER ]</p>
-          <h3 className="text-lg font-bold text-sm-display">{provider.name}</h3>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-sm-secondary">{provider.evidenceNote}</p>
-        </div>
-        <p className="border border-sm-border px-2 py-1 text-[9px] tracking-widest text-sm-secondary font-label">
-          [ {provider.status.replace(/_/g, " ").toUpperCase()} ]
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ ACCESS TYPE ]</p>
-          <p className="text-sm leading-snug text-sm-primary">
-            {provider.accessModes.map(accessModeLabel).join(" / ")}
-          </p>
-        </div>
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ EXECUTION BOUNDARY ]</p>
-          <p className="text-sm leading-snug text-sm-primary">{executionBoundary(provider)}</p>
-        </div>
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ SETUP STATE ]</p>
-          <p className="text-sm leading-snug text-sm-primary">{setupState(provider)}</p>
-        </div>
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ SAFE NEXT ACTION ]</p>
-          <p className="text-sm leading-snug text-sm-primary">{safeNextAction(provider, refreshReady)}</p>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ MODEL SOURCE ]</p>
-          <p className="text-sm leading-snug text-sm-primary">{modelState(provider)}</p>
-        </div>
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ REGISTRY ROW ]</p>
-          <p className="text-sm leading-snug text-sm-primary">{provider.id}</p>
-        </div>
-        <div className="border border-sm-border-subtle px-3 py-2">
-          <p className="mb-1 text-[9px] tracking-widest text-sm-disabled font-label">[ EXECUTABLE PROVIDER ID ]</p>
-          <p className="text-sm leading-snug text-sm-primary">{provider.executableProviderId ?? "not direct"}</p>
-        </div>
-      </div>
-    </section>
-  );
+  const hasDefaultEndpoint = Boolean(provider.gatewayProfile?.defaultBaseUrl);
+  return !requiresEndpoint || hasConfiguredEndpoint || hasDraftEndpoint || hasDefaultEndpoint;
 }
 
 export function ProviderCenter({
   initialData = null,
-  initialUsage = null,
-  initialPolicies = null,
 }: {
   initialData?: ProvidersResponse | null;
-  initialUsage?: UsageResponse | null;
-  initialPolicies?: RoutingPoliciesResponse | null;
 }) {
   const [data, setData] = useState<ProvidersResponse | null>(initialData);
-  const [usage, setUsage] = useState<UsageResponse | null>(initialUsage);
-  const [policies, setPolicies] = useState<RoutingPoliciesResponse>(initialPolicies ?? emptyPolicies);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
     initialData?.activeProviderRegistryId ?? initialData?.providers[0]?.id ?? ""
   );
@@ -437,10 +324,10 @@ export function ProviderCenter({
   const [loadState, setLoadState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [configureState, setConfigureState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [refreshState, setRefreshState] = useState<ProviderActionState>({ status: "idle", message: null });
-  const [pricingState, setPricingState] = useState<ProviderActionState>({ status: "idle", message: null });
   const [testState, setTestState] = useState<ProviderActionState>({ status: "idle", message: null });
-  const [policyState, setPolicyState] = useState<ProviderActionState>({ status: "idle", message: null });
-  const [policySimulation, setPolicySimulation] = useState<RoutingSimulationResult | null>(null);
+  const [authSession, setAuthSession] = useState<ProviderAuthSession | null>(null);
+  const [configuredAuthFlowId, setConfiguredAuthFlowId] = useState<string | null>(null);
+  const configureProviderRef = useRef<() => Promise<boolean>>(async () => false);
 
   const selectedProvider = useMemo(
     () => data?.providers.find((provider) => provider.id === selectedProviderId) ?? null,
@@ -467,26 +354,6 @@ export function ProviderCenter({
         status: "error",
         message: error instanceof Error ? error.message : "Provider status failed",
       });
-    }
-  };
-
-  const loadUsage = async () => {
-    try {
-      const response = await fetch("/api/providers/usage");
-      const payload = (await response.json()) as UsageResponse;
-      setUsage(response.ok ? payload : emptyUsage);
-    } catch {
-      setUsage(emptyUsage);
-    }
-  };
-
-  const loadPolicies = async () => {
-    try {
-      const response = await fetch("/api/providers/policies");
-      const payload = (await response.json()) as RoutingPoliciesResponse;
-      if (response.ok) setPolicies(payload);
-    } catch {
-      setPolicies(emptyPolicies);
     }
   };
 
@@ -518,69 +385,35 @@ export function ProviderCenter({
     };
   }, [initialData]);
 
-  useEffect(() => {
-    if (initialUsage) return;
-    let cancelled = false;
-    async function loadInitialUsage() {
-      try {
-        const response = await fetch("/api/providers/usage");
-        const payload = (await response.json()) as UsageResponse;
-        if (!cancelled) setUsage(response.ok ? payload : emptyUsage);
-      } catch {
-        if (!cancelled) setUsage(emptyUsage);
-      }
-    }
-    void loadInitialUsage();
-    return () => {
-      cancelled = true;
-    };
-  }, [initialUsage]);
-
-  useEffect(() => {
-    if (initialPolicies) return;
-    let cancelled = false;
-    async function loadInitialPolicies() {
-      try {
-        const response = await fetch("/api/providers/policies");
-        const payload = (await response.json()) as RoutingPoliciesResponse;
-        if (!cancelled && response.ok) setPolicies(payload);
-      } catch {
-        if (!cancelled) setPolicies(emptyPolicies);
-      }
-    }
-    void loadInitialPolicies();
-    return () => {
-      cancelled = true;
-    };
-  }, [initialPolicies]);
-
   const handleSelectProvider = (provider: ProviderRow) => {
     setSelectedProviderId(provider.id);
     setDraft(draftForProvider(provider));
     setConfigureState({ status: "idle", message: null });
     setRefreshState({ status: "idle", message: null });
-    setPricingState({ status: "idle", message: null });
     setTestState({ status: "idle", message: null });
-    setPolicyState({ status: "idle", message: null });
-    setPolicySimulation(null);
+    setAuthSession(null);
+    setConfiguredAuthFlowId(null);
   };
 
-  const configureProvider = async () => {
-    if (!selectedProvider) return;
-    setConfigureState({ status: "running", message: "Saving secret-reference configuration" });
+  const configureProvider = async (): Promise<boolean> => {
+    if (!selectedProvider) return false;
+    setConfigureState({ status: "running", message: "Saving provider credential configuration" });
 
     const secretRef =
       draft.configMode === "gateway_virtual_key_ref"
         ? { type: "gateway_virtual_key_ref", name: draft.gatewayRefName }
         : draft.configMode === "env_key"
           ? { type: "env", name: draft.envVarName }
-          : { type: "none" };
+          : draft.configMode === "api_key"
+            ? undefined
+            : { type: "none" };
 
     const payload = {
       providerRegistryId: selectedProvider.id,
       ...(selectedProvider.executableProviderId ? { provider: selectedProvider.executableProviderId } : {}),
       configMode: draft.configMode,
-      secretRef,
+      ...(secretRef ? { secretRef } : {}),
+      ...(draft.configMode === "api_key" && draft.apiKey ? { apiKey: draft.apiKey } : {}),
       gatewayBackend: draft.configMode === "gateway_virtual_key_ref" ? "bifrost_local" : "direct",
       ...(draft.baseURL ? { baseURL: draft.baseURL } : {}),
       ...(draft.model ? { model: draft.model } : {}),
@@ -601,11 +434,193 @@ export function ProviderCenter({
         message: result.persisted ? "Executable provider config saved" : "Registry metadata accepted",
       });
       await loadProviders();
-      await loadUsage();
+      return true;
     } catch (error) {
       setConfigureState({
         status: "error",
         message: error instanceof Error ? error.message : "Provider configuration failed",
+      });
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    configureProviderRef.current = configureProvider;
+  });
+
+  const fetchProviderStatus = async (providerRegistryId: string): Promise<ProviderStatusResult> => {
+    const response = await fetch("/api/providers/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ providerRegistryId }),
+    });
+    const result = (await response.json()) as ProviderStatusResult;
+    if (!response.ok) throw new Error(actionMessage(result, "Provider status test failed"));
+    return result;
+  };
+
+  useEffect(() => {
+    if (!authSession) return;
+    if (authSession.providerRegistryId !== "openai_codex") return;
+    if (!["authorization_required", "pending"].includes(authSession.status)) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/providers/auth/${authSession.flowId}/status`);
+        const result = (await response.json()) as { session?: ProviderAuthSession; message?: string; error?: string };
+        if (cancelled) return;
+        if (!response.ok || !result.session) {
+          throw new Error(actionMessage(result, "Codex authorization status failed"));
+        }
+        setAuthSession(result.session);
+        if (result.session.status === "ready" && configuredAuthFlowId !== result.session.flowId) {
+          setConfiguredAuthFlowId(result.session.flowId);
+          setTestState({ status: "success", message: "OpenAI Codex auth ready" });
+          void configureProviderRef.current();
+        }
+        if (result.session.status === "failed" || result.session.status === "cancelled") {
+          setConfigureState({ status: "error", message: result.session.message });
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setConfigureState({
+          status: "error",
+          message: error instanceof Error ? error.message : "Codex authorization status failed",
+        });
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 2_000);
+    void poll();
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [authSession, configuredAuthFlowId]);
+
+  const startCodexAuth = async (): Promise<boolean> => {
+    setConfigureState({ status: "running", message: "Starting OpenAI Codex authorization" });
+    setTestState({ status: "idle", message: null });
+    setAuthSession(null);
+    setConfiguredAuthFlowId(null);
+
+    try {
+      const response = await fetch("/api/providers/auth/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerRegistryId: "openai_codex",
+          method: "chatgpt_device_code",
+        }),
+      });
+      const result = (await response.json()) as { session?: ProviderAuthSession; message?: string; error?: string };
+      if (!response.ok || !result.session) throw new Error(actionMessage(result, "OpenAI Codex authorization failed"));
+      setAuthSession(result.session);
+      setConfigureState({
+        status: "running",
+        message: "Open the authorization page and enter the displayed code.",
+      });
+      return true;
+    } catch (error) {
+      setConfigureState({
+        status: "error",
+        message: error instanceof Error ? error.message : "OpenAI Codex authorization failed",
+      });
+      return false;
+    }
+  };
+
+  const cancelCodexAuth = async () => {
+    if (!authSession) return;
+    try {
+      const response = await fetch(`/api/providers/auth/${authSession.flowId}/cancel`, {
+        method: "POST",
+      });
+      const result = (await response.json()) as { session?: ProviderAuthSession };
+      if (response.ok && result.session) setAuthSession(result.session);
+    } finally {
+      setConfigureState({ status: "idle", message: null });
+    }
+  };
+
+  const connectLocalAuth = async (): Promise<boolean> => {
+    if (!selectedProvider) return false;
+    if (selectedProvider.id === "openai_codex") {
+      return startCodexAuth();
+    }
+
+    setConfigureState({ status: "running", message: "Opening local auth flow" });
+    setTestState({ status: "idle", message: null });
+
+    try {
+      const response = await fetch("/api/providers/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerRegistryId: selectedProvider.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Local auth connection failed"));
+
+      if (result.status === "ready") {
+        setTestState({ status: "success", message: "Local auth ready" });
+        return await configureProvider();
+      }
+
+      setConfigureState({
+        status: "running",
+        message: actionMessage(result, "Complete the local CLI auth flow"),
+      });
+
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline) {
+        await sleep(2_000);
+        const status = await fetchProviderStatus(selectedProvider.id);
+        if (status.status === "ready") {
+          setTestState({ status: "success", message: "Local auth ready" });
+          return await configureProvider();
+        }
+        if (status.status === "missing_local_cli") {
+          throw new Error(actionMessage(status, "Local CLI is not installed or unavailable"));
+        }
+      }
+
+      setConfigureState({
+        status: "error",
+        message: "Local auth flow opened. Finish sign-in, then click Connect again.",
+      });
+      return false;
+    } catch (error) {
+      setConfigureState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Local auth connection failed",
+      });
+      return false;
+    }
+  };
+
+  const deleteCredential = async () => {
+    if (!selectedProvider) return;
+    setConfigureState({ status: "running", message: "Deleting stored credential" });
+    try {
+      const response = await fetch("/api/providers/configure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerRegistryId: selectedProvider.id,
+          action: "delete_credential",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(actionMessage(result, "Credential delete failed"));
+      setConfigureState({ status: "success", message: "Stored credential deleted" });
+      await loadProviders();
+    } catch (error) {
+      setConfigureState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Credential delete failed",
       });
     }
   };
@@ -643,226 +658,51 @@ export function ProviderCenter({
     }
   };
 
-  const refreshPricing = async () => {
-    if (!selectedProvider) return;
-    setPricingState({ status: "running", message: "Refreshing pricing snapshots" });
-    try {
-      const response = await fetch("/api/providers/pricing/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          providerRegistryId: selectedProvider.id,
-          source: "portkey_models",
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(actionMessage(result, "Pricing refresh failed"));
-      if (result.refreshed === false) {
-        setPricingState({
-          status: "error",
-          message: actionMessage(result, "No pricing snapshots refreshed"),
-        });
-        return;
-      }
-      setPricingState({
-        status: "success",
-        message: `${result.snapshotCount ?? 0} pricing snapshots from ${result.source ?? "source"}`,
-      });
-      await loadUsage();
-    } catch (error) {
-      setPricingState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Pricing refresh failed",
-      });
-    }
-  };
-
-  const testProvider = async () => {
-    if (!selectedProvider) return;
-    setTestState({ status: "running", message: "Testing provider status" });
-    try {
-      const response = await fetch("/api/providers/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ providerRegistryId: selectedProvider.id }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(actionMessage(result, "Provider status test failed"));
-      setTestState({ status: "success", message: `Status: ${result.status}` });
-    } catch (error) {
-      setTestState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Provider status test failed",
-      });
-    }
-  };
-
-  const savePolicy = async (payload: unknown) => {
-    setPolicyState({ status: "running", message: "Saving routing policy" });
-    try {
-      const response = await fetch("/api/providers/policies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(actionMessage(result, "Routing policy save failed"));
-      setPolicyState({ status: "success", message: `Saved ${result.policy?.id ?? "policy"}` });
-      await loadPolicies();
-      await loadUsage();
-    } catch (error) {
-      setPolicyState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Routing policy save failed",
-      });
-    }
-  };
-
-  const activatePolicy = async (id: string) => {
-    setPolicyState({ status: "running", message: "Activating routing policy" });
-    try {
-      const response = await fetch("/api/providers/policies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "activate", id }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(actionMessage(result, "Routing policy activation failed"));
-      setPolicyState({ status: "success", message: `Activated ${result.routingPolicyId ?? id}` });
-      setDraft({ ...draft, routingPolicyId: result.routingPolicyId ?? id });
-      await loadProviders();
-      await loadUsage();
-    } catch (error) {
-      setPolicyState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Routing policy activation failed",
-      });
-    }
-  };
-
-  const togglePolicy = async (id: string, enabled: boolean) => {
-    setPolicyState({ status: "running", message: enabled ? "Enabling routing policy" : "Disabling routing policy" });
-    try {
-      const response = await fetch("/api/providers/policies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: enabled ? "enable" : "disable", id }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(actionMessage(result, "Routing policy status change failed"));
-      setPolicyState({ status: "success", message: `${enabled ? "Enabled" : "Disabled"} ${result.policy?.id ?? id}` });
-      await loadPolicies();
-      await loadUsage();
-    } catch (error) {
-      setPolicyState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Routing policy status change failed",
-      });
-    }
-  };
-
-  const simulatePolicy = async (payload: unknown) => {
-    const body = buildPolicySimulationBody(payload);
-    setPolicyState({ status: "running", message: "Simulating routing policy" });
-    try {
-      const response = await fetch("/api/providers/policies/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(actionMessage(result, "Routing policy simulation failed"));
-      setPolicySimulation(result as RoutingSimulationResult);
-      const blockers = Array.isArray(result.eligibility)
-        ? result.eligibility.flatMap((item: { blockerCodes?: string[] }) => item.blockerCodes ?? [])
-        : [];
-      const outcome = result.blocked
-        ? `blocked${blockers.length > 0 ? `: ${blockers.slice(0, 3).join(", ")}` : ""}`
-        : `selected ${result.selected?.modelId ?? "candidate"}`;
-      setPolicyState({ status: "success", message: `Simulation ${outcome}` });
-    } catch (error) {
-      setPolicyState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Routing policy simulation failed",
-      });
-    }
-  };
-
-  const statusLine = data?.configured
-    ? `Configured: ${data.activeProviderRegistryId ?? data.activeProvider} / ${data.activeModel ?? "model pending"}`
-    : "No active provider configuration";
-
   return (
     <section className="min-w-0 space-y-5">
       <div>
-        <p className="mb-2 text-[9px] tracking-widest text-sm-secondary font-label">[ PROVIDER CENTER ]</p>
-        <h2 className="mb-2 text-xl font-bold text-sm-display">Provider Center</h2>
-        <p className="max-w-2xl text-sm leading-relaxed text-sm-secondary">
-          Configure provider access with references, inspect local and gateway status, refresh model labels, and track
-          usage costs without storing raw provider secrets in the browser.
+        <p className="mb-2 text-[9px] tracking-widest text-sm-secondary font-label">[ LLM SETUP ]</p>
+        <h2 className="mb-2 text-2xl font-bold text-sm-display">Provider Center</h2>
+        <p className="max-w-4xl text-sm leading-relaxed text-sm-secondary">
+          Pick an LLM provider. Enter an API key or connect supported auth. Retrieve current models, choose one, then create a skill.
         </p>
       </div>
 
-      <div className="border border-sm-border bg-sm-surface px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[10px] tracking-widest text-sm-display font-label">[ {statusLine.toUpperCase()} ]</p>
-          <p className="text-[9px] tracking-widest text-sm-secondary font-label">
-            [ ACTIVE MODEL: {(data?.activeModel ?? "NONE").toUpperCase()} ]
-          </p>
-        </div>
-        {loadState.message && (
-          <p className={`mt-2 text-[9px] tracking-widest font-label ${loadState.status === "error" ? "text-sm-accent" : "text-sm-secondary"}`}>
-            [ {loadState.message.toUpperCase()} ]
-          </p>
-        )}
-      </div>
+      <label className="block border border-sm-border bg-sm-surface p-4">
+        <span className="mb-1 block text-[9px] tracking-widest text-sm-secondary font-label">[ LLM PROVIDER ]</span>
+        <span className="block border-b border-sm-border focus-within:border-sm-display">
+          <select
+            value={selectedProviderId}
+            onChange={(event) => {
+              const next = data?.providers.find((provider) => provider.id === event.target.value);
+              if (next) handleSelectProvider(next);
+            }}
+            className="w-full bg-transparent py-2 text-base font-semibold text-sm-display outline-none"
+          >
+            {(data?.providers ?? []).map((provider) => (
+              <option key={provider.id} value={provider.id}>
+                {provider.name}
+              </option>
+            ))}
+          </select>
+        </span>
+      </label>
 
-      <SelectedProviderContext provider={selectedProvider} refreshReady={canRefreshSelectedProvider} />
-
-      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
-        <ProviderCatalogList
-          providers={data?.providers ?? []}
-          selectedProviderId={selectedProviderId}
-          onSelectProvider={handleSelectProvider}
-        />
-
-        <div className="min-w-0 space-y-5">
-          <ProviderConfigPanel
-            provider={selectedProvider}
-            draft={draft}
-            actionState={configureState}
-            onDraftChange={setDraft}
-            onSave={configureProvider}
-          />
-          <ModelRefreshPanel
-            provider={selectedProvider}
-            refreshState={refreshState}
-            testState={testState}
-            refreshReady={canRefreshSelectedProvider}
-            onRefresh={refreshModels}
-            onTest={testProvider}
-          />
-          <PolicyControlPanel
-            provider={selectedProvider}
-            providerDraft={draft}
-            policies={policies.policies}
-            supportedModes={policies.supportedModes}
-            activeRoutingPolicyId={data?.routingPolicyId ?? selectedProvider?.configStatus.routingPolicyId ?? null}
-            actionState={policyState}
-            onSavePolicy={savePolicy}
-            onActivatePolicy={activatePolicy}
-            onTogglePolicy={togglePolicy}
-            onSimulatePolicy={simulatePolicy}
-            simulationResult={policySimulation}
-          />
-          <UsageCostPanel
-            usage={usage ?? emptyUsage}
-            activeProviderId={selectedProvider?.id ?? null}
-            pricingState={pricingState}
-            onRefreshPricing={refreshPricing}
-          />
-        </div>
-      </div>
+      <ProviderConfigPanel
+        provider={selectedProvider}
+        draft={draft}
+        actionState={configureState}
+        refreshState={refreshState}
+        testState={testState}
+        onDraftChange={setDraft}
+        onSave={configureProvider}
+        onConnectLocalAuth={connectLocalAuth}
+        authSession={selectedProvider?.id === "openai_codex" ? authSession : null}
+        onCancelAuth={cancelCodexAuth}
+        onDeleteCredential={deleteCredential}
+        onRefresh={refreshModels}
+      />
+      <div hidden>{loadState.message}</div>
     </section>
   );
 }

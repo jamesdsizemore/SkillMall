@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { writeProviderConfig } from '@/lib/providers/config-store'
 import {
+  deleteStoredApiKey,
+  storedApiKeySecretId,
+  storedSecretValuePresentSync,
+  writeStoredApiKey,
+} from '@/lib/providers/secret-store'
+import { checkLocalCliAuthStatus } from '@/lib/providers/local-cli-auth'
+import {
   assertRouterAuthMode,
   assertRouterGatewayBackend,
   sanitizeSecretRef,
@@ -21,6 +28,7 @@ import type { ProviderID, ProviderRegistryID } from '@/lib/providers/types'
 
 const executableProviders = new Set<ProviderID>([
   'openai',
+  'codex',
   'anthropic',
   'claude-code',
   'gemini',
@@ -31,7 +39,6 @@ const executableProviders = new Set<ProviderID>([
 const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegistryID, ...ProviderRegistryID[]]
 
 const forbiddenSecretFieldNames = new Set([
-  'apiKey',
   'rawKey',
   'key',
   'token',
@@ -50,18 +57,21 @@ const forbiddenSecretFieldNames = new Set([
 ])
 
 const ConfigureBodySchema = z.object({
+  action: z.enum(['delete_credential']).optional(),
   providerRegistryId: z.enum(registryIds).optional(),
   provider: z.string().optional(),
   model: z.string().min(1).optional(),
   manualModels: z.array(z.string().min(1)).optional(),
   configMode: z
-    .enum(['env_key', 'gateway_virtual_key_ref', 'local_cli_session', 'none_local'])
+    .enum(['api_key', 'env_key', 'gateway_virtual_key_ref', 'local_cli_session', 'none_local'])
     .optional(),
+  apiKey: z.string().min(1).optional(),
   authMode: z.enum(['env_key', 'local_cli_session', 'none_local', 'gateway_virtual_key']).optional(),
   secretRef: z
     .discriminatedUnion('type', [
       z.object({ type: z.literal('env'), name: z.string().min(1) }),
       z.object({ type: z.literal('gateway_virtual_key_ref'), name: z.string().min(1) }),
+      z.object({ type: z.literal('stored_api_key'), id: z.string().min(1) }),
       z.object({ type: z.literal('none') }),
     ])
     .optional(),
@@ -81,11 +91,16 @@ function rejectedRawSecretFields(value: unknown, prefix = ''): string[] {
   return Object.entries(value).flatMap(([key, nestedValue]) => {
     const path = prefix ? `${prefix}.${key}` : key
     const nested = rejectedRawSecretFields(nestedValue, path)
+    if (key === 'apiKey') {
+      const allowedTopLevelApiKey = path === 'apiKey' && (value as { configMode?: unknown })?.configMode === 'api_key'
+      return allowedTopLevelApiKey ? nested : [path, ...nested]
+    }
     return forbiddenSecretFieldNames.has(key) ? [path, ...nested] : nested
   })
 }
 
 function authModeFromInput(configMode: string | undefined, authMode: string | undefined): LLMAuthMode | undefined {
+  if (configMode === 'api_key') return 'env_key'
   if (configMode === 'gateway_virtual_key_ref') return 'gateway_virtual_key'
   if (configMode === 'env_key' || configMode === 'local_cli_session' || configMode === 'none_local') {
     return configMode
@@ -103,11 +118,49 @@ function sanitizeSecretStatus(secretRef: SecretRef | undefined | null) {
     }
   }
 
+  if (secretRef.type === 'stored_api_key') {
+    return {
+      type: 'stored_api_key',
+      id: secretRef.id,
+      valuePresent: awaitStoredSecretStatus(secretRef.id),
+      source: 'encrypted_local_store',
+    }
+  }
+
   return {
     type: secretRef.type,
     name: secretRef.name,
     valuePresent: Boolean(process.env[secretRef.name]),
     source: 'reference_only',
+  }
+}
+
+function awaitStoredSecretStatus(id: string): boolean {
+  try {
+    return storedSecretValuePresentSync(id)
+  } catch {
+    return false
+  }
+}
+
+type PendingStoredApiKey = { id: string; value?: string; hadExisting: boolean }
+
+async function writeProviderConfigWithPendingSecret(
+  input: Parameters<typeof writeProviderConfig>[0],
+  pendingStoredApiKey: PendingStoredApiKey | null,
+) {
+  if (!pendingStoredApiKey?.value) {
+    return writeProviderConfig(input)
+  }
+
+  await writeStoredApiKey(pendingStoredApiKey.id, pendingStoredApiKey.value)
+  try {
+    return await writeProviderConfig(input)
+  } catch (error) {
+    if (!pendingStoredApiKey.hadExisting) {
+      await deleteStoredApiKey(pendingStoredApiKey.id).catch(() => undefined)
+    }
+    throw error
   }
 }
 
@@ -130,7 +183,7 @@ export async function POST(req: NextRequest) {
       {
         error: 'raw_secret_field_rejected',
         rejectedFields,
-        message: 'Configure with secret references only; raw keys, browser/session tokens, and credential file paths are not accepted.',
+        message: 'Configure credentials only through approved app-managed fields; browser/session tokens and credential file paths are not accepted.',
       },
       { status: 400 }
     )
@@ -158,13 +211,64 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    if (parsed.data.action === 'delete_credential') {
+      const secretId = storedApiKeySecretId(registryEntry.id)
+      await deleteStoredApiKey(secretId)
+      return NextResponse.json({
+        success: true,
+        credentialDeleted: true,
+        providerRegistryId: registryEntry.id,
+        secretRef: { type: 'stored_api_key', id: secretId },
+        secretStatus: {
+          type: 'stored_api_key',
+          id: secretId,
+          valuePresent: false,
+          source: 'encrypted_local_store',
+        },
+      })
+    }
+
     const authMode = authModeFromInput(parsed.data.configMode, parsed.data.authMode)
     const gatewayBackend = assertRouterGatewayBackend(parsed.data.gatewayBackend)
     if (gatewayBackend === 'bifrost_local') assertLocalBifrostBaseURL(parsed.data.baseURL)
-    const secretRef = parsed.data.secretRef ? sanitizeSecretRef(parsed.data.secretRef) : undefined
+    let secretRef = parsed.data.secretRef ? sanitizeSecretRef(parsed.data.secretRef) : undefined
+    let pendingStoredApiKey: PendingStoredApiKey | null = null
+    if (parsed.data.configMode === 'api_key') {
+      const secretId = storedApiKeySecretId(registryEntry.id)
+      const hadExisting = storedSecretValuePresentSync(secretId)
+      if (!parsed.data.apiKey && !hadExisting) {
+        return NextResponse.json(
+          {
+            error: 'invalid_provider_config',
+            message: 'API key setup requires an API key before this provider can be saved.',
+          },
+          { status: 400 }
+        )
+      }
+      pendingStoredApiKey = { id: secretId, value: parsed.data.apiKey, hadExisting }
+      secretRef = { type: 'stored_api_key', id: secretId }
+    }
     if (authMode) {
       assertAuthModeAllowedForProvider(registryEntry, authMode)
       validateSecretRefForAuthMode(authMode, secretRef)
+    }
+
+    if (authMode === 'local_cli_session') {
+      const localCliAuth = await checkLocalCliAuthStatus(registryEntry.id)
+      if (!localCliAuth.available || !localCliAuth.authenticated) {
+        return NextResponse.json(
+          {
+            error: localCliAuth.available ? 'missing_local_auth' : 'missing_local_cli',
+            message: localCliAuth.message,
+            localCliAuth: {
+              available: localCliAuth.available,
+              authenticated: localCliAuth.authenticated,
+              authMethod: localCliAuth.authMethod ?? null,
+            },
+          },
+          { status: 400 }
+        )
+      }
     }
 
     if (parsed.data.provider && !provider) {
@@ -203,7 +307,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: 'invalid_provider_config',
-          message: 'OpenAI-compatible registry execution requires an env secret reference for this provider row.',
+          message: 'OpenAI-compatible registry execution requires a stored API key or env secret reference for this provider row.',
         },
         { status: 400 }
       )
@@ -212,7 +316,7 @@ export async function POST(req: NextRequest) {
     if (canPersistRegistryTarget && openAICompatibleExecutionProvider) {
       const resolvedAuthMode = authMode ?? 'env_key'
       assertAuthModeAllowedForProvider(registryEntry, resolvedAuthMode)
-      const saved = await writeProviderConfig({
+      const saved = await writeProviderConfigWithPendingSecret({
         provider: openAICompatibleExecutionProvider,
         providerRegistryId: registryEntry.id,
         executionKind: registryEntry.id === providerRegistryIdForExecutableProvider(openAICompatibleExecutionProvider)
@@ -224,7 +328,7 @@ export async function POST(req: NextRequest) {
         gatewayBackend,
         baseURL: resolvedBaseURL,
         routingPolicyId: parsed.data.routingPolicyId,
-      })
+      }, pendingStoredApiKey)
 
       return NextResponse.json({
         success: true,
@@ -245,17 +349,17 @@ export async function POST(req: NextRequest) {
     if (provider && registryEntry.executableProviderId === provider) {
       const resolvedAuthMode = authMode ?? defaultAuthModeForProvider(provider)
       assertAuthModeAllowedForProvider(registryEntry, resolvedAuthMode)
-      const saved = await writeProviderConfig({
+      const saved = await writeProviderConfigWithPendingSecret({
         provider,
         providerRegistryId: registryEntry.id,
         executionKind: gatewayBackend === 'bifrost_local' ? 'bifrost_local' : 'direct',
         model: parsed.data.model,
-        authMode,
+        authMode: resolvedAuthMode,
         secretRef,
         gatewayBackend,
         baseURL: parsed.data.baseURL,
         routingPolicyId: parsed.data.routingPolicyId,
-      })
+      }, pendingStoredApiKey)
 
       return NextResponse.json({
         success: true,

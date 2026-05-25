@@ -30,10 +30,10 @@ export function AuthButton({ session }: Props) {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <Link
         href="/dashboard"
-        className="text-[9px] tracking-widest text-sm-secondary hover:text-sm-primary transition-colors"
+        className="max-w-20 truncate text-[9px] tracking-widest text-sm-secondary transition-colors hover:text-sm-primary sm:max-w-32"
         style={{ fontFamily: "var(--font-space-mono, monospace)" }}
       >
         {session.github_login}
@@ -41,7 +41,7 @@ export function AuthButton({ session }: Props) {
       <button
         onClick={handleSignOut}
         disabled={signingOut}
-        className="text-[9px] tracking-widest text-sm-disabled hover:text-sm-primary transition-colors"
+        className="whitespace-nowrap text-[9px] tracking-widest text-sm-disabled transition-colors hover:text-sm-primary"
         style={{ fontFamily: "var(--font-space-mono, monospace)" }}
       >
         [ {signingOut ? "..." : "SIGN OUT"} ]

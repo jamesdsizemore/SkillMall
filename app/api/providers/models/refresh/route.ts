@@ -4,6 +4,7 @@ import { resolveRouterProviderConfig } from '@/lib/llm/router/config'
 import { refreshRegistryProviderModels } from '@/lib/llm/router/model-refresh'
 import { getProviderRegistryEntry, PROVIDER_REGISTRY, providerRegistryIdForExecutableProvider } from '@/lib/providers/registry'
 import { resolveEnvSecret } from '@/lib/llm/router/secret-refs'
+import { readStoredApiKeySync } from '@/lib/providers/secret-store'
 import type { ProviderRegistryID } from '@/lib/providers/types'
 
 const registryIds = PROVIDER_REGISTRY.map((entry) => entry.id) as [ProviderRegistryID, ...ProviderRegistryID[]]
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   let activeConfig: ReturnType<typeof resolveRouterProviderConfig> | null = null
   try {
-    activeConfig = resolveRouterProviderConfig()
+    activeConfig = resolveRouterProviderConfig({ preferStoredConfig: true })
   } catch {
     activeConfig = null
   }
@@ -52,7 +53,12 @@ export async function POST(req: NextRequest) {
     activeConfig && (activeConfig.providerRegistryId ?? providerRegistryIdForExecutableProvider(activeConfig.provider)) === entry.id
   )
   const secretRef = activeMatches && activeConfig ? activeConfig.secretRef : undefined
-  const apiKey = secretRef && 'name' in secretRef ? resolveEnvSecret(secretRef.name) : undefined
+  const apiKey =
+    secretRef?.type === 'env' || secretRef?.type === 'gateway_virtual_key_ref'
+      ? resolveEnvSecret(secretRef.name)
+      : secretRef?.type === 'stored_api_key'
+        ? readStoredApiKeySync(secretRef.id)
+        : undefined
   const baseUrl =
     parsed.data.baseURL ??
     (activeMatches && activeConfig ? activeConfig.baseURL : undefined) ??
@@ -103,8 +109,13 @@ export async function POST(req: NextRequest) {
         ? {
             type: secretRef.type,
             name: 'name' in secretRef ? secretRef.name : undefined,
+            id: 'id' in secretRef ? secretRef.id : undefined,
             valuePresent: secretRef.type === 'none' ? true : Boolean(apiKey),
-            source: secretRef.type === 'none' ? 'no_secret_required' : 'reference_only',
+            source: secretRef.type === 'none'
+              ? 'no_secret_required'
+              : secretRef.type === 'stored_api_key'
+                ? 'encrypted_local_store'
+                : 'reference_only',
           }
         : null,
     })

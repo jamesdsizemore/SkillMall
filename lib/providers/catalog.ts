@@ -31,6 +31,17 @@ export const FALLBACK_PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     tokenLabel: 'OpenAI API key',
   },
   {
+    id: 'codex',
+    name: 'OpenAI Codex Auth Token',
+    requiresApiKey: false,
+    authMode: 'cli',
+    defaultModel: DEFAULT_MODELS.codex,
+    availableModels: ['gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano'],
+    modelSource: 'fallback',
+    setupUrl: 'https://developers.openai.com/codex',
+    setupInstructions: 'Uses the locally authenticated Codex CLI session. This is separate from OpenAI API-key access.',
+  },
+  {
     id: 'anthropic',
     name: 'Claude API',
     requiresApiKey: true,
@@ -44,7 +55,7 @@ export const FALLBACK_PROVIDER_CATALOG: ProviderCatalogEntry[] = [
   },
   {
     id: 'claude-code',
-    name: 'Claude Code CLI',
+    name: 'Claude Code CLI Auth Token',
     requiresApiKey: false,
     authMode: 'cli',
     defaultModel: DEFAULT_MODELS['claude-code'],

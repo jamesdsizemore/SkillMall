@@ -23,7 +23,7 @@ export default async function SettingsLayout({
 
   return (
     <div className="bg-sm-bg min-h-screen">
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <p
           className="mb-1 text-[9px] tracking-widest text-sm-disabled"
           style={{ fontFamily: "var(--font-space-mono, monospace)" }}
@@ -32,9 +32,9 @@ export default async function SettingsLayout({
         </p>
         <h1 className="mb-8 text-2xl font-bold text-sm-display">Settings</h1>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:gap-8">
           {/* Sidebar nav */}
-          <nav className="w-full shrink-0 sm:w-40">
+          <nav className="w-full shrink-0 lg:w-36">
             <ul className="flex flex-wrap gap-1 sm:block sm:space-y-1">
               {NAV_ITEMS.map((item) => (
                 <li key={item.href}>

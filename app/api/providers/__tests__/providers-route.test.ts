@@ -7,6 +7,12 @@ import path from 'path'
 const mocks = vi.hoisted(() => ({
   writeProviderConfig: vi.fn(),
   getDb: vi.fn(),
+  checkLocalCliAuthStatus: vi.fn(),
+  startLocalCliAuthFlow: vi.fn(),
+  startCodexAppServerAuth: vi.fn(),
+  getCodexAppServerAuthStatus: vi.fn(),
+  refreshCodexAppServerAuthStatus: vi.fn(),
+  cancelCodexAppServerAuth: vi.fn(),
 }))
 
 vi.mock('@/lib/providers/config-store', () => ({
@@ -15,6 +21,18 @@ vi.mock('@/lib/providers/config-store', () => ({
 
 vi.mock('@/lib/db/client', () => ({
   getDb: mocks.getDb,
+}))
+
+vi.mock('@/lib/providers/local-cli-auth', () => ({
+  checkLocalCliAuthStatus: mocks.checkLocalCliAuthStatus,
+  startLocalCliAuthFlow: mocks.startLocalCliAuthFlow,
+}))
+
+vi.mock('@/lib/providers/codex-app-server-auth', () => ({
+  startCodexAppServerAuth: mocks.startCodexAppServerAuth,
+  getCodexAppServerAuthStatus: mocks.getCodexAppServerAuthStatus,
+  refreshCodexAppServerAuthStatus: mocks.refreshCodexAppServerAuthStatus,
+  cancelCodexAppServerAuth: mocks.cancelCodexAppServerAuth,
 }))
 
 function postRequest(url: string, body: unknown): Request {
@@ -37,6 +55,7 @@ const phase4MigrationSql = fs.readFileSync(
   'utf-8'
 )
 const tempDbs: Array<{ db: Database.Database; file: string }> = []
+const tempHomes: string[] = []
 
 function createProviderDb(): Database.Database {
   const file = path.join(os.tmpdir(), `skillmall-provider-route-${Date.now()}-${Math.random()}.db`)
@@ -56,19 +75,64 @@ describe('provider API routes', () => {
     vi.resetModules()
     mocks.writeProviderConfig.mockReset()
     mocks.getDb.mockReset()
+    mocks.checkLocalCliAuthStatus.mockReset()
+    mocks.startLocalCliAuthFlow.mockReset()
+    mocks.startCodexAppServerAuth.mockReset()
+    mocks.getCodexAppServerAuthStatus.mockReset()
+    mocks.refreshCodexAppServerAuthStatus.mockReset()
+    mocks.cancelCodexAppServerAuth.mockReset()
+    mocks.checkLocalCliAuthStatus.mockResolvedValue({
+      available: true,
+      authenticated: true,
+      authMethod: 'test',
+      message: 'Local CLI auth is active.',
+    })
+    mocks.startLocalCliAuthFlow.mockResolvedValue({
+      providerRegistryId: 'openai_codex',
+      started: true,
+      command: 'codex login --device-auth',
+      launchedInTerminal: true,
+      message: 'Local CLI auth flow opened in Terminal.',
+    })
+    mocks.startCodexAppServerAuth.mockResolvedValue({
+      providerRegistryId: 'openai_codex',
+      method: 'chatgpt_device_code',
+      status: 'authorization_required',
+      flowId: 'flow-1',
+      loginId: 'login-1',
+      verificationUrl: 'https://auth.openai.com/codex/device',
+      userCode: 'ABCD-EFGH',
+      startedAt: '2026-05-21T00:00:00.000Z',
+      expiresAt: '2026-05-21T00:10:00.000Z',
+      message: 'Open the authorization page and enter the displayed code to authorize OpenAI Codex.',
+    })
     process.env = { ...originalEnv }
     delete process.env.SKILL_MALL_PROVIDER
     delete process.env.SKILL_MALL_MODEL
     delete process.env.OPENAI_API_KEY
     delete process.env.BIFROST_VIRTUAL_KEY
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'skillmall-provider-home-'))
+    tempHomes.push(tempHome)
+    process.env.HOME = tempHome
+    process.env.SKILL_MALL_CONFIG_PATH = path.join(tempHome, '.skill-mall', 'config.json')
+    process.env.SKILL_MALL_SECRETS_PATH = path.join(os.tmpdir(), `skillmall-provider-secrets-${Date.now()}-${Math.random()}.json`)
+    process.env.SKILL_MALL_SECRETS_KEY_PATH = path.join(os.tmpdir(), `skillmall-provider-secrets-${Date.now()}-${Math.random()}.key`)
     vi.stubGlobal('fetch', vi.fn())
   })
 
   afterEach(() => {
+    const secretsPath = process.env.SKILL_MALL_SECRETS_PATH
+    const secretsKeyPath = process.env.SKILL_MALL_SECRETS_KEY_PATH
     vi.doUnmock('@/lib/llm/router/config')
     process.env = { ...originalEnv }
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+    for (const file of [secretsPath, secretsKeyPath]) {
+      if (!file) continue
+      try {
+        fs.unlinkSync(file)
+      } catch {}
+    }
     while (tempDbs.length > 0) {
       const entry = tempDbs.pop()
       if (!entry) continue
@@ -78,6 +142,13 @@ describe('provider API routes', () => {
           fs.unlinkSync(entry.file + suffix)
         } catch {}
       }
+    }
+    while (tempHomes.length > 0) {
+      const dir = tempHomes.pop()
+      if (!dir) continue
+      try {
+        fs.rmSync(dir, { recursive: true, force: true })
+      } catch {}
     }
   })
 
@@ -362,6 +433,129 @@ describe('provider API routes', () => {
     expect(JSON.stringify(json)).not.toContain('/Users/test/.skill-mall/config.json')
   })
 
+  it('configure stores API access credentials in encrypted app-managed storage without echoing values', async () => {
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'openai',
+      providerRegistryId: 'openai',
+      executionKind: 'direct',
+      model: 'gpt-5-mini',
+      authMode: 'env_key',
+      gatewayBackend: 'direct',
+      baseURL: null,
+      routingPolicyId: null,
+      secretRef: { type: 'stored_api_key', id: 'provider:openai:api_key' },
+      path: '/Users/test/.skill-mall/config.json',
+    })
+
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai',
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        configMode: 'api_key',
+        apiKey: 'sk-skillmall-app-managed-test-secret',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      success: true,
+      persisted: true,
+      providerRegistryId: 'openai',
+      provider: 'openai',
+      authMode: 'env_key',
+      secretRef: { type: 'stored_api_key', id: 'provider:openai:api_key' },
+      secretStatus: {
+        type: 'stored_api_key',
+        id: 'provider:openai:api_key',
+        valuePresent: true,
+        source: 'encrypted_local_store',
+      },
+    })
+    expect(mocks.writeProviderConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        providerRegistryId: 'openai',
+        authMode: 'env_key',
+        secretRef: { type: 'stored_api_key', id: 'provider:openai:api_key' },
+      })
+    )
+    expect(JSON.stringify(json)).not.toContain('sk-skillmall-app-managed-test-secret')
+    expect(fs.readFileSync(process.env.SKILL_MALL_SECRETS_PATH!, 'utf-8')).not.toContain(
+      'sk-skillmall-app-managed-test-secret'
+    )
+  })
+
+  it('configure removes a new app-managed API key if provider config persistence fails', async () => {
+    mocks.writeProviderConfig.mockRejectedValue(new Error('config write failed'))
+
+    const { POST } = await import('../configure/route')
+    const { storedSecretValuePresentSync } = await import('@/lib/providers/secret-store')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai',
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        configMode: 'api_key',
+        apiKey: 'sk-cleanup-on-failure-test-secret',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json).toMatchObject({
+      error: 'invalid_provider_config',
+      message: 'config write failed',
+    })
+    expect(storedSecretValuePresentSync('provider:openai:api_key')).toBe(false)
+  })
+
+  it('configure deletes app-managed API credentials without returning credential values', async () => {
+    mocks.writeProviderConfig.mockResolvedValue({
+      provider: 'openai',
+      providerRegistryId: 'openai',
+      executionKind: 'direct',
+      model: 'gpt-5-mini',
+      authMode: 'env_key',
+      gatewayBackend: 'direct',
+      secretRef: { type: 'stored_api_key', id: 'provider:openai:api_key' },
+      path: '/Users/test/.skill-mall/config.json',
+    })
+
+    const { POST } = await import('../configure/route')
+    await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai',
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        configMode: 'api_key',
+        apiKey: 'sk-delete-me-test-secret',
+      }) as never
+    )
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai',
+        action: 'delete_credential',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      success: true,
+      credentialDeleted: true,
+      providerRegistryId: 'openai',
+      secretStatus: {
+        type: 'stored_api_key',
+        id: 'provider:openai:api_key',
+        valuePresent: false,
+      },
+    })
+    expect(JSON.stringify(json)).not.toContain('sk-delete-me-test-secret')
+  })
+
   it('configure stores gateway_virtual_key_ref executable provider config', async () => {
     mocks.writeProviderConfig.mockResolvedValue({
       provider: 'openai',
@@ -410,6 +604,15 @@ describe('provider API routes', () => {
   it('configure stores local_cli_session and none_local executable provider config safely', async () => {
     mocks.writeProviderConfig
       .mockResolvedValueOnce({
+        provider: 'codex',
+        providerRegistryId: 'openai_codex',
+        executionKind: 'direct',
+        model: 'gpt-5.1',
+        authMode: 'local_cli_session',
+        gatewayBackend: 'direct',
+        secretRef: { type: 'none' },
+      })
+      .mockResolvedValueOnce({
         provider: 'claude-code',
         providerRegistryId: 'claude_code',
         executionKind: 'direct',
@@ -429,6 +632,15 @@ describe('provider API routes', () => {
       })
 
     const { POST } = await import('../configure/route')
+    const codexResponse = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai_codex',
+        provider: 'codex',
+        model: 'gpt-5.1',
+        configMode: 'local_cli_session',
+        secretRef: { type: 'none' },
+      }) as never
+    )
     const claudeResponse = await POST(
       postRequest('http://localhost/api/providers/configure', {
         providerRegistryId: 'claude_code',
@@ -448,6 +660,15 @@ describe('provider API routes', () => {
       }) as never
     )
 
+    expect(codexResponse.status).toBe(200)
+    expect(await codexResponse.json()).toMatchObject({
+      persisted: true,
+      provider: 'codex',
+      providerRegistryId: 'openai_codex',
+      authMode: 'local_cli_session',
+      secretRef: { type: 'none' },
+      secretStatus: { type: 'none', valuePresent: true },
+    })
     expect(claudeResponse.status).toBe(200)
     expect(await claudeResponse.json()).toMatchObject({
       persisted: true,
@@ -455,6 +676,8 @@ describe('provider API routes', () => {
       secretRef: { type: 'none' },
       secretStatus: { type: 'none', valuePresent: true },
     })
+    expect(mocks.checkLocalCliAuthStatus).toHaveBeenCalledWith('openai_codex')
+    expect(mocks.checkLocalCliAuthStatus).toHaveBeenCalledWith('claude_code')
     expect(ollamaResponse.status).toBe(200)
     expect(await ollamaResponse.json()).toMatchObject({
       persisted: true,
@@ -462,6 +685,215 @@ describe('provider API routes', () => {
       secretRef: { type: 'none' },
       secretStatus: { type: 'none', valuePresent: true },
     })
+  })
+
+  it('configure rejects local auth-token providers when the local CLI auth is not active', async () => {
+    mocks.checkLocalCliAuthStatus.mockResolvedValue({
+      available: true,
+      authenticated: false,
+      message: 'Codex login is not active.',
+    })
+
+    const { POST } = await import('../configure/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/configure', {
+        providerRegistryId: 'openai_codex',
+        provider: 'codex',
+        model: 'gpt-5.1',
+        configMode: 'local_cli_session',
+        secretRef: { type: 'none' },
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json).toMatchObject({
+      error: 'missing_local_auth',
+      localCliAuth: {
+        available: true,
+        authenticated: false,
+      },
+    })
+    expect(mocks.writeProviderConfig).not.toHaveBeenCalled()
+  })
+
+  it('starts the OpenAI Codex official local auth flow without accepting raw tokens', async () => {
+    mocks.checkLocalCliAuthStatus.mockResolvedValue({
+      available: true,
+      authenticated: false,
+      message: 'Codex login is not active.',
+    })
+    mocks.startLocalCliAuthFlow.mockResolvedValue({
+      providerRegistryId: 'openai_codex',
+      started: true,
+      command: 'codex login --device-auth',
+      launchedInTerminal: true,
+      message: 'Local CLI auth flow opened in Terminal.',
+    })
+
+    const { POST } = await import('../connect/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/connect', {
+        providerRegistryId: 'openai_codex',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      providerRegistryId: 'openai_codex',
+      status: 'auth_flow_started',
+      authFlow: {
+        started: true,
+        command: 'codex login --device-auth',
+        launchedInTerminal: true,
+      },
+      localCliAuth: {
+        available: true,
+        authenticated: false,
+      },
+    })
+    expect(mocks.startLocalCliAuthFlow).toHaveBeenCalledWith('openai_codex')
+  })
+
+  it('starts OpenAI Codex app-server auth and returns the authorization object', async () => {
+    const { POST } = await import('../auth/start/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/auth/start', {
+        providerRegistryId: 'openai_codex',
+        method: 'chatgpt_device_code',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      session: {
+        providerRegistryId: 'openai_codex',
+        method: 'chatgpt_device_code',
+        status: 'authorization_required',
+        flowId: 'flow-1',
+        loginId: 'login-1',
+        verificationUrl: 'https://auth.openai.com/codex/device',
+        userCode: 'ABCD-EFGH',
+      },
+    })
+    expect(mocks.startCodexAppServerAuth).toHaveBeenCalledWith('chatgpt_device_code')
+    expect(JSON.stringify(json)).not.toContain('platform.openai.com/api-keys')
+  })
+
+  it('reports OpenAI Codex app-server auth status by flow id', async () => {
+    mocks.refreshCodexAppServerAuthStatus.mockResolvedValue({
+      providerRegistryId: 'openai_codex',
+      method: 'chatgpt_device_code',
+      status: 'ready',
+      flowId: 'flow-1',
+      loginId: 'login-1',
+      verificationUrl: 'https://auth.openai.com/codex/device',
+      userCode: 'ABCD-EFGH',
+      startedAt: '2026-05-21T00:00:00.000Z',
+      expiresAt: '2026-05-21T00:10:00.000Z',
+      message: 'Codex account authorization completed.',
+    })
+
+    const { GET } = await import('../auth/[flowId]/status/route')
+    const response = await GET(
+      new Request('http://localhost/api/providers/auth/flow-1/status') as never,
+      { params: Promise.resolve({ flowId: 'flow-1' }) }
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      session: {
+        providerRegistryId: 'openai_codex',
+        status: 'ready',
+        flowId: 'flow-1',
+      },
+    })
+    expect(mocks.refreshCodexAppServerAuthStatus).toHaveBeenCalledWith('flow-1')
+  })
+
+  it('cancels OpenAI Codex app-server auth by flow id', async () => {
+    mocks.cancelCodexAppServerAuth.mockResolvedValue({
+      providerRegistryId: 'openai_codex',
+      method: 'chatgpt_device_code',
+      status: 'cancelled',
+      flowId: 'flow-1',
+      loginId: 'login-1',
+      startedAt: '2026-05-21T00:00:00.000Z',
+      expiresAt: '2026-05-21T00:10:00.000Z',
+      message: 'Codex authorization cancelled.',
+    })
+
+    const { POST } = await import('../auth/[flowId]/cancel/route')
+    const response = await POST(
+      new Request('http://localhost/api/providers/auth/flow-1/cancel', { method: 'POST' }) as never,
+      { params: Promise.resolve({ flowId: 'flow-1' }) }
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      session: {
+        providerRegistryId: 'openai_codex',
+        status: 'cancelled',
+        flowId: 'flow-1',
+      },
+    })
+    expect(mocks.cancelCodexAppServerAuth).toHaveBeenCalledWith('flow-1')
+  })
+
+  it('starts the Claude Code auth flow as a local session connection path', async () => {
+    mocks.checkLocalCliAuthStatus.mockResolvedValue({
+      available: true,
+      authenticated: false,
+      message: 'Claude Code auth is not active.',
+    })
+    mocks.startLocalCliAuthFlow.mockResolvedValue({
+      providerRegistryId: 'claude_code',
+      started: true,
+      command: 'claude auth login',
+      launchedInTerminal: true,
+      message: 'Local CLI auth flow opened in Terminal.',
+    })
+
+    const { POST } = await import('../connect/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/connect', {
+        providerRegistryId: 'claude_code',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      providerRegistryId: 'claude_code',
+      status: 'auth_flow_started',
+      authFlow: {
+        started: true,
+        command: 'claude auth login',
+      },
+    })
+    expect(mocks.startLocalCliAuthFlow).toHaveBeenCalledWith('claude_code')
+  })
+
+  it('local auth connect rejects raw credential material', async () => {
+    const { POST } = await import('../connect/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/connect', {
+        providerRegistryId: 'openai_codex',
+        token: 'never-accept-this',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json).toMatchObject({
+      error: 'raw_secret_field_rejected',
+      rejectedFields: ['token'],
+    })
+    expect(mocks.startLocalCliAuthFlow).not.toHaveBeenCalled()
   })
 
   it('configure accepts custom OpenAI-compatible metadata without widening executable providers', async () => {
@@ -730,7 +1162,6 @@ describe('provider API routes', () => {
     const response = await POST(
       postRequest('http://localhost/api/providers/test', {
         providerRegistryId: 'openai',
-        prompt: 'do not persist me',
       }) as never
     )
     const json = await response.json()
@@ -747,6 +1178,71 @@ describe('provider API routes', () => {
       },
     })
     expect(JSON.stringify(json)).not.toContain('test-route-secret')
+    expect(JSON.stringify(json)).not.toContain('prompt body')
+    expect(JSON.stringify(json)).not.toContain('response body')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('provider test route checks local CLI auth before the local session provider is active', async () => {
+    mocks.checkLocalCliAuthStatus.mockResolvedValue({
+      available: true,
+      authenticated: true,
+      authMethod: 'ChatGPT',
+      message: 'Logged in using ChatGPT',
+    })
+
+    const { POST } = await import('../test/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/test', {
+        providerRegistryId: 'openai_codex',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toMatchObject({
+      providerRegistryId: 'openai_codex',
+      configured: false,
+      status: 'ready',
+      localCliAuth: {
+        available: true,
+        authenticated: true,
+        authMethod: 'ChatGPT',
+      },
+    })
+  })
+
+  it('provider test route rejects prompt fields as invalid status-test input', async () => {
+    const { POST } = await import('../test/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/test', {
+        providerRegistryId: 'openai',
+        prompt: 'do not persist me',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toBe('invalid_input')
+    expect(JSON.stringify(json)).not.toContain('do not persist me')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('provider test route rejects raw secret fields before strict schema parsing', async () => {
+    const { POST } = await import('../test/route')
+    const response = await POST(
+      postRequest('http://localhost/api/providers/test', {
+        providerRegistryId: 'openai',
+        prompt: 'do not persist me',
+        apiKey: 'raw-test-secret',
+      }) as never
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toBe('raw_secret_field_rejected')
+    expect(json.rejectedFields).toContain('apiKey')
+    expect(JSON.stringify(json)).not.toContain('raw-test-secret')
     expect(JSON.stringify(json)).not.toContain('do not persist me')
     expect(fetch).not.toHaveBeenCalled()
   })

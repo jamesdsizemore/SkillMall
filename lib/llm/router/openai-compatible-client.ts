@@ -2,6 +2,7 @@ import { ConfigError, type CompletionOptions, type ProviderConfig } from '../../
 import type { GatewayBackedLLMClient } from './gateway-client'
 import type { GatewayCompletionResult, GatewayUsageMetadata } from './gateway-adapter'
 import { resolveEnvSecret } from './secret-refs'
+import { readStoredApiKeySync } from '../../providers/secret-store'
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -63,8 +64,16 @@ function costFromResponse(data: OpenAICompatibleResponse, headers: Headers): num
 
 function resolveApiKey(config: ProviderConfig): string {
   if (config.apiKey) return config.apiKey
-  if (config.authMode !== 'env_key' || config.secretRef?.type !== 'env') {
-    throw new ConfigError('OpenAI-compatible registry execution requires env_key auth with an env secret ref')
+  if (config.authMode !== 'env_key') {
+    throw new ConfigError('OpenAI-compatible registry execution requires env_key auth with an API credential ref')
+  }
+  if (config.secretRef?.type === 'stored_api_key') {
+    const value = readStoredApiKeySync(config.secretRef.id)
+    if (!value) throw new ConfigError(`Missing stored API key: ${config.secretRef.id}`)
+    return value
+  }
+  if (config.secretRef?.type !== 'env') {
+    throw new ConfigError('OpenAI-compatible registry execution requires env_key auth with an API credential ref')
   }
 
   const value = resolveEnvSecret(config.secretRef.name)

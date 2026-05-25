@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const baseConfig = resolveRouterProviderConfig()
+    const baseConfig = resolveRouterProviderConfig({ preferStoredConfig: true })
     const result = simulateRoutingPolicyDecision({
       baseConfig,
       policy,

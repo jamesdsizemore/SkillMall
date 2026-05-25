@@ -20,7 +20,7 @@ import type { ProviderRegistryID } from '../../providers/types'
 
 export const ROUTER_USER_CONFIG_PATH = path.join(os.homedir(), '.skill-mall', 'config.json')
 
-const PROVIDER_IDS: ProviderID[] = ['openai', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama']
+const PROVIDER_IDS: ProviderID[] = ['openai', 'codex', 'anthropic', 'claude-code', 'gemini', 'groq', 'ollama']
 
 const API_ENV_BY_PROVIDER: Partial<Record<ProviderID, string>> = {
   openai: 'OPENAI_API_KEY',
@@ -57,11 +57,16 @@ export interface ResolvedRouterProviderConfig extends RouterProviderConfig {
   warnings: string[]
 }
 
+export type ResolveRouterProviderConfigOptions = {
+  preferStoredConfig?: boolean
+}
+
 function isProviderID(value: string | undefined): value is ProviderID {
   return Boolean(value && (PROVIDER_IDS as string[]).includes(value))
 }
 
 export function defaultAuthModeForProvider(provider: ProviderID): LLMAuthMode {
+  if (provider === 'codex') return 'local_cli_session'
   if (provider === 'claude-code') return 'local_cli_session'
   if (provider === 'ollama') return 'none_local'
   return 'env_key'
@@ -72,10 +77,15 @@ export function defaultSecretRefForProvider(provider: ProviderID): SecretRef | u
   return envName ? { type: 'env', name: envName } : undefined
 }
 
+function routerUserConfigPath(): string {
+  return process.env.SKILL_MALL_CONFIG_PATH ?? ROUTER_USER_CONFIG_PATH
+}
+
 function readConfigFile(): RouterConfigFile | undefined {
-  if (!fs.existsSync(ROUTER_USER_CONFIG_PATH)) return undefined
+  const configPath = routerUserConfigPath()
+  if (!fs.existsSync(configPath)) return undefined
   try {
-    return JSON.parse(fs.readFileSync(ROUTER_USER_CONFIG_PATH, 'utf-8')) as RouterConfigFile
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8')) as RouterConfigFile
   } catch {
     throw new ConfigError(
       `~/.skill-mall/config.json is malformed JSON. Run: npx skill-mall configure`
@@ -111,40 +121,35 @@ function resolveAuthAndSecret(
   }
 }
 
-export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
-  const envProvider = process.env.SKILL_MALL_PROVIDER
-  const envModel = process.env.SKILL_MALL_MODEL
-
-  if (envProvider) {
-    if (!isProviderID(envProvider)) {
-      throw new ConfigError(`Unknown LLM provider "${envProvider}". Run: npx skill-mall configure`)
-    }
-
-    const authMode = defaultAuthModeForProvider(envProvider)
-    const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(envProvider))
-    if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
-    const secretRef = validateSecretRefForAuthMode(
-      authMode,
-      authMode === 'env_key' ? defaultSecretRefForProvider(envProvider) : { type: 'none' }
-    )
-
-    return {
-      provider: envProvider,
-      providerRegistryId: providerRegistryIdForExecutableProvider(envProvider),
-      executionKind: 'direct',
-      model: envModel ?? DEFAULT_MODELS[envProvider],
-      authMode,
-      secretRef,
-      gatewayBackend: 'direct',
-      warnings: [],
-    }
+function resolveEnvProviderConfig(envProvider: string, envModel: string | undefined): ResolvedRouterProviderConfig {
+  if (!isProviderID(envProvider)) {
+    throw new ConfigError(`Unknown LLM provider "${envProvider}". Run: npx skill-mall configure`)
   }
 
-  const raw = readConfigFile()
-  if (!raw) {
-    throw new ConfigError('No LLM provider configured. Run: npx skill-mall configure')
-  }
+  const authMode = defaultAuthModeForProvider(envProvider)
+  const registryEntry = getProviderRegistryEntry(providerRegistryIdForExecutableProvider(envProvider))
+  if (registryEntry) assertAuthModeAllowedForProvider(registryEntry, authMode)
+  const secretRef = validateSecretRefForAuthMode(
+    authMode,
+    authMode === 'env_key' ? defaultSecretRefForProvider(envProvider) : { type: 'none' }
+  )
 
+  return {
+    provider: envProvider,
+    providerRegistryId: providerRegistryIdForExecutableProvider(envProvider),
+    executionKind: 'direct',
+    model: envModel ?? DEFAULT_MODELS[envProvider],
+    authMode,
+    secretRef,
+    gatewayBackend: 'direct',
+    warnings: [],
+  }
+}
+
+function resolveConfigFileProviderConfig(
+  raw: RouterConfigFile,
+  modelOverride: string | undefined
+): ResolvedRouterProviderConfig {
   if (!isProviderID(raw.provider)) {
     throw new ConfigError(
       `~/.skill-mall/config.json has an unknown provider. Run: npx skill-mall configure`
@@ -173,7 +178,7 @@ export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
       : gatewayBackend === 'bifrost_local'
         ? 'bifrost_local'
         : 'direct',
-    model: envModel ?? stored.model ?? raw.model ?? DEFAULT_MODELS[storedProvider],
+    model: modelOverride ?? stored.model ?? raw.model ?? DEFAULT_MODELS[storedProvider],
     authMode,
     secretRef,
     baseURL: stored.baseURL,
@@ -181,4 +186,25 @@ export function resolveRouterProviderConfig(): ResolvedRouterProviderConfig {
     routingPolicyId: stored.routingPolicyId,
     warnings,
   }
+}
+
+export function resolveRouterProviderConfig(
+  options: ResolveRouterProviderConfigOptions = {}
+): ResolvedRouterProviderConfig {
+  const envProvider = process.env.SKILL_MALL_PROVIDER
+  const envModel = process.env.SKILL_MALL_MODEL
+
+  if (options.preferStoredConfig) {
+    const raw = readConfigFile()
+    if (raw) return resolveConfigFileProviderConfig(raw, undefined)
+  }
+
+  if (envProvider) return resolveEnvProviderConfig(envProvider, envModel)
+
+  const raw = readConfigFile()
+  if (!raw) {
+    throw new ConfigError('No LLM provider configured. Run: npx skill-mall configure')
+  }
+
+  return resolveConfigFileProviderConfig(raw, envModel)
 }
